@@ -15,3 +15,6 @@ __pycache__/
 *.pyc
 *.pt
 *.onnx
+
+# Cache de la tabla Ciqual descargada por tools/catalog/build_catalog.py
+tools/catalog/.cache/

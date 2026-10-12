@@ -1,0 +1,155 @@
+id,es,en,synonyms,portion,code
+pan_blanco,Pan blanco,White bread,pan|barra|baguette,60,7001
+pan_integral,Pan integral,Wholemeal bread,pan integral|pan de centeno,60,7111
+arroz_blanco,Arroz blanco cocido,Cooked white rice,arroz|arroz blanco,200,9104
+arroz_integral,Arroz integral cocido,Cooked brown rice,arroz integral,200,9103
+arroz_basmati,Arroz basmati cocido,Cooked basmati rice,arroz basmati,200,9125
+pasta_cocida,Pasta cocida,Cooked pasta,espaguetis|macarrones|pasta,200,9811
+pasta_integral,Pasta integral cocida,Cooked wholemeal pasta,pasta integral,200,9871
+quinoa,Quinoa cocida,Cooked quinoa,quinoa,150,9341
+avena,Copos de avena,Oat flakes,avena|copos de avena,40,32140
+copos_maiz,Copos de maiz,Corn flakes,copos de maiz|corn flakes,30,32005
+muesli,Muesli,Muesli,muesli,40,32004
+patata_cocida,Patata cocida,Boiled potato,patata|papa,150,4003
+patata_frita,Patatas fritas de bolsa,Crisps,patatas fritas|chips,30,4004
+pure_patata,Pure de patata,Mashed potato,pure de patata,200,4047
+boniato,Boniato,Sweet potato,boniato|batata,150,4101
+lentejas,Lentejas cocidas,Cooked lentils,lentejas,200,20505
+garbanzos,Garbanzos cocidos,Cooked chickpeas,garbanzos,200,20507
+judias_blancas,Judias blancas cocidas,Cooked white beans,judias blancas|alubias,200,20502
+judias_pintas,Judias pintas cocidas,Cooked kidney beans,judias pintas,200,20503
+guisantes,Guisantes cocidos,Cooked peas,guisantes|arvejas,150,20037
+habas,Habas cocidas,Cooked broad beans,habas,150,20500
+judia_verde,Judia verde cocida,Cooked green beans,judia verde|ejotes,150,20320
+hummus,Hummus,Hummus,hummus,100,25621
+soja,Soja,Soybean,soja,150,20901
+tomate,Tomate,Tomato,tomate,150,20047
+tomate_cherry,Tomate cherry,Cherry tomato,tomate cherry,100,20172
+lechuga,Lechuga,Lettuce,lechuga,100,20031
+cebolla,Cebolla,Onion,cebolla,100,20034
+ajo,Ajo,Garlic,ajo,5,11000
+zanahoria,Zanahoria,Carrot,zanahoria,100,20009
+pimiento_rojo,Pimiento rojo,Red pepper,pimiento rojo,100,20087
+pimiento_verde,Pimiento verde,Green pepper,pimiento verde,100,20085
+calabacin,Calabacin,Courgette,calabacin|zucchini,150,20020
+berenjena,Berenjena,Aubergine,berenjena,150,20053
+pepino,Pepino,Cucumber,pepino,100,20019
+brocoli,Brocoli,Broccoli,brocoli,150,20057
+coliflor,Coliflor,Cauliflower,coliflor,150,20016
+espinacas,Espinacas,Spinach,espinacas,150,20059
+champinon,Champinon,Mushroom,champinon|setas,150,20056
+maiz_dulce,Maiz dulce,Sweet corn,maiz dulce,100,20066
+calabaza,Calabaza,Pumpkin,calabaza,150,20044
+puerro,Puerro,Leek,puerro,100,20039
+alcachofa,Alcachofa,Artichoke,alcachofa,150,20052
+esparragos,Esparragos,Asparagus,esparragos,150,20279
+aguacate,Aguacate,Avocado,aguacate,100,13004
+aceitunas,Aceitunas,Olives,aceitunas,30,13032
+remolacha,Remolacha,Beetroot,remolacha|betabel,100,20091
+apio,Apio,Celery,apio,100,20023
+repollo,Repollo,Cabbage,repollo|col,100,20069
+col_lombarda,Col lombarda,Red cabbage,col lombarda,100,20014
+acelgas,Acelgas,Swiss chard,acelgas,150,20004
+nabos,Nabos,Turnip,nabos,150,20064
+manzana,Manzana,Apple,manzana,150,13050
+platano,Platano,Banana,platano|banana,120,13005
+naranja,Naranja,Orange,naranja,150,13034
+mandarina,Mandarina,Mandarin,mandarina|clementina,100,13024
+pera,Pera,Pear,pera,150,13037
+uva,Uva,Grape,uva|uvas,100,13112
+fresa,Fresa,Strawberry,fresa|freson,150,13014
+sandia,Sandia,Watermelon,sandia,200,13036
+melon,Melon,Melon,melon,200,13742
+kiwi,Kiwi,Kiwi,kiwi,100,13021
+pina,Pina,Pineapple,pina|ananas,120,13002
+melocoton,Melocoton,Peach,melocoton|durazno,150,13043
+albaricoque,Albaricoque,Apricot,albaricoque|damasco,150,13000
+ciruela,Ciruela,Plum,ciruela,150,13100
+cereza,Cereza,Cherry,cereza|cerezas,100,13008
+mango,Mango,Mango,mango,150,13025
+higo,Higo,Fig,higo,100,13012
+granada,Granada,Pomegranate,granada,150,13018
+limon,Limon,Lemon,limon,30,13009
+datil,Datil,Date,datil|datiles,30,13011
+pasas,Pasas,Raisins,pasas|uvas pasas,30,13046
+frambuesa,Frambuesa,Raspberry,frambuesa,100,13015
+arandano,Arandano,Blueberry,arandano|arandanos,100,13028
+pomelo,Pomelo,Grapefruit,pomelo,150,13040
+nectarina,Nectarina,Nectarine,nectarina,150,13030
+papaya,Papaya,Papaya,papaya,150,13035
+leche_entera,Leche entera,Whole milk,leche entera,200,19023
+leche_semidesnatada,Leche semidesnatada,Semi-skimmed milk,leche semidesnatada,200,19041
+leche_desnatada,Leche desnatada,Skimmed milk,leche desnatada,200,19050
+yogur_natural,Yogur natural,Plain yoghurt,yogur natural,125,19600
+yogur_griego,Yogur griego,Greek yoghurt,yogur griego,125,19860
+yogur_frutas,Yogur de frutas,Fruit yoghurt,yogur de frutas,125,19628
+queso_fresco,Queso fresco,Fresh cheese,queso fresco|requeson,60,19641
+queso_curado,Queso curado,Hard cheese,queso curado|queso manchego,40,12100
+mozzarella,Mozzarella,Mozzarella,mozzarella,60,19590
+petit_suisse,Petit suisse,Fromage frais,petit suisse|queso batido,60,19664
+nata,Nata,Cream,nata|crema de leche,30,19402
+mantequilla,Mantequilla,Butter,mantequilla,15,16400
+flan,Flan,Flan,flan,120,19674
+natillas,Natillas,Custard,natillas,120,39229
+huevo,Huevo,Egg,huevo|huevos,60,22000
+pollo_pechuga,Pechuga de pollo,Chicken breast,pechuga de pollo,150,36017
+pollo_muslo,Muslo de pollo,Chicken thigh,muslo de pollo,150,36024
+ternera,Ternera,Beef,ternera|vacuno,150,6101
+cerdo,Cerdo,Pork,cerdo,150,28100
+pavo,Pavo,Turkey,pavo,150,36301
+atun,Atun en conserva,Canned tuna,atun,60,26039
+salmon,Salmon,Salmon,salmon,150,25996
+sardina,Sardina en conserva,Canned sardine,sardina,60,26034
+gambas,Gambas,Prawns,gambas|langostinos,100,10007
+jamon_serrano,Jamon serrano,Dry-cured ham,jamon serrano|jamon,40,28845
+jamon_cocido,Jamon cocido,Cooked ham,jamon cocido|jamon de york,50,28910
+chorizo,Chorizo,Chorizo,chorizo,30,30316
+tortilla_patatas,Tortilla de patatas,Spanish omelette,tortilla|tortilla de patatas,150,22510
+tortilla_francesa,Tortilla francesa,Plain omelette,tortilla francesa|omelette,120,22509
+paella,Paella,Paella,paella,300,25031
+gazpacho,Gazpacho,Gazpacho,gazpacho,250,25967
+croquetas,Croquetas,Croquettes,croquetas,100,26028
+pizza,Pizza,Pizza,pizza,250,25516
+lasana,Lasana,Lasagna,lasana|lasagna,300,25081
+canelones,Canelones,Cannelloni,canelones,300,25081
+espaguetis_bolonesa,Espaguetis a la bolonesa,Spaghetti bolognese,espaguetis bolonesa|bolonesa,300,25085
+sopa_fideos,Sopa de fideos,Noodle soup,sopa de fideos|sopa,300,25908
+crema_verduras,Crema de verduras,Vegetable soup,crema de verduras|sopa de verduras,300,25962
+fabada,Fabada,Fabada,fabada|potaje de alubias,300,25098
+pisto,Pisto,Ratatouille,pisto|ratatouille,200,25018
+empanadilla,Empanadilla,Ham and cheese puff pastry,empanadilla|empanada,100,25508
+sandwich_mixto,Sandwich mixto,Ham and cheese sandwich,sandwich mixto|bocadillo,180,25547
+hamburguesa,Hamburguesa,Hamburger,hamburguesa,200,25413
+arroz_leche,Arroz con leche,Rice pudding,arroz con leche,150,39212
+chocolate_negro,Chocolate negro,Dark chocolate,chocolate negro,30,31005
+chocolate_leche,Chocolate con leche,Milk chocolate,chocolate con leche,30,31004
+chocolate_blanco,Chocolate blanco,White chocolate,chocolate blanco,30,31010
+crema_cacao,Crema de cacao,Chocolate spread,crema de cacao|nocilla,20,31032
+galletas,Galletas,Biscuits,galletas|galletas maria,30,24000
+galleta_chocolate,Galleta de chocolate,Chocolate biscuit,galleta de chocolate,30,24017
+croissant,Croissant,Croissant,croissant|bollo,60,7602
+magdalena,Magdalena,Muffin,magdalena|muffin,60,23950
+bizcocho,Bizcocho,Sponge cake,bizcocho|tarta,60,23080
+brioche,Brioche,Brioche,brioche|suizo,60,7745
+donut,Donut,Doughnut,donut|rosquilla,60,23880
+tarta_queso,Tarta de queso,Cheesecake,tarta de queso|cheesecake,100,19689
+helado,Helado,Ice cream,helado,100,39515
+azucar,Azucar,Sugar,azucar,10,31016
+miel,Miel,Honey,miel,20,31008
+mermelada,Mermelada,Jam,mermelada,20,31062
+turron,Turron,Nougat,turron,30,31033
+nueces,Nueces,Walnuts,nueces,30,15005
+almendras,Almendras,Almonds,almendras,30,15041
+avellanas,Avellanas,Hazelnuts,avellanas,30,15004
+cacahuetes,Cacahuetes,Peanuts,cacahuetes|mani,30,15001
+tomate_frito,Tomate frito,Tomato sauce,tomate frito|salsa de tomate,30,20170
+mayonesa,Mayonesa,Mayonnaise,mayonesa,15,11054
+ketchup,Ketchup,Ketchup,ketchup,15,11008
+aceite_oliva,Aceite de oliva,Olive oil,aceite de oliva,10,17270
+aceite_girasol,Aceite de girasol,Sunflower oil,aceite de girasol,10,17440
+zumo_naranja,Zumo de naranja,Orange juice,zumo de naranja,200,2070
+zumo_manzana,Zumo de manzana,Apple juice,zumo de manzana,200,2074
+zumo_pina,Zumo de pina,Pineapple juice,zumo de pina,200,2073
+limonada,Limonada,Lemonade,limonada,250,18010
+refresco_cola,Refresco de cola,Cola,refresco de cola|coca cola,330,18018
+cerveza,Cerveza,Beer,cerveza,330,5001

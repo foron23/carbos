@@ -32,7 +32,7 @@ TRAIN_ARGS ?=
 EXPORT_ARGS ?=
 
 .PHONY: help setup install build test e2e lint format format-check check run dev clean \
-        train-setup train train-smoke export-model
+        train-setup train train-smoke export-model catalog
 
 ## help: Show this help
 help:
@@ -182,6 +182,10 @@ train-smoke:
 ## export-model: Exporta a ONNX int8 y escribe el manifest del clasificador
 export-model:
 	$(PYTHON) training/export_onnx.py --model $(TRAIN_OUT)/model.pt --out $(TRAIN_OUT) $(EXPORT_ARGS)
+
+## catalog: Regenera src/catalog/catalog.ts desde Ciqual 2020 (tools/catalog/build_catalog.py)
+catalog:
+	$(PYTHON) tools/catalog/build_catalog.py
 
 ## clean: Remove build artifacts and caches
 clean:

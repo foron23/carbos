@@ -1,0 +1,8 @@
+# Dependencias del entrenamiento (cabeza nueva). Ver docs/specs/08-linear-probe.md.
+# Recomendado: Python 3.11 o 3.12 (torch suele tardar en publicar wheels para versiones muy nuevas).
+torch>=2.2
+torchvision>=0.17
+onnx>=1.16
+onnxruntime>=1.18
+numpy>=1.26
+Pillow>=10.0

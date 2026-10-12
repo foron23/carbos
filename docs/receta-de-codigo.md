@@ -20,6 +20,7 @@ se invocan herramientas sueltas (`npx`, `vitest`, `tsc`) si existe un target.
 | `make train-smoke`  | Prueba el pipeline de entrenamiento sin datos (dry-run)                                                    |
 | `make train`        | Entrena la cabeza nueva (linear probe) sobre el set propio                                                 |
 | `make export-model` | Exporta a ONNX int8 y escribe el manifest del clasificador                                                 |
+| `make catalog`      | Regenera `src/catalog/catalog.ts` desde Ciqual 2020 (`tools/catalog/build_catalog.py`)                     |
 | `make clean`        | Borra `dist/` y caches                                                                                     |
 
 > El entrenamiento es **dev time**: sus datos y pesos no entran al bundle ni al repo
@@ -40,6 +41,7 @@ src/
   style.css
 e2e/           Arnés E2E (Puppeteer + Firefox headless) y escenarios.
 training/      Entrenamiento (dev time): linear_probe.py, export_onnx.py, requirements.txt.
+tools/catalog/ Generador del catalogo (selection.csv + build_catalog.py; cache en .cache/).
 public/        manifest.webmanifest, sw.js, icon.svg (PWA minima)
 docs/          specs/ (roadmap, fase 1, despliegue, spike BEDCA, benchmark, runtime, fine-tuning, linear probe), decisiones.md, esta receta.
 ```
