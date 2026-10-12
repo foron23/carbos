@@ -1,5 +1,11 @@
 const CACHE = 'carbos-__BUILD__';
-const APP_SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
+const APP_SHELL = [
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './manifest.en.webmanifest',
+  './icon.svg',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

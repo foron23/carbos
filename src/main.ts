@@ -129,8 +129,8 @@ app.innerHTML = `
   <fieldset class="card hero daybar">
     <legend data-i18n="section.today"></legend>
     <p class="hero-figure">
-      <output id="day-total" class="total" aria-live="polite">0 g</output>
-      <span class="chip"><span data-i18n="diary.week"></span>: <output id="week-total">0 g</output></span>
+      <output id="day-total" class="total" aria-live="polite"></output>
+      <span class="chip"><span data-i18n="diary.week"></span>: <output id="week-total"></output></span>
     </p>
     <label for="date" data-i18n="field.date"></label>
     <div class="row daynav">
@@ -169,7 +169,7 @@ app.innerHTML = `
     <ul id="search-results" class="results"></ul>
     <h3 data-i18n="draft.items"></h3>
     <ul id="draft-items" class="draft"></ul>
-    <p><span data-i18n="label.total"></span>: <output id="draft-total" aria-live="polite">0 g</output></p>
+    <p><span data-i18n="label.total"></span>: <output id="draft-total" aria-live="polite"></output></p>
     <p><button id="register" type="button" class="primary" data-i18n="button.register"></button></p>
     <p id="register-status" class="muted" aria-live="polite"></p>
     <p class="muted" data-i18n="text.estimateNote"></p>
@@ -244,6 +244,13 @@ function applyI18n(): void {
     if (key && isStringKey(key)) node.setAttribute('aria-label', tr(key));
   }
   document.documentElement.lang = locale;
+  document.title = tr('app.title');
+  const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
+  if (description) description.content = tr('app.tagline');
+  const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+  if (manifest) {
+    manifest.href = locale === 'en' ? './manifest.en.webmanifest' : './manifest.webmanifest';
+  }
 }
 
 function downloadText(filename: string, text: string, type: string): void {
