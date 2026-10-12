@@ -228,6 +228,22 @@ export const scenarios = [
         );
         assertEqual(sinTraducir.length, 0, `cadenas sin traducir en ${tag}: ${sinTraducir}`);
       }
+      // El modulo de insulina tambien sigue al idioma (fallo reportado).
+      await page.$$eval('details', (nodes) => nodes.forEach((node) => (node.open = true)));
+      await page.$eval('#insulin-toggle', (el) => el.click());
+      await page.waitForSelector('#ins-gate-accept', { timeout: 8000 });
+      await setValue(page, '#locale', 'es');
+      await waitForText(page, '#ins-gate-accept', 'Entiendo y la activo');
+      await setValue(page, '#locale', 'en');
+      await waitForText(page, '#ins-gate-accept', 'I understand, enable it');
+      await setValue(page, '#locale', 'es');
+      await waitForText(page, '#ins-gate-accept', 'Entiendo y la activo');
+      const gateSinTraducir = await page.$$eval(
+        '#insulin-host [data-i18n]',
+        (nodes) => nodes.filter((node) => (node.textContent ?? '').trim() === '').length,
+      );
+      assertEqual(gateSinTraducir, 0, 'la puerta de insulina sin cadenas vacias');
+
       await screenshot(page, 'idioma');
     },
   },
