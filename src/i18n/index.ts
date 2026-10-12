@@ -1,0 +1,218 @@
+export const STRINGS = {
+  es: {
+    'app.tagline': 'Cuenta carbohidratos. En tu dispositivo, y solo en tu dispositivo.',
+    'nav.language': 'Idioma',
+    'field.date': 'Fecha',
+    'label.total': 'Total',
+    'section.today': 'Hoy',
+    'section.diary': 'Registro',
+    'section.photo': 'Foto',
+    'section.addFood': 'Anadir comida',
+    'section.copy': 'Copia',
+    'section.settings': 'Ajustes',
+    'slot.breakfast': 'Desayuno',
+    'slot.lunch': 'Comida',
+    'slot.dinner': 'Cena',
+    'slot.snack': 'Snack',
+    'field.slot': 'Comida',
+    'field.food': 'Alimento',
+    'field.grams': 'Gramos',
+    'field.portion': 'Porcion',
+    'field.carbsPer100g': 'Carbohidratos por 100 g',
+    'field.search': 'Buscar en el catalogo',
+    'button.search': 'Buscar',
+    'button.register': 'Registrar',
+    'button.addItem': 'Anadir',
+    'button.remove': 'Quitar',
+    'button.clear': 'Vaciar',
+    'button.exportJson': 'Exportar JSON',
+    'button.exportEncrypted': 'Exportar cifrado',
+    'button.import': 'Importar',
+    'button.takePhoto': 'Hacer foto',
+    'button.chooseFile': 'Elegir fichero',
+    'button.persist': 'Pedir almacenamiento persistente',
+    'button.calc': 'Calcular',
+    'text.estimateNote': 'Estimacion. Revisa y ajusta los gramos.',
+    'text.photoNote': 'La imagen no sale del dispositivo. Se procesa en local.',
+    'photo.none': 'Sin foto. Puedes anadir alimentos a mano.',
+    'photo.ready': 'Foto lista para revisar.',
+    'diary.empty': 'Sin comidas registradas.',
+    'diary.week': 'Semana',
+    'diary.day': 'Dia',
+    'diary.meal': 'Comida',
+    'diary.originManual': 'Manual',
+    'diary.originPhoto': 'Foto',
+    'search.noResults': 'Sin resultados.',
+    'draft.empty': 'Ningun alimento en la comida.',
+    'draft.items': 'Alimentos de la comida',
+    'confidence.label': 'Confianza',
+    'unknown.food': 'Desconocido',
+    'unknown.note': 'Clase no reconocida. Elige del catalogo.',
+    'section.insulinLog': 'Registro de insulina',
+    'insulin.note': 'Solo registro de lo ya puesto. No se calcula nada aqui.',
+    'insulin.empty': 'Sin registros de insulina.',
+    'field.units': 'Unidades',
+    'field.time': 'Hora',
+    'field.kind': 'Tipo',
+    'kind.bolus': 'Bolo',
+    'kind.basal': 'Basal',
+    'button.addInsulin': 'Anadir registro',
+    'storage.notice': 'El navegador puede borrar los datos sin avisar. Exporta a menudo.',
+    'storage.granted': 'Almacenamiento persistente concedido.',
+    'storage.denied': 'El navegador no ha concedido almacenamiento persistente.',
+    'export.passwordPrompt': 'Contrasena para el export cifrado',
+    'export.passwordHint':
+      'Se usa Argon2id para derivar la clave. Guardala: sin ella no hay acceso.',
+    'export.done': 'Export creado.',
+    'export.imported': 'Import completado.',
+    'export.importFailed': 'No se pudo importar el fichero.',
+    'export.summary': 'Resumen',
+    'settings.insulinModule': 'Activar modulo de aritmetica de insulina (opt-in)',
+    'ui.insulinTitle': 'Aritmetica (tus numeros)',
+    'ui.insulinDisclaimer':
+      'Es la aritmetica que has pedido, con tus numeros. No es consejo medico ni un dispositivo medico. Revisa y ajusta con tu equipo medico.',
+    'ui.insulinRatio': 'Ratio (g por U)',
+    'ui.insulinCF': 'Factor correccion (mg/dL por U)',
+    'ui.insulinTarget': 'Objetivo (mg/dL)',
+    'ui.insulinCurrent': 'Glucosa actual (mg/dL)',
+    'ui.insulinCarbs': 'Carbohidratos (g)',
+    'ui.insulinIncomplete': 'Datos incompletos',
+    'ui.insulinMeal': 'Comida',
+    'ui.insulinCorrection': 'Correccion',
+    'unit.grams': 'g',
+    'unit.units': 'U',
+  },
+  en: {
+    'app.tagline': 'Count carbs. On your device, and only on your device.',
+    'nav.language': 'Language',
+    'field.date': 'Date',
+    'label.total': 'Total',
+    'section.today': 'Today',
+    'section.diary': 'Log',
+    'section.photo': 'Photo',
+    'section.addFood': 'Add food',
+    'section.copy': 'Backup',
+    'section.settings': 'Settings',
+    'slot.breakfast': 'Breakfast',
+    'slot.lunch': 'Lunch',
+    'slot.dinner': 'Dinner',
+    'slot.snack': 'Snack',
+    'field.slot': 'Meal',
+    'field.food': 'Food',
+    'field.grams': 'Grams',
+    'field.portion': 'Portion',
+    'field.carbsPer100g': 'Carbs per 100 g',
+    'field.search': 'Search the catalog',
+    'button.search': 'Search',
+    'button.register': 'Log it',
+    'button.addItem': 'Add',
+    'button.remove': 'Remove',
+    'button.clear': 'Clear',
+    'button.exportJson': 'Export JSON',
+    'button.exportEncrypted': 'Export encrypted',
+    'button.import': 'Import',
+    'button.takePhoto': 'Take photo',
+    'button.chooseFile': 'Choose file',
+    'button.persist': 'Request persistent storage',
+    'button.calc': 'Compute',
+    'text.estimateNote': 'Estimate. Review and adjust the grams.',
+    'text.photoNote': 'The image never leaves the device. It is processed locally.',
+    'photo.none': 'No photo. You can add foods by hand.',
+    'photo.ready': 'Photo ready to review.',
+    'diary.empty': 'No meals logged.',
+    'diary.week': 'Week',
+    'diary.day': 'Day',
+    'diary.meal': 'Meal',
+    'diary.originManual': 'Manual',
+    'diary.originPhoto': 'Photo',
+    'search.noResults': 'No results.',
+    'draft.empty': 'No food in this meal.',
+    'draft.items': 'Foods in this meal',
+    'confidence.label': 'Confidence',
+    'unknown.food': 'Unknown',
+    'unknown.note': 'Class not recognized. Pick from the catalog.',
+    'section.insulinLog': 'Insulin log',
+    'insulin.note': 'Only a record of what was already taken. Nothing is computed here.',
+    'insulin.empty': 'No insulin records.',
+    'field.units': 'Units',
+    'field.time': 'Time',
+    'field.kind': 'Type',
+    'kind.bolus': 'Bolus',
+    'kind.basal': 'Basal',
+    'button.addInsulin': 'Add record',
+    'storage.notice': 'The browser may delete the data without warning. Export often.',
+    'storage.granted': 'Persistent storage granted.',
+    'storage.denied': 'The browser did not grant persistent storage.',
+    'export.passwordPrompt': 'Password for the encrypted export',
+    'export.passwordHint': 'Argon2id derives the key. Keep it: without it there is no access.',
+    'export.done': 'Export created.',
+    'export.imported': 'Import done.',
+    'export.importFailed': 'Could not import the file.',
+    'export.summary': 'Summary',
+    'settings.insulinModule': 'Enable the insulin arithmetic module (opt-in)',
+    'ui.insulinTitle': 'Arithmetic (your numbers)',
+    'ui.insulinDisclaimer':
+      'It is the arithmetic you asked for, with your numbers. It is not medical advice or a medical device. Review and adjust with your care team.',
+    'ui.insulinRatio': 'Ratio (g per U)',
+    'ui.insulinCF': 'Correction factor (mg/dL per U)',
+    'ui.insulinTarget': 'Target (mg/dL)',
+    'ui.insulinCurrent': 'Current glucose (mg/dL)',
+    'ui.insulinCarbs': 'Carbs (g)',
+    'ui.insulinIncomplete': 'Incomplete data',
+    'ui.insulinMeal': 'Meal',
+    'ui.insulinCorrection': 'Correction',
+    'unit.grams': 'g',
+    'unit.units': 'U',
+  },
+} as const;
+
+export type Locale = keyof typeof STRINGS;
+export type StringKey = keyof (typeof STRINGS)['es'];
+
+export const LOCALES: readonly Locale[] = ['es', 'en'];
+
+const LOCALE_KEY = 'carbos.locale';
+
+export function t(locale: Locale, key: StringKey): string {
+  return STRINGS[locale][key];
+}
+
+export function isLocale(value: string): value is Locale {
+  return (LOCALES as readonly string[]).includes(value);
+}
+
+export function isStringKey(value: string): value is StringKey {
+  return Object.prototype.hasOwnProperty.call(STRINGS.es, value);
+}
+
+export function detectLocale(fallback: Locale = 'es'): Locale {
+  const stored = safeGet(LOCALE_KEY);
+  if (stored && isLocale(stored)) return stored;
+  const candidates =
+    typeof navigator !== 'undefined' ? (navigator.languages ?? [navigator.language]) : [];
+  for (const candidate of candidates) {
+    const tag = candidate.slice(0, 2).toLowerCase();
+    if (isLocale(tag)) return tag;
+  }
+  return fallback;
+}
+
+export function storeLocale(locale: Locale): void {
+  safeSet(LOCALE_KEY, locale);
+}
+
+function safeGet(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeSet(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}

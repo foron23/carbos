@@ -24,7 +24,15 @@ GO       ?= go
 # --- Tunables ---------------------------------------------------------------
 PORT     ?= 8000
 
-.PHONY: help setup install build test lint format format-check check run dev clean
+# --- Entrenamiento (cabeza nueva) -------------------------------------------
+# Ver docs/specs/08-linear-probe.md. El codigo de entrenamiento vive en training/.
+TRAIN_DATA ?= training/data
+TRAIN_OUT  ?= training/out
+TRAIN_ARGS ?=
+EXPORT_ARGS ?=
+
+.PHONY: help setup install build test e2e lint format format-check check run dev clean \
+        train-setup train train-smoke export-model
 
 ## help: Show this help
 help:
@@ -77,6 +85,10 @@ ifeq ($(HAS_GO),1)
 	$(GO) test ./...
 endif
 
+## e2e: Prueba E2E real en Firefox headless sobre el build (requiere firefox)
+e2e: build
+	$(NPM) run e2e
+
 ## lint: Run linters / static analysis
 lint:
 ifeq ($(HAS_NODE),1)
@@ -95,7 +107,7 @@ endif
 ## format: Auto-format the codebase
 format:
 ifeq ($(HAS_NODE),1)
-	@if command -v prettier >/dev/null 2>&1; then npx --no-install prettier --write .; else echo "prettier not installed"; fi
+	$(NPM) run format
 endif
 ifeq ($(HAS_PY),1)
 	@if command -v ruff >/dev/null 2>&1; then ruff format .; else echo "ruff not installed"; fi
@@ -110,7 +122,7 @@ endif
 ## format-check: Verify formatting without modifying files
 format-check:
 ifeq ($(HAS_NODE),1)
-	@if command -v prettier >/dev/null 2>&1; then npx --no-install prettier --check .; else echo "prettier not installed"; fi
+	$(NPM) run format:check
 endif
 ifeq ($(HAS_PY),1)
 	@if command -v ruff >/dev/null 2>&1; then ruff format --check .; else echo "ruff not installed"; fi
@@ -154,6 +166,22 @@ endif
 ifeq ($(HAS_GO),1)
 	@command -v air >/dev/null 2>&1 && air || $(GO) run .
 endif
+
+## train-setup: Instala las dependencias de entrenamiento (Python; ver docs/specs/08-linear-probe.md)
+train-setup:
+	$(PYTHON) -m pip install -r training/requirements.txt
+
+## train: Entrena la cabeza nueva (linear probe) sobre el set propio
+train:
+	$(PYTHON) training/linear_probe.py --data $(TRAIN_DATA) --out $(TRAIN_OUT) $(TRAIN_ARGS)
+
+## train-smoke: Prueba el pipeline de entrenamiento sin datos (dry-run)
+train-smoke:
+	$(PYTHON) training/linear_probe.py --dry-run --out $(TRAIN_OUT) $(TRAIN_ARGS)
+
+## export-model: Exporta a ONNX int8 y escribe el manifest del clasificador
+export-model:
+	$(PYTHON) training/export_onnx.py --model $(TRAIN_OUT)/model.pt --out $(TRAIN_OUT) $(EXPORT_ARGS)
 
 ## clean: Remove build artifacts and caches
 clean:

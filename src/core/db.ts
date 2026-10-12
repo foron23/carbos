@@ -1,5 +1,6 @@
 import type { InsulinLog, Meal, Vault } from './types';
 import { SCHEMA_VERSION, emptyVault } from './types';
+import { upgradeMeal } from './migrate';
 
 const DB_NAME = 'carbos';
 const DB_VERSION = 1;
@@ -23,7 +24,11 @@ export function openDb(): Promise<IDBDatabase> {
   });
 }
 
-function tx<T>(storeName: string, mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+function tx<T>(
+  storeName: string,
+  mode: IDBTransactionMode,
+  run: (store: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> {
   return openDb().then(
     (db) =>
       new Promise<T>((resolve, reject) => {
@@ -54,7 +59,7 @@ export function allInsulin(): Promise<InsulinLog[]> {
 
 export async function loadVault(): Promise<Vault> {
   const [meals, insulin] = await Promise.all([allMeals(), allInsulin()]);
-  return { version: SCHEMA_VERSION, meals, insulin };
+  return { version: SCHEMA_VERSION, meals: meals.map(upgradeMeal), insulin };
 }
 
 export function replaceVault(vault: Vault): Promise<void> {

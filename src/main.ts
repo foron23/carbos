@@ -1,24 +1,42 @@
 import './style.css';
 import {
   dayCarbs,
+  emptyVault,
   fromJson,
   itemCarbs,
   loadVault,
-  mealCarbs,
+  putInsulin,
   putMeal,
   replaceVault,
   roundCarbs,
+  slotCarbs,
   toJson,
+  weekCarbs,
 } from './core';
-import type { Meal, MealSlot } from './core';
+import type { FoodItem, InsulinKind, Meal, MealSlot, Vault } from './core';
+import { CATALOG, searchFoods } from './catalog';
+import type { Food } from './catalog';
+import { detectLocale, isLocale, isStringKey, storeLocale, t } from './i18n';
+import type { Locale, StringKey } from './i18n';
+import { prepareImage } from './capture/image';
+import type { CapturedImage } from './capture/image';
+import { decryptVault, encryptVault, isEncrypted } from './export/crypto';
 import { setupInsulin } from './insulin';
+import type { InsulinStrings } from './insulin';
 
-const SLOTS: ReadonlyArray<{ value: MealSlot; label: string }> = [
-  { value: 'breakfast', label: 'Desayuno' },
-  { value: 'lunch', label: 'Comida' },
-  { value: 'dinner', label: 'Cena' },
-  { value: 'snack', label: 'Snack' },
-];
+const SLOTS: readonly MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+interface Draft {
+  slot: MealSlot;
+  origin: 'manual' | 'photo';
+  items: FoodItem[];
+}
+
+let locale: Locale = detectLocale();
+let currentDate = today();
+let draft: Draft = { slot: 'breakfast', origin: 'manual', items: [] };
+let capture: CapturedImage | null = null;
+let vault: Vault = emptyVault();
 
 function byId<T extends HTMLElement = HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -34,148 +52,448 @@ function uid(): string {
   return globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
 }
 
-function slotLabel(slot: MealSlot): string {
-  return SLOTS.find((s) => s.value === slot)?.label ?? slot;
+function tr(key: StringKey): string {
+  return t(locale, key);
+}
+
+function slotOptions(): string {
+  return SLOTS.map((slot) => `<option value="${slot}" data-i18n="slot.${slot}"></option>`).join('');
 }
 
 const app = byId('app');
 app.innerHTML = `
   <header>
-    <h1>Carbos</h1>
-    <p class="muted">Cuenta carbohidratos. En tu dispositivo, y solo en tu dispositivo.</p>
+    <div class="row between">
+      <h1>Carbos</h1>
+      <label class="lang">
+        <span data-i18n="nav.language"></span>
+        <select id="locale"></select>
+      </label>
+    </div>
+    <p class="muted" data-i18n="app.tagline"></p>
   </header>
 
   <fieldset>
-    <legend>Hoy</legend>
-    <label for="date">Fecha</label>
+    <legend data-i18n="section.today"></legend>
+    <label for="date" data-i18n="field.date"></label>
     <input id="date" type="date" />
-    <p>Total: <span id="day-total" class="total">0 g</span></p>
+    <p><span data-i18n="label.total"></span>:
+      <output id="day-total" class="total" aria-live="polite">0 g</output></p>
+    <p class="muted"><span data-i18n="diary.week"></span>:
+      <output id="week-total">0 g</output></p>
   </fieldset>
 
   <fieldset>
-    <legend>Anadir comida</legend>
-    <form id="meal-form">
-      <div class="grid">
-        <label>Comida
-          <select id="meal-slot">
-            ${SLOTS.map((s) => `<option value="${s.value}">${s.label}</option>`).join('')}
-          </select>
-        </label>
-        <label>Alimento
-          <input id="meal-name" type="text" required placeholder="p. ej. tortilla" />
-        </label>
-        <label>Gramos
-          <input id="meal-grams" type="number" min="0" step="1" value="100" required />
-        </label>
-        <label>Carbohidratos por 100 g
-          <input id="meal-carbsp100" type="number" min="0" step="0.1" value="0" required />
-        </label>
-      </div>
-      <p><button type="submit" class="primary">Registrar</button></p>
-    </form>
-    <p class="muted">Estimacion. Revisa y ajusta los gramos.</p>
+    <legend data-i18n="section.photo"></legend>
+    <img id="photo-preview" class="preview" alt="" hidden />
+    <p id="photo-status" class="muted" data-i18n="photo.none" aria-live="polite"></p>
+    <div class="row">
+      <label class="btn"><input id="camera-input" type="file" accept="image/*" capture="environment" hidden /><span data-i18n="button.takePhoto"></span></label>
+      <label class="btn"><input id="file-input" type="file" accept="image/*" hidden /><span data-i18n="button.chooseFile"></span></label>
+    </div>
+    <p class="muted" data-i18n="text.photoNote"></p>
   </fieldset>
 
   <fieldset>
-    <legend>Registro</legend>
-    <ul id="meals"></ul>
+    <legend data-i18n="section.addFood"></legend>
+    <label for="draft-slot" data-i18n="field.slot"></label>
+    <select id="draft-slot">${slotOptions()}</select>
+    <label for="food-search" data-i18n="field.search"></label>
+    <div class="row">
+      <input id="food-search" type="search" autocomplete="off" />
+    </div>
+    <ul id="search-results" class="results"></ul>
+    <h3 data-i18n="draft.items"></h3>
+    <ul id="draft-items" class="draft"></ul>
+    <p><span data-i18n="label.total"></span>: <output id="draft-total" aria-live="polite">0 g</output></p>
+    <p><button id="register" type="button" class="primary" data-i18n="button.register"></button></p>
+    <p class="muted" data-i18n="text.estimateNote"></p>
   </fieldset>
 
   <fieldset>
-    <legend>Copia</legend>
-    <p>
-      <button id="export" type="button">Exportar JSON</button>
-      <label for="import" class="muted" style="display:inline">Importar</label>
-      <input id="import" type="file" accept="application/json" />
-    </p>
-    <p class="muted">El navegador puede borrar los datos sin avisar. Exporta a menudo.</p>
+    <legend data-i18n="section.diary"></legend>
+    <ul id="diary"></ul>
   </fieldset>
 
   <fieldset>
-    <legend>Ajustes</legend>
-    <label>
-      <input id="insulin-toggle" type="checkbox" />
-      Activar modulo de aritmetica de insulina (opt-in)
-    </label>
+    <legend data-i18n="section.insulinLog"></legend>
+    <p class="muted" data-i18n="insulin.note"></p>
+    <div class="grid">
+      <label><span data-i18n="field.time"></span><input id="ins-time" type="time" /></label>
+      <label><span data-i18n="field.units"></span><input id="ins-units" type="number" min="0" step="0.1" value="0" /></label>
+      <label><span data-i18n="field.kind"></span>
+        <select id="ins-kind">
+          <option value="bolus" data-i18n="kind.bolus"></option>
+          <option value="basal" data-i18n="kind.basal"></option>
+        </select>
+      </label>
+    </div>
+    <p><button id="add-insulin" type="button" data-i18n="button.addInsulin"></button></p>
+    <ul id="insulin-list"></ul>
+  </fieldset>
+
+  <fieldset>
+    <legend data-i18n="section.copy"></legend>
+    <label for="export-pass" data-i18n="export.passwordPrompt"></label>
+    <input id="export-pass" type="password" autocomplete="new-password" />
+    <p class="muted" data-i18n="export.passwordHint"></p>
+    <div class="row">
+      <button id="export" type="button" data-i18n="button.exportJson"></button>
+      <button id="export-enc" type="button" data-i18n="button.exportEncrypted"></button>
+      <label class="btn"><input id="import" type="file" accept="application/json,.json,.carbos" hidden /><span data-i18n="button.import"></span></label>
+    </div>
+    <p id="copy-status" class="muted" aria-live="polite"></p>
+    <p class="muted" data-i18n="storage.notice"></p>
+  </fieldset>
+
+  <fieldset>
+    <legend data-i18n="section.settings"></legend>
+    <p><button id="persist" type="button" data-i18n="button.persist"></button></p>
+    <p id="persist-status" class="muted" aria-live="polite"></p>
+    <label class="check"><input id="insulin-toggle" type="checkbox" /> <span data-i18n="settings.insulinModule"></span></label>
     <div id="insulin-host" hidden></div>
   </fieldset>
 `;
 
-async function render(): Promise<void> {
-  const vault = await loadVault();
-  const date = byId<HTMLInputElement>('date').value || today();
-  byId('day-total').textContent = `${roundCarbs(dayCarbs(vault.meals, date))} g`;
+const localeSelect = byId<HTMLSelectElement>('locale');
+localeSelect.innerHTML = ['es', 'en']
+  .map((code) => `<option value="${code}">${code.toUpperCase()}</option>`)
+  .join('');
 
-  const list = byId('meals');
-  const meals = vault.meals.filter((meal) => meal.date === date);
+function applyI18n(): void {
+  for (const node of app.querySelectorAll<HTMLElement>('[data-i18n]')) {
+    const key = node.dataset.i18n;
+    if (key && isStringKey(key)) node.textContent = tr(key);
+  }
+  for (const node of app.querySelectorAll<HTMLInputElement>('[data-i18n-ph]')) {
+    const key = node.dataset.i18nPh;
+    if (key && isStringKey(key)) node.placeholder = tr(key);
+  }
+  for (const node of app.querySelectorAll<HTMLElement>('[data-i18n-aria]')) {
+    const key = node.dataset.i18nAria;
+    if (key && isStringKey(key)) node.setAttribute('aria-label', tr(key));
+  }
+  document.documentElement.lang = locale;
+}
+
+function downloadText(filename: string, text: string, type: string): void {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function addFoodToDraft(food: Food): void {
+  draft.items.push({
+    id: uid(),
+    name: food.name[locale],
+    grams: food.defaultPortionGrams,
+    carbsPer100g: food.carbsPer100g,
+  });
+  renderDraft();
+}
+
+function renderSearch(): void {
+  const query = byId<HTMLInputElement>('food-search').value;
+  const list = byId('search-results');
+  if (query.trim().length < 2) {
+    list.innerHTML = '';
+    return;
+  }
+  const results = searchFoods(query, 8, CATALOG);
+  if (results.length === 0) {
+    list.innerHTML = `<li class="muted" data-i18n="search.noResults">${tr('search.noResults')}</li>`;
+    return;
+  }
+  list.innerHTML = '';
+  for (const food of results) {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'result';
+    button.textContent = `${food.name[locale]} · ${food.carbsPer100g} ${tr('unit.grams')}/100 ${tr('unit.grams')}`;
+    button.addEventListener('click', () => {
+      addFoodToDraft(food);
+      byId<HTMLInputElement>('food-search').value = '';
+      list.innerHTML = '';
+    });
+    item.appendChild(button);
+    list.appendChild(item);
+  }
+}
+
+function renderDraft(): void {
+  const list = byId('draft-items');
+  if (draft.items.length === 0) {
+    list.innerHTML = `<li class="muted">${tr('draft.empty')}</li>`;
+  } else {
+    list.innerHTML = '';
+    draft.items.forEach((item, index) => {
+      const row = document.createElement('li');
+      row.className = 'draft-row';
+      const name = document.createElement('span');
+      name.className = 'draft-name';
+      name.textContent = item.name;
+      const gramsLabel = document.createElement('label');
+      const grams = document.createElement('input');
+      grams.type = 'number';
+      grams.min = '0';
+      grams.step = '1';
+      grams.value = String(item.grams);
+      grams.setAttribute('aria-label', tr('field.grams'));
+      grams.addEventListener('change', () => {
+        item.grams = Math.max(0, Number.parseFloat(grams.value) || 0);
+        renderDraft();
+      });
+      gramsLabel.append(grams, document.createTextNode(` ${tr('unit.grams')}`));
+      const carbs = document.createElement('span');
+      carbs.className = 'muted';
+      carbs.textContent = `${roundCarbs(itemCarbs(item))} ${tr('unit.grams')}`;
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = tr('button.remove');
+      remove.setAttribute('aria-label', `${tr('button.remove')} ${item.name}`);
+      remove.addEventListener('click', () => {
+        draft.items.splice(index, 1);
+        renderDraft();
+      });
+      row.append(name, gramsLabel, carbs, remove);
+      list.appendChild(row);
+    });
+  }
+  const total = draft.items.reduce((sum, item) => sum + itemCarbs(item), 0);
+  byId('draft-total').textContent = `${roundCarbs(total)} ${tr('unit.grams')}`;
+}
+
+function renderPhoto(): void {
+  const preview = byId<HTMLImageElement>('photo-preview');
+  const status = byId('photo-status');
+  if (capture) {
+    preview.src = capture.dataUrl;
+    preview.hidden = false;
+    status.textContent = tr('photo.ready');
+  } else {
+    preview.hidden = true;
+    preview.removeAttribute('src');
+    status.textContent = tr('photo.none');
+  }
+}
+
+function renderToday(): void {
+  byId('day-total').textContent =
+    `${roundCarbs(dayCarbs(vault.meals, currentDate))} ${tr('unit.grams')}`;
+  const weekStart = currentDate;
+  byId('week-total').textContent =
+    `${roundCarbs(weekCarbs(vault.meals, weekStart))} ${tr('unit.grams')}`;
+}
+
+function renderDiary(): void {
+  const list = byId('diary');
+  const meals = vault.meals.filter((meal) => meal.date === currentDate);
   if (meals.length === 0) {
-    list.innerHTML = '<li class="muted">Sin comidas registradas.</li>';
+    list.innerHTML = `<li class="muted">${tr('diary.empty')}</li>`;
     return;
   }
   list.innerHTML = '';
   for (const meal of meals) {
     const item = document.createElement('li');
+    const head = document.createElement('strong');
+    head.textContent = `${tr(`slot.${meal.slot}` as StringKey)} (${slotCarbs(vault.meals, currentDate, meal.slot)} ${tr('unit.grams')})`;
+    const detail = document.createElement('div');
+    detail.className = 'muted';
     const items = meal.items
-      .map((food) => `${food.name} ${food.grams} g (${roundCarbs(itemCarbs(food))} g)`)
-      .join(', ');
-    item.textContent = `${slotLabel(meal.slot)}: ${items} — ${roundCarbs(mealCarbs(meal))} g`;
+      .map(
+        (food) =>
+          `${food.name} ${food.grams} ${tr('unit.grams')} (${roundCarbs(itemCarbs(food))} ${tr('unit.grams')})`,
+      )
+      .join(' · ');
+    detail.textContent = items;
+    item.append(head, detail);
+    if (meal.confidence !== null) {
+      const conf = document.createElement('span');
+      conf.className = 'muted';
+      conf.textContent = ` · ${tr('confidence.label')}: ${Math.round(meal.confidence * 100)}%`;
+      head.appendChild(conf);
+    }
     list.appendChild(item);
   }
 }
 
+function renderInsulin(): void {
+  const list = byId('insulin-list');
+  const logs = vault.insulin.filter((log) => log.date === currentDate);
+  if (logs.length === 0) {
+    list.innerHTML = `<li class="muted">${tr('insulin.empty')}</li>`;
+    return;
+  }
+  list.innerHTML = '';
+  for (const log of logs) {
+    const item = document.createElement('li');
+    item.textContent = `${log.time} · ${log.units} ${tr('unit.units')} · ${tr(`kind.${log.kind}` as StringKey)}`;
+    list.appendChild(item);
+  }
+}
+
+function render(): void {
+  applyI18n();
+  localeSelect.value = locale;
+  renderToday();
+  renderPhoto();
+  renderDraft();
+  renderSearch();
+  renderDiary();
+  renderInsulin();
+}
+
+async function refresh(): Promise<void> {
+  vault = await loadVault();
+  render();
+}
+
 function wire(): void {
-  const dateInput = byId<HTMLInputElement>('date');
-  dateInput.value = today();
-  dateInput.addEventListener('change', () => {
-    void render();
+  byId<HTMLInputElement>('date').value = currentDate;
+  localeSelect.value = locale;
+
+  localeSelect.addEventListener('change', () => {
+    const value = localeSelect.value;
+    if (isLocale(value)) {
+      locale = value;
+      storeLocale(locale);
+      render();
+    }
   });
 
-  byId<HTMLFormElement>('meal-form').addEventListener('submit', (event) => {
-    event.preventDefault();
+  byId<HTMLInputElement>('date').addEventListener('change', () => {
+    currentDate = byId<HTMLInputElement>('date').value || today();
+    render();
+  });
+
+  const onFile = (event: Event): void => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    void prepareImage(file)
+      .then((image) => {
+        capture = image;
+        draft.origin = 'photo';
+        renderPhoto();
+      })
+      .catch(() => {
+        /* imagen no legible: seguimos con la entrada manual */
+      });
+  };
+  byId<HTMLInputElement>('camera-input').addEventListener('change', onFile);
+  byId<HTMLInputElement>('file-input').addEventListener('change', onFile);
+
+  byId<HTMLSelectElement>('draft-slot').addEventListener('change', () => {
+    draft.slot = byId<HTMLSelectElement>('draft-slot').value as MealSlot;
+  });
+
+  let searchTimer: number | undefined;
+  byId<HTMLInputElement>('food-search').addEventListener('input', () => {
+    if (searchTimer !== undefined) window.clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(renderSearch, 120);
+  });
+
+  byId('register').addEventListener('click', () => {
+    if (draft.items.length === 0) return;
     const meal: Meal = {
       id: uid(),
-      date: dateInput.value || today(),
-      slot: byId<HTMLSelectElement>('meal-slot').value as MealSlot,
-      items: [
-        {
-          id: uid(),
-          name: byId<HTMLInputElement>('meal-name').value.trim(),
-          grams: Number.parseFloat(byId<HTMLInputElement>('meal-grams').value) || 0,
-          carbsPer100g: Number.parseFloat(byId<HTMLInputElement>('meal-carbsp100').value) || 0,
-        },
-      ],
+      date: currentDate,
+      slot: draft.slot,
+      items: draft.items.map((item) => ({ ...item })),
       confidence: null,
+      origin: draft.origin,
     };
-    void putMeal(meal).then(render);
-  });
-
-  byId('export').addEventListener('click', () => {
-    void loadVault().then((vault) => {
-      const blob = new Blob([toJson(vault)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `carbos-${today()}.json`;
-      anchor.click();
-      URL.revokeObjectURL(url);
+    void putMeal(meal).then(() => {
+      draft = { slot: draft.slot, origin: 'manual', items: [] };
+      capture = null;
+      return refresh();
     });
   });
 
-  byId<HTMLInputElement>('import').addEventListener('change', (event) => {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (!file) return;
-    void file
-      .text()
-      .then((text) => replaceVault(fromJson(text)))
-      .then(render)
-      .catch(() => window.alert('No se pudo importar el fichero.'));
+  byId('add-insulin').addEventListener('click', () => {
+    const time = byId<HTMLInputElement>('ins-time').value || '00:00';
+    const units = Number.parseFloat(byId<HTMLInputElement>('ins-units').value) || 0;
+    const kind = byId<HTMLSelectElement>('ins-kind').value as InsulinKind;
+    void putInsulin({ id: uid(), date: currentDate, time, units, kind }).then(refresh);
   });
 
-  setupInsulin(byId('insulin-host'), byId<HTMLInputElement>('insulin-toggle'));
+  byId('export').addEventListener('click', () => {
+    void loadVault().then((current) => {
+      downloadText(`carbos-${today()}.json`, toJson(current), 'application/json');
+      byId('copy-status').textContent = tr('export.done');
+    });
+  });
+
+  byId('export-enc').addEventListener('click', () => {
+    const password = byId<HTMLInputElement>('export-pass').value;
+    void loadVault()
+      .then((current) => encryptVault(current, password))
+      .then((text) => {
+        downloadText(`carbos-${today()}.carbos`, text, 'application/json');
+        byId('copy-status').textContent = tr('export.done');
+      });
+  });
+
+  byId<HTMLInputElement>('import').addEventListener('change', (event) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    const status = byId('copy-status');
+    void file
+      .text()
+      .then((text) => {
+        if (isEncrypted(text)) {
+          const password = window.prompt(tr('export.passwordPrompt')) ?? '';
+          return decryptVault(text, password);
+        }
+        return Promise.resolve(fromJson(text));
+      })
+      .then((imported) => replaceVault(imported))
+      .then(() => {
+        status.textContent = tr('export.imported');
+        input.value = '';
+        return refresh();
+      })
+      .catch(() => {
+        status.textContent = tr('export.importFailed');
+      });
+  });
+
+  byId('persist').addEventListener('click', () => {
+    const status = byId('persist-status');
+    if (!navigator.storage?.persist) {
+      status.textContent = tr('storage.denied');
+      return;
+    }
+    void navigator.storage.persist().then((granted) => {
+      status.textContent = granted ? tr('storage.granted') : tr('storage.denied');
+    });
+  });
+
+  const insulinStrings: InsulinStrings = {
+    title: tr('ui.insulinTitle'),
+    disclaimer: tr('ui.insulinDisclaimer'),
+    ratio: tr('ui.insulinRatio'),
+    correctionFactor: tr('ui.insulinCF'),
+    target: tr('ui.insulinTarget'),
+    current: tr('ui.insulinCurrent'),
+    carbs: tr('ui.insulinCarbs'),
+    compute: tr('button.calc'),
+    incomplete: tr('ui.insulinIncomplete'),
+    meal: tr('ui.insulinMeal'),
+    correction: tr('ui.insulinCorrection'),
+    unit: tr('unit.units'),
+  };
+  setupInsulin(byId('insulin-host'), byId<HTMLInputElement>('insulin-toggle'), insulinStrings);
 }
 
 wire();
-void render();
+void refresh();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

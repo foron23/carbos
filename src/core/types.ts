@@ -1,10 +1,24 @@
 export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
+export type MealOrigin = 'manual' | 'photo';
+
+export interface TopK {
+  classId: string;
+  p: number;
+}
+
+export interface ModelMeta {
+  detector: string;
+  classifier: string;
+  topk: TopK[];
+}
+
 export interface FoodItem {
   id: string;
   name: string;
   grams: number;
   carbsPer100g: number;
+  classId?: string | undefined;
 }
 
 export interface Meal {
@@ -13,6 +27,8 @@ export interface Meal {
   slot: MealSlot;
   items: FoodItem[];
   confidence: number | null;
+  origin: MealOrigin;
+  model?: ModelMeta | undefined;
 }
 
 export type InsulinKind = 'bolus' | 'basal';
@@ -25,7 +41,7 @@ export interface InsulinLog {
   kind: InsulinKind;
 }
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export interface Vault {
   version: number;

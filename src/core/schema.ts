@@ -2,13 +2,26 @@ import { z } from 'zod';
 import { SCHEMA_VERSION } from './types';
 
 export const mealSlotSchema = z.enum(['breakfast', 'lunch', 'dinner', 'snack']);
+export const mealOriginSchema = z.enum(['manual', 'photo']);
 export const insulinKindSchema = z.enum(['bolus', 'basal']);
+
+export const topkSchema = z.object({
+  classId: z.string().min(1),
+  p: z.number().min(0).max(1),
+});
+
+export const modelMetaSchema = z.object({
+  detector: z.string().min(1),
+  classifier: z.string().min(1),
+  topk: z.array(topkSchema),
+});
 
 export const foodItemSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   grams: z.number().nonnegative(),
   carbsPer100g: z.number().nonnegative(),
+  classId: z.string().min(1).optional(),
 });
 
 export const mealSchema = z.object({
@@ -17,6 +30,8 @@ export const mealSchema = z.object({
   slot: mealSlotSchema,
   items: z.array(foodItemSchema),
   confidence: z.number().min(0).max(1).nullable(),
+  origin: mealOriginSchema.default('manual'),
+  model: modelMetaSchema.optional(),
 });
 
 export const insulinLogSchema = z.object({

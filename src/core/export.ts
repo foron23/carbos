@@ -1,4 +1,4 @@
-import { vaultSchema } from './schema';
+import { migrateVault } from './migrate';
 import type { Vault } from './types';
 
 export function toJson(vault: Vault): string {
@@ -6,6 +6,5 @@ export function toJson(vault: Vault): string {
 }
 
 export function fromJson(text: string): Vault {
-  const parsed: unknown = JSON.parse(text);
-  return vaultSchema.parse(parsed);
+  return migrateVault(JSON.parse(text));
 }

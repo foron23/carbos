@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { FoodItem, Meal, MealSlot } from './types';
-import { dayCarbs, itemCarbs, mealCarbs, roundCarbs, weekCarbs } from './totals';
+import { dayCarbs, itemCarbs, mealCarbs, roundCarbs, slotCarbs, weekCarbs } from './totals';
 
 function food(grams: number, carbsPer100g: number): FoodItem {
   return { id: 'f', name: 'alimento', grams, carbsPer100g };
 }
 
 function meal(id: string, date: string, slot: MealSlot, items: FoodItem[]): Meal {
-  return { id, date, slot, items, confidence: null };
+  return { id, date, slot, items, confidence: null, origin: 'manual' };
 }
 
 describe('totals', () => {
@@ -27,6 +27,16 @@ describe('totals', () => {
       meal('m3', '2026-10-11', 'lunch', [food(100, 99)]),
     ];
     expect(dayCarbs(meals, '2026-10-12')).toBeCloseTo(50);
+  });
+
+  it('slotCarbs filtra por fecha y comida', () => {
+    const meals = [
+      meal('m1', '2026-10-12', 'lunch', [food(100, 20)]),
+      meal('m2', '2026-10-12', 'lunch', [food(50, 40)]),
+      meal('m3', '2026-10-12', 'dinner', [food(100, 99)]),
+    ];
+    expect(slotCarbs(meals, '2026-10-12', 'lunch')).toBeCloseTo(40);
+    expect(slotCarbs(meals, '2026-10-12', 'breakfast')).toBeCloseTo(0);
   });
 
   it('weekCarbs cubre siete dias desde el inicio', () => {

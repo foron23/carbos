@@ -1,4 +1,4 @@
-import type { FoodItem, Meal } from './types';
+import type { FoodItem, Meal, MealSlot } from './types';
 
 export function itemCarbs(item: FoodItem): number {
   return (item.grams * item.carbsPer100g) / 100;
@@ -12,8 +12,16 @@ export function mealsForDate(meals: readonly Meal[], date: string): Meal[] {
   return meals.filter((meal) => meal.date === date);
 }
 
+export function mealsForSlot(meals: readonly Meal[], date: string, slot: MealSlot): Meal[] {
+  return meals.filter((meal) => meal.date === date && meal.slot === slot);
+}
+
 export function dayCarbs(meals: readonly Meal[], date: string): number {
   return mealsForDate(meals, date).reduce((sum, meal) => sum + mealCarbs(meal), 0);
+}
+
+export function slotCarbs(meals: readonly Meal[], date: string, slot: MealSlot): number {
+  return mealsForSlot(meals, date, slot).reduce((sum, meal) => sum + mealCarbs(meal), 0);
 }
 
 export function weekCarbs(meals: readonly Meal[], startDate: string): number {
