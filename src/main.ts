@@ -784,8 +784,13 @@ function wire(): void {
     meal: tr('ui.insulinMeal'),
     correction: tr('ui.insulinCorrection'),
     unit: tr('unit.units'),
+    gateTitle: tr('insulin.gateTitle'),
+    gateBody: tr('insulin.gateBody'),
+    gateAccept: tr('insulin.gateAccept'),
+    gateCancel: tr('insulin.gateCancel'),
   };
   setupInsulin(byId('insulin-host'), byId<HTMLInputElement>('insulin-toggle'), insulinStrings);
+  renderExportReminder();
 }
 
 wire();

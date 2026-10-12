@@ -14,6 +14,10 @@ export interface InsulinStrings {
   meal: string;
   correction: string;
   unit: string;
+  gateTitle: string;
+  gateBody: string;
+  gateAccept: string;
+  gateCancel: string;
 }
 
 function num(input: HTMLInputElement): number {
@@ -21,6 +25,10 @@ function num(input: HTMLInputElement): number {
   return Number.isFinite(value) ? value : Number.NaN;
 }
 
+/**
+ * Modulo opt-in de aritmetica. Activarlo exige confirmar un aviso no
+ * descartable (spec 09, D7, D10): la casilla no enciende el panel sola.
+ */
 export function setupInsulin(
   host: HTMLElement,
   toggle: HTMLInputElement,
@@ -28,23 +36,47 @@ export function setupInsulin(
 ): void {
   toggle.checked = isInsulinEnabled();
 
-  const renderTab = (): void => {
-    if (!toggle.checked) {
-      host.innerHTML = '';
-      host.hidden = true;
-      return;
-    }
+  const clear = (): void => {
+    host.innerHTML = '';
+    host.hidden = true;
+  };
+
+  const renderGate = (): void => {
     host.hidden = false;
     host.innerHTML = `
-      <fieldset>
+      <div class="notice" role="note">
+        <strong>${strings.gateTitle}</strong>
+        <p>${strings.gateBody}</p>
+        <div class="row">
+          <button id="ins-gate-accept" type="button" class="primary">${strings.gateAccept}</button>
+          <button id="ins-gate-cancel" type="button">${strings.gateCancel}</button>
+        </div>
+      </div>
+    `;
+    host.querySelector('#ins-gate-accept')?.addEventListener('click', () => {
+      setInsulinEnabled(true);
+      toggle.checked = true;
+      renderPanel();
+    });
+    host.querySelector('#ins-gate-cancel')?.addEventListener('click', () => {
+      setInsulinEnabled(false);
+      toggle.checked = false;
+      clear();
+    });
+  };
+
+  const renderPanel = (): void => {
+    host.hidden = false;
+    host.innerHTML = `
+      <fieldset class="card inset">
         <legend>${strings.title}</legend>
-        <p class="muted">${strings.disclaimer}</p>
+        <p class="notice" role="note">${strings.disclaimer}</p>
         <div class="grid">
-          <label>${strings.ratio}<input id="ins-ratio" type="number" min="0" step="0.1" value="10" /></label>
-          <label>${strings.correctionFactor}<input id="ins-cf" type="number" min="0" step="1" value="50" /></label>
-          <label>${strings.target}<input id="ins-target" type="number" min="0" step="1" value="100" /></label>
-          <label>${strings.current}<input id="ins-current" type="number" min="0" step="1" value="100" /></label>
-          <label>${strings.carbs}<input id="ins-carbs" type="number" min="0" step="1" value="0" /></label>
+          <label>${strings.ratio}<input id="ins-ratio" type="number" inputmode="decimal" min="0" step="0.1" value="10" /></label>
+          <label>${strings.correctionFactor}<input id="ins-cf" type="number" inputmode="numeric" min="0" step="1" value="50" /></label>
+          <label>${strings.target}<input id="ins-target" type="number" inputmode="numeric" min="0" step="1" value="100" /></label>
+          <label>${strings.current}<input id="ins-current" type="number" inputmode="numeric" min="0" step="1" value="100" /></label>
+          <label>${strings.carbs}<input id="ins-carbs" type="number" inputmode="decimal" min="0" step="1" value="0" /></label>
         </div>
         <p id="ins-result" class="total" aria-live="polite">0 ${strings.unit}</p>
         <p id="ins-terms" class="muted"></p>
@@ -78,9 +110,17 @@ export function setupInsulin(
   };
 
   toggle.addEventListener('change', () => {
-    setInsulinEnabled(toggle.checked);
-    renderTab();
+    if (toggle.checked) {
+      renderGate();
+    } else {
+      setInsulinEnabled(false);
+      clear();
+    }
   });
 
-  renderTab();
+  if (toggle.checked) {
+    renderPanel();
+  } else {
+    clear();
+  }
 }
