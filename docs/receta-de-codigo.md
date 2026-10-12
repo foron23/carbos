@@ -5,26 +5,27 @@ se invocan herramientas sueltas (`npx`, `vitest`, `tsc`) si existe un target.
 
 ## Comandos
 
-| Comando             | Que hace                                                                                                   |
-| ------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `make setup`        | Instala dependencias (`npm install`)                                                                       |
-| `make dev`          | Servidor de desarrollo de Vite                                                                             |
-| `make build`        | Typecheck + build estatico (`tsc --noEmit && vite build`)                                                  |
-| `make test`         | Vitest (`npm test`)                                                                                        |
-| `make e2e`          | Prueba E2E real en Firefox headless sobre el build (`make build` + `npm run e2e`)                          |
-| `make lint`         | ESLint                                                                                                     |
-| `make format`       | Prettier                                                                                                   |
-| `make format-check` | Prettier en modo verificacion                                                                              |
-| `make check`        | `format-check` + `lint` + `test` — la puerta antes de commit                                               |
-| `make train-setup`  | Instala dependencias de entrenamiento (Python; ver [`specs/08-linear-probe.md`](specs/08-linear-probe.md)) |
-| `make train-smoke`  | Prueba el pipeline de entrenamiento sin datos (dry-run)                                                    |
-| `make train`        | Entrena la cabeza nueva (linear probe) sobre el set propio                                                 |
-| `make export-model` | Exporta a ONNX int8 y escribe el manifest del clasificador                                                 |
-| `make catalog`      | Regenera `src/catalog/catalog.ts` desde Ciqual 2020 (`tools/catalog/build_catalog.py`)                     |
-| `make smoke-setup`  | Crea `tools/smoke/.venv` (onnx/numpy/onnxruntime) para el smoke test local                                 |
-| `make smoke-models` | Genera modelos ONNX **de prueba** + `public/model-manifest.json` (no se commitea)                          |
-| `make smoke-clean`  | Borra los modelos de prueba y el manifest local                                                            |
-| `make clean`        | Borra `dist/` y caches                                                                                     |
+| Comando             | Que hace                                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `make setup`        | Instala dependencias (`npm install`)                                                                                           |
+| `make dev`          | Servidor de desarrollo de Vite                                                                                                 |
+| `make build`        | Typecheck + build estatico (`tsc --noEmit && vite build`)                                                                      |
+| `make test`         | Vitest (`npm test`)                                                                                                            |
+| `make e2e`          | Prueba E2E real en Firefox headless sobre el build (`make build` + `npm run e2e`)                                              |
+| `make lint`         | ESLint                                                                                                                         |
+| `make format`       | Prettier                                                                                                                       |
+| `make format-check` | Prettier en modo verificacion                                                                                                  |
+| `make check`        | `format-check` + `lint` + `test` — la puerta antes de commit                                                                   |
+| `make train-setup`  | Instala dependencias de entrenamiento (Python; ver [`specs/08-linear-probe.md`](specs/08-linear-probe.md))                     |
+| `make train-smoke`  | Prueba el pipeline de entrenamiento sin datos (dry-run)                                                                        |
+| `make train`        | Entrena la cabeza nueva (linear probe) sobre el set propio                                                                     |
+| `make export-model` | Exporta a ONNX int8 y escribe el manifest del clasificador                                                                     |
+| `make catalog`      | Regenera `src/catalog/catalog.ts` desde Ciqual 2020 (`tools/catalog/build_catalog.py`)                                         |
+| `make smoke-setup`  | Crea `tools/smoke/.venv` (onnx/numpy/onnxruntime) para el smoke test local                                                     |
+| `make smoke-models` | Genera modelos ONNX **de prueba** + `public/model-manifest.json` (no se commitea)                                              |
+| `make smoke-clean`  | Borra los modelos de prueba y el manifest local                                                                                |
+| `make eval`         | Corre el banco de Nutrition5k sobre el manifest de modelos (`eval/`; ver [`specs/09-experimento.md`](specs/09-experimento.md)) |
+| `make clean`        | Borra `dist/` y caches                                                                                                         |
 
 > El entrenamiento es **dev time**: sus datos y pesos no entran al bundle ni al repo
 > (`.gitignore` cubre `training/data/`, `training/out/`, `*.pt`, `*.onnx`).
@@ -68,6 +69,7 @@ src/
   main.ts      Bootstrap de la PWA: UI de registro, foto, diario, insulina y copia.
   style.css
 e2e/           Arnés E2E (Puppeteer + Firefox headless) y escenarios.
+eval/          Banco de evaluacion (Nutrition5k): descarga, inferencia ONNX y metricas.
 training/      Entrenamiento (dev time): linear_probe.py, export_onnx.py, requirements.txt.
 tools/catalog/ Generador del catalogo (selection.csv + build_catalog.py; cache en .cache/).
 tools/smoke/   Modelos ONNX de prueba y manifest local para el smoke test (make smoke-models).

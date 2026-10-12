@@ -1,0 +1,84 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { Inference, decodePng, loadManifest, predictedCarbs } from './infer.ts';
+import { summarize } from './metrics.ts';
+import type { Row } from './metrics.ts';
+import { loadTestDishes } from './nutrition5k.ts';
+
+function arg(flag: string, fallback: string): string {
+  const index = process.argv.indexOf(flag);
+  const value = index >= 0 ? process.argv[index + 1] : undefined;
+  return value ?? fallback;
+}
+
+async function main(): Promise<void> {
+  const manifestPath = arg('--manifest', 'public/model-manifest.json');
+  const root = arg('--root', 'public');
+  const limit = Number(arg('--limit', '0')) || 0;
+  const outDir = arg('--out', 'eval/results');
+
+  const manifest = await loadManifest(manifestPath);
+  const inference = await Inference.create(manifest, root);
+
+  let dishes = await loadTestDishes();
+  if (limit > 0) dishes = dishes.slice(0, limit);
+  console.log(`Platos a evaluar: ${dishes.length}`);
+
+  const rows: Row[] = [];
+  for (const dish of dishes) {
+    const response = await fetch(dish.imageUrl);
+    if (!response.ok) {
+      console.warn(`  sin imagen: ${dish.id} (${response.status})`);
+      continue;
+    }
+    const rgba = decodePng(new Uint8Array(await response.arrayBuffer()));
+    const detections = await inference.run(rgba);
+    const { carbs, mass, resolved } = predictedCarbs(detections);
+    rows.push({
+      id: dish.id,
+      trueCarb: dish.totalCarb,
+      predCarb: carbs,
+      trueMass: dish.totalMass,
+      predMass: mass,
+      detections: detections.length,
+      resolved,
+    });
+    if (rows.length % 10 === 0) process.stdout.write('.');
+  }
+  process.stdout.write('\n');
+
+  const summary = summarize(rows);
+  await mkdir(outDir, { recursive: true });
+  const stamp = new Date().toISOString().slice(0, 10);
+  const result = {
+    benchmark: 'nutrition5k',
+    split: 'rgb_test_ids',
+    date: stamp,
+    detector: {
+      version: manifest.detector.version,
+      sha256: manifest.detector.sha256,
+      bytes: manifest.detector.bytes,
+    },
+    classifier: {
+      version: manifest.classifier.version,
+      sha256: manifest.classifier.sha256,
+      bytes: manifest.classifier.bytes,
+      classes: manifest.classifier.classes.length,
+    },
+    summary,
+    rows,
+  };
+  const file = join(outDir, `nutrition5k-${stamp}.json`);
+  await writeFile(file, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
+
+  console.log(
+    `MAE carbohidratos: ${summary.maeCarb.toFixed(2)} g (${(summary.maeCarbPct * 100).toFixed(1)}%)`,
+  );
+  console.log(`IC95: [${summary.ciLow.toFixed(2)}, ${summary.ciHigh.toFixed(2)}] g`);
+  console.log(
+    `MAE masa: ${summary.maeMass.toFixed(2)} g   cobertura: ${(summary.coverage * 100).toFixed(1)}%`,
+  );
+  console.log(`Resultado: ${file}`);
+}
+
+void main();

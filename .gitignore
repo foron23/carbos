@@ -23,3 +23,8 @@ tools/catalog/.cache/
 public/models/
 public/model-manifest.json
 tools/smoke/.venv/
+
+# Banco de evaluacion (build, cache y resultados)
+eval/.build/
+eval/cache/
+eval/results/
