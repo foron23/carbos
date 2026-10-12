@@ -10,8 +10,9 @@ de tu dispositivo.
 - Plan por fases: [`docs/specs/01-roadmap.md`](docs/specs/01-roadmap.md)
 - Fase 1 (nucleo): [`docs/specs/02-fase1.md`](docs/specs/02-fase1.md)
 - Despliegue (GitHub Pages): [`docs/specs/03-despliegue.md`](docs/specs/03-despliegue.md)
-- Experimento (benchmark): [`docs/specs/09-experimento.md`](docs/specs/09-experimento.md)
-- Feedback de usuarios (diferido): [`docs/specs/10-feedback.md`](docs/specs/10-feedback.md)
+- Experimento (benchmark): [`docs/specs/10-experimento.md`](docs/specs/10-experimento.md)
+- Comparacion de modelos (writeup): [`docs/specs/11-comparacion-modelos.md`](docs/specs/11-comparacion-modelos.md)
+- Feedback de usuarios (diferido): [`docs/specs/12-feedback.md`](docs/specs/12-feedback.md)
 - Contrato de trabajo: [`docs/receta-de-codigo.md`](docs/receta-de-codigo.md)
 
 ## Estado
@@ -29,7 +30,7 @@ local sin pesos: `make smoke-models`.
 **Benchmark (Nutrition5k, 507 platos):** el mejor candidato es **MobileNetV3-Large ImageNet int8**
 (5.7 MB): MAE 15.63 g, cobertura 28.4 %. Ningun modelo publico se acerca al catalogo: el siguiente
 paso es **fine-tuning al catalogo** o **destilacion** (D32). Detalle en
-[`docs/specs/09-experimento.md`](docs/specs/09-experimento.md).
+[`docs/specs/10-experimento.md`](docs/specs/10-experimento.md).
 
 Detalle por entregable: [`docs/specs/02-fase1.md`](docs/specs/02-fase1.md).
 

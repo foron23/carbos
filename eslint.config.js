@@ -11,6 +11,7 @@ export default tseslint.config(
       'tools/shortlist/.venv',
       'tools/smoke/.venv',
       'tools/catalog/.cache',
+      '**/*.tmp.mjs',
     ],
   },
   js.configs.recommended,

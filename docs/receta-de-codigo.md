@@ -24,7 +24,7 @@ se invocan herramientas sueltas (`npx`, `vitest`, `tsc`) si existe un target.
 | `make smoke-setup`  | Crea `tools/smoke/.venv` (onnx/numpy/onnxruntime) para el smoke test local                                                     |
 | `make smoke-models` | Genera modelos ONNX **de prueba** + `public/model-manifest.json` (no se commitea)                                              |
 | `make smoke-clean`  | Borra los modelos de prueba y el manifest local                                                                                |
-| `make eval`         | Corre el banco de Nutrition5k sobre el manifest de modelos (`eval/`; ver [`specs/09-experimento.md`](specs/09-experimento.md)) |
+| `make eval`         | Corre el banco de Nutrition5k sobre el manifest de modelos (`eval/`; ver [`specs/10-experimento.md`](specs/10-experimento.md)) |
 | `make clean`        | Borra `dist/` y caches                                                                                                         |
 
 > El entrenamiento es **dev time**: sus datos y pesos no entran al bundle ni al repo

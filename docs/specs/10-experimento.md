@@ -152,6 +152,8 @@ Conclusion: la via fiable y pequena es **torchvision**; para alinear con el cata
 
 ## Barrido completo (2026-10-12, 507 platos, split de test)
 
+Writeup detallado (fichas, analisis, reproducibilidad): [`11-comparacion-modelos.md`](11-comparacion-modelos.md).
+
 Mismo detector (YOLO11n COCO) para todos; 202 de 709 platos no tienen cenital.
 
 | Candidato                              | Tamano     | MAE carb    | %MAE    | Cobertura  |
@@ -174,4 +176,4 @@ Lectura:
 El teacher fiable es Swin Food-101 int8 (o el ImageNet); el student, un MobileNetV3. Con imagenes
 **sin etiquetar** (Nutrition5k + fotos de usuarios) se generan pseudo-etiquetas del teacher y se
 entrena el student, que se exporta con torchvision (fiable). Mantiene la taxonomia del teacher;
-para alinearse al catalogo hace falta el feedback de usuarios (ver [`10-feedback.md`](10-feedback.md)).
+para alinearse al catalogo hace falta el feedback de usuarios (ver [`12-feedback.md`](12-feedback.md)).

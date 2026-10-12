@@ -41,7 +41,7 @@ TRAIN_ARGS ?=
 EXPORT_ARGS ?=
 
 # --- Banco de evaluacion (Nutrition5k) --------------------------------------
-# Ver docs/specs/09-experimento.md. --limit 0 evalua los 709 platos del test.
+# Ver docs/specs/10-experimento.md. --limit 0 evalua los 709 platos del test.
 EVAL_ARGS ?= --manifest public/model-manifest.json --root public --limit 25
 
 .PHONY: help setup install build test e2e lint format format-check check run dev clean \
@@ -236,7 +236,7 @@ smoke-models:
 smoke-clean:
 	rm -rf public/models public/model-manifest.json
 
-## eval: Corre el banco de Nutrition5k sobre el manifest de modelos (ver docs/specs/09-experimento.md)
+## eval: Corre el banco de Nutrition5k sobre el manifest de modelos (ver docs/specs/10-experimento.md)
 eval:
 	@npx --no-install esbuild eval/run.ts --bundle --platform=node --format=esm --target=node20 \
 		--outfile=eval/.build/run.mjs --external:onnxruntime-node --external:pngjs

@@ -31,3 +31,6 @@ eval/results/
 
 # Shortlist de modelos (venv de conversion)
 tools/shortlist/.venv/
+
+# Ficheros temporales de depuracion
+*.tmp.mjs

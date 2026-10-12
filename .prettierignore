@@ -1,1 +1,2 @@
 src/catalog/catalog.ts
+*.tmp.mjs
