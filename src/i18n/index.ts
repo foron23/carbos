@@ -93,6 +93,31 @@ export const STRINGS = {
     'ui.insulinCorrection': 'Correccion',
     'unit.grams': 'g',
     'unit.units': 'U',
+    'onboarding.title': 'Antes de empezar',
+    'onboarding.privacyTitle': 'Tus datos no salen de aqui',
+    'onboarding.privacyBody':
+      'Todo lo que registras (comidas, fotos, numeros) se queda en este dispositivo. No hay cuentas, no hay servidores, no hay analitica. Puedes exportar una copia cuando quieras.',
+    'onboarding.storageTitle': 'El navegador puede borrar tus datos',
+    'onboarding.storageBody':
+      'Este diario vive en tu navegador. Si no lo usas durante dias, el navegador puede borrar lo guardado. Anadelo a la pantalla de inicio y exporta copias de vez en cuando.',
+    'onboarding.scopeTitle': 'Que es y que no es',
+    'onboarding.scopeBody':
+      'Cuenta carbohidratos y registra lo que haces. No es un dispositivo medico y no te dice cuanta insulina ponerte. Tus numeros y tus decisiones son tuyos; tu equipo medico es quien te guia.',
+    'onboarding.start': 'Empezar',
+    'footer.disclaimer':
+      'Carbos no es un dispositivo medico ni ofrece consejo medico. Uso bajo tu responsabilidad; consulta con tu equipo medico.',
+    'nav.today': 'Hoy',
+    'nav.prevDay': 'Dia anterior',
+    'nav.nextDay': 'Dia siguiente',
+    'register.done': 'Comida registrada.',
+    'register.empty': 'Anade algun alimento antes de registrar.',
+    'export.reminder':
+      'Hace tiempo que no exportas. El navegador puede borrar los datos sin avisar.',
+    'insulin.gateTitle': 'Activar la aritmetica de insulina',
+    'insulin.gateBody':
+      'Vas a activar una calculadora aritmetica. No es un dispositivo medico ni consejo medico, y no sustituye a tu equipo medico. La hipoglucemia puede ser peligrosa. Usala solo con los numeros que te haya dado tu equipo y bajo tu responsabilidad.',
+    'insulin.gateAccept': 'Entiendo y la activo',
+    'insulin.gateCancel': 'Cancelar',
   },
   en: {
     'app.tagline': 'Count carbs. On your device, and only on your device.',
@@ -187,6 +212,31 @@ export const STRINGS = {
     'ui.insulinCorrection': 'Correction',
     'unit.grams': 'g',
     'unit.units': 'U',
+    'onboarding.title': 'Before you start',
+    'onboarding.privacyTitle': 'Your data never leaves this device',
+    'onboarding.privacyBody':
+      'Everything you log (meals, photos, numbers) stays on this device. No accounts, no servers, no analytics. You can export a copy whenever you want.',
+    'onboarding.storageTitle': 'The browser may delete your data',
+    'onboarding.storageBody':
+      'This diary lives in your browser. If you do not use it for days, the browser may delete what is stored. Add it to your home screen and export copies from time to time.',
+    'onboarding.scopeTitle': 'What it is and what it is not',
+    'onboarding.scopeBody':
+      'It counts carbohydrates and records what you do. It is not a medical device and it does not tell you how much insulin to take. Your numbers and your decisions are yours; your care team is who guides you.',
+    'onboarding.start': 'Start',
+    'footer.disclaimer':
+      'Carbos is not a medical device and does not give medical advice. Use at your own responsibility; consult your care team.',
+    'nav.today': 'Today',
+    'nav.prevDay': 'Previous day',
+    'nav.nextDay': 'Next day',
+    'register.done': 'Meal logged.',
+    'register.empty': 'Add some food before logging.',
+    'export.reminder':
+      'You have not exported in a while. The browser may delete the data without warning.',
+    'insulin.gateTitle': 'Enable insulin arithmetic',
+    'insulin.gateBody':
+      'You are about to enable an arithmetic calculator. It is not a medical device or medical advice, and it does not replace your care team. Hypoglycaemia can be dangerous. Use it only with the numbers your care team gave you, and at your own responsibility.',
+    'insulin.gateAccept': 'I understand, enable it',
+    'insulin.gateCancel': 'Cancel',
   },
 } as const;
 
