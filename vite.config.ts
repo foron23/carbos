@@ -7,6 +7,9 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
   },
+  worker: {
+    format: 'es',
+  },
   test: {
     globals: true,
     environment: 'node',

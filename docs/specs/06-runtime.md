@@ -6,6 +6,20 @@
 > clases (E2). Los pesos llegan por **manifest con sha256** desde jsDelivr/Releases (D24) y se
 > cachean. El runtime **nunca produce gramos ni unidades**: solo clase y confianza.
 
+## Estado
+
+Implementado en `src/model/`: `preprocess.ts` (letterbox + tensor NCHW), `detector.ts` (decode
+YOLOv8 + NMS), `classifier.ts` (softmax + top-k), `loader.ts` (sha256 + descarga con progreso +
+Cache Storage), `worker.ts` (ONNX en Web Worker, WebGPU con fallback WASM) y `client.ts`
+(protocolo UI <-> inferencia). `vite build` deja ORT fuera del chunk inicial. **Falta** publicar
+los pesos (E3): sin `public/model-manifest.json` la deteccion falla de forma honesta y la UI cae a
+entrada manual. El contrato del manifest esta en `public/model-manifest.example.json`.
+
+Supuestos del decodificador (fijados con el modelo publico, D20/D31):
+`onnxruntime-web/webgpu`; entrada del detector letterbox a 640 con normalizacion unitaria (`/255`);
+salida `[1, 4+nc, anchors]` en pixeles del input; clasificador a 224 con normalizacion ImageNet;
+nombres de entrada/salida tomados de `session.inputNames` / `session.outputNames`.
+
 ## Arquitectura
 
 ```

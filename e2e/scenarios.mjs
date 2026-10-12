@@ -98,7 +98,14 @@ export const scenarios = [
         }
       });
       await uploadFile(page, '#file-input', ctx.fixturePng);
-      await waitForText(page, '#photo-status', 'Foto lista');
+      await page.waitForFunction(
+        () => {
+          const el = document.querySelector('#photo-status');
+          const value = el?.textContent ?? '';
+          return value.includes('no disponible') || value.includes('detectad');
+        },
+        { timeout: 10000 },
+      );
       const hidden = await page.$eval('#photo-preview', (el) => el.hidden);
       assertEqual(hidden, false, 'la previsualizacion es visible');
       assertEqual(

@@ -20,6 +20,8 @@ import { detectLocale, isLocale, isStringKey, storeLocale, t } from './i18n';
 import type { Locale, StringKey } from './i18n';
 import { prepareImage } from './capture/image';
 import type { CapturedImage } from './capture/image';
+import { createDetectionClient } from './model';
+import type { DetectionClient, DetectionResult, InferencePhase, TopKEntry } from './model';
 import { decryptVault, encryptVault, isEncrypted } from './export/crypto';
 import { setupInsulin } from './insulin';
 import type { InsulinStrings } from './insulin';
@@ -37,6 +39,30 @@ let currentDate = today();
 let draft: Draft = { slot: 'breakfast', origin: 'manual', items: [] };
 let capture: CapturedImage | null = null;
 let vault: Vault = emptyVault();
+
+const MODEL_MANIFEST_URL = new URL('model-manifest.json', document.baseURI).href;
+const MODEL_CACHE = 'carbos-models-v1';
+const PHASE_KEYS: Record<InferencePhase, StringKey> = {
+  manifest: 'model.manifest',
+  downloading: 'model.downloading',
+  verifying: 'model.verifying',
+  session: 'model.session',
+  detecting: 'photo.detecting',
+  classifying: 'photo.classifying',
+};
+
+let detections: DetectionResult[] = [];
+let detectionDraftIds: string[] = [];
+let detectionEngine = '';
+let detectionMeta: { detector: string; classifier: string } | null = null;
+let photoStatusKey: StringKey | null = null;
+let detectAbort: AbortController | null = null;
+let detectionClient: DetectionClient | null = null;
+
+function getDetectionClient(): DetectionClient {
+  if (!detectionClient) detectionClient = createDetectionClient();
+  return detectionClient;
+}
 
 function byId<T extends HTMLElement = HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -92,6 +118,12 @@ app.innerHTML = `
       <label class="btn"><input id="file-input" type="file" accept="image/*" hidden /><span data-i18n="button.chooseFile"></span></label>
     </div>
     <p class="muted" data-i18n="text.photoNote"></p>
+    <div id="detect-panel" hidden>
+      <p id="detect-summary" class="muted" aria-live="polite"></p>
+      <h3 data-i18n="photo.detected"></h3>
+      <ul id="detect-results" class="draft"></ul>
+      <p class="muted" data-i18n="photo.resultsNote"></p>
+    </div>
   </fieldset>
 
   <fieldset>
@@ -268,17 +300,157 @@ function renderDraft(): void {
   byId('draft-total').textContent = `${roundCarbs(total)} ${tr('unit.grams')}`;
 }
 
+function setPhotoStatus(key: StringKey | null): void {
+  photoStatusKey = key;
+  byId('photo-status').textContent = tr(key ?? 'photo.ready');
+}
+
 function renderPhoto(): void {
   const preview = byId<HTMLImageElement>('photo-preview');
   const status = byId('photo-status');
   if (capture) {
     preview.src = capture.dataUrl;
     preview.hidden = false;
-    status.textContent = tr('photo.ready');
+    status.textContent = tr(photoStatusKey ?? 'photo.ready');
   } else {
     preview.hidden = true;
     preview.removeAttribute('src');
+    photoStatusKey = null;
     status.textContent = tr('photo.none');
+  }
+}
+
+function foodById(id: string | null): Food | undefined {
+  if (!id) return undefined;
+  return CATALOG.foods.find((food) => food.id === id);
+}
+
+function pushFood(food: Food): string {
+  const id = uid();
+  draft.items.push({
+    id,
+    name: food.name[locale],
+    grams: food.defaultPortionGrams,
+    carbsPer100g: food.carbsPer100g,
+    classId: food.id,
+  });
+  return id;
+}
+
+function topkLabel(entry: TopKEntry): string {
+  const food = foodById(entry.classId);
+  return food ? food.name[locale] : tr('unknown.food');
+}
+
+function chooseDetection(index: number, entry: TopKEntry): void {
+  const food = foodById(entry.classId);
+  if (!food) return;
+  const existingId = detectionDraftIds[index];
+  const item = existingId
+    ? draft.items.find((candidate) => candidate.id === existingId)
+    : undefined;
+  if (item) {
+    item.name = food.name[locale];
+    item.carbsPer100g = food.carbsPer100g;
+    item.classId = food.id;
+  } else {
+    detectionDraftIds[index] = pushFood(food);
+  }
+  renderDraft();
+}
+
+function applyDetections(results: DetectionResult[]): void {
+  detectionDraftIds = results.map((result) => {
+    const food = foodById(result.classId);
+    return food ? pushFood(food) : '';
+  });
+  renderDraft();
+  renderDetect();
+}
+
+function renderDetect(): void {
+  const panel = byId('detect-panel');
+  const summary = byId('detect-summary');
+  const list = byId('detect-results');
+  if (detections.length === 0) {
+    panel.hidden = true;
+    summary.textContent = '';
+    list.innerHTML = '';
+    return;
+  }
+  panel.hidden = false;
+  const engine = detectionEngine ? ` · ${tr('detect.engine')}: ${detectionEngine}` : '';
+  summary.textContent = `${detections.length} · ${tr('photo.detected')}${engine}`;
+  list.innerHTML = '';
+  detections.forEach((result, index) => {
+    const best: TopKEntry = result.topk[0] ?? {
+      label: result.label,
+      classId: result.classId,
+      p: result.score,
+    };
+    const row = document.createElement('li');
+    row.className = 'draft-row';
+    const name = document.createElement('span');
+    name.className = 'draft-name';
+    name.textContent = `${topkLabel(best)} · ${Math.round(best.p * 100)}%`;
+    row.appendChild(name);
+    if (result.topk.length > 1) {
+      const select = document.createElement('select');
+      select.className = 'detect-alt';
+      select.setAttribute('aria-label', tr('detect.alternatives'));
+      result.topk.forEach((entry, altIndex) => {
+        const option = document.createElement('option');
+        option.value = String(altIndex);
+        option.textContent = `${topkLabel(entry)} ${Math.round(entry.p * 100)}%`;
+        option.disabled = !entry.classId;
+        select.appendChild(option);
+      });
+      select.addEventListener('change', () => {
+        const chosen = result.topk[Number(select.value)];
+        if (chosen) chooseDetection(index, chosen);
+      });
+      row.appendChild(select);
+    }
+    list.appendChild(row);
+  });
+}
+
+async function startDetection(image: CapturedImage): Promise<void> {
+  detectAbort?.abort();
+  const controller = new AbortController();
+  detectAbort = controller;
+  const previous = new Set(detectionDraftIds.filter(Boolean));
+  if (previous.size > 0) draft.items = draft.items.filter((item) => !previous.has(item.id));
+  detections = [];
+  detectionDraftIds = [];
+  detectionEngine = '';
+  detectionMeta = null;
+  renderDraft();
+  renderDetect();
+  setPhotoStatus('photo.detecting');
+  try {
+    const outcome = await getDetectionClient().detect(
+      { dataUrl: image.dataUrl, width: image.width, height: image.height },
+      { manifestUrl: MODEL_MANIFEST_URL, cacheName: MODEL_CACHE, signal: controller.signal },
+      { onProgress: (event) => setPhotoStatus(PHASE_KEYS[event.phase]) },
+    );
+    if (controller.signal.aborted) return;
+    detections = outcome.results;
+    detectionEngine = outcome.engine;
+    detectionMeta = { detector: outcome.detector, classifier: outcome.classifier };
+    applyDetections(outcome.results);
+    setPhotoStatus(outcome.results.length > 0 ? 'photo.detected' : 'photo.noItems');
+  } catch (error) {
+    if (
+      controller.signal.aborted ||
+      (error instanceof DOMException && error.name === 'AbortError')
+    ) {
+      return;
+    }
+    detections = [];
+    detectionDraftIds = [];
+    renderDetect();
+    setPhotoStatus('photo.noModel');
   }
 }
 
@@ -343,6 +515,7 @@ function render(): void {
   renderToday();
   renderPhoto();
   renderDraft();
+  renderDetect();
   renderSearch();
   renderDiary();
   renderInsulin();
@@ -379,7 +552,9 @@ function wire(): void {
       .then((image) => {
         capture = image;
         draft.origin = 'photo';
+        photoStatusKey = null;
         renderPhoto();
+        void startDetection(image);
       })
       .catch(() => {
         /* imagen no legible: seguimos con la entrada manual */
@@ -400,17 +575,36 @@ function wire(): void {
 
   byId('register').addEventListener('click', () => {
     if (draft.items.length === 0) return;
+    const confidence =
+      detections.length > 0
+        ? detections.reduce((sum, result) => sum + result.score, 0) / detections.length
+        : null;
+    const topk = detections.flatMap((result) =>
+      result.topk
+        .filter((entry) => entry.classId)
+        .slice(0, 1)
+        .map((entry) => ({ classId: entry.classId as string, p: entry.p })),
+    );
     const meal: Meal = {
       id: uid(),
       date: currentDate,
       slot: draft.slot,
       items: draft.items.map((item) => ({ ...item })),
-      confidence: null,
+      confidence,
       origin: draft.origin,
+      model:
+        detectionMeta && topk.length > 0
+          ? { detector: detectionMeta.detector, classifier: detectionMeta.classifier, topk }
+          : undefined,
     };
     void putMeal(meal).then(() => {
       draft = { slot: draft.slot, origin: 'manual', items: [] };
       capture = null;
+      detections = [];
+      detectionDraftIds = [];
+      detectionMeta = null;
+      detectionEngine = '';
+      photoStatusKey = null;
       return refresh();
     });
   });

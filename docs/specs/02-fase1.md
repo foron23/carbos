@@ -17,10 +17,11 @@ Parametros de Fase 1 cerrados el 2026-10-12 (D19-D32), ver [`../decisiones.md`](
 
 Hecho: **E1** catalogo (154 alimentos, `make catalog`), **E2** mapa de clases (`classmap.ts`),
 **E5** captura, **E7** diario (dia/comida/semana), **E8** registro de insulina, **E9** export JSON
-y cifrado (Argon2id + AES-GCM), **E10** PWA offline, **E11** i18n ES/EN, y la migracion de
-esquema 1->2. Pendiente: **E3/E4** runtime de inferencia (pesos fuera del repo), **E6** porciones
-guiadas por la foto, **E12** auditoria de accesibilidad, **E13/E14** banco y publicacion del error
-(Nutrition5k). Ver [`05-benchmark.md`](05-benchmark.md), [`06-runtime.md`](06-runtime.md).
+y cifrado (Argon2id + AES-GCM), **E10** PWA offline, **E11** i18n ES/EN, **E4** runtime de
+inferencia (ONNX en Web Worker, WebGPU/WASM, descarga con sha256 y cache) y la migracion de esquema
+1->2. Pendiente: **E3** pesos publicados (sin ellos la deteccion degrada a entrada manual), **E6**
+porciones guiadas por la foto, **E12** auditoria de accesibilidad, **E13/E14** banco y publicacion
+del error (Nutrition5k). Ver [`05-benchmark.md`](05-benchmark.md), [`06-runtime.md`](06-runtime.md).
 
 ## Herencia de Fase 0 (deuda declarada)
 

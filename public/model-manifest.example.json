@@ -1,0 +1,15 @@
+{
+  "detector": {
+    "version": "0.1.0",
+    "url": "https://cdn.jsdelivr.net/gh/foron23/carbos-weights@0.1.0/detector.onnx",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "bytes": 1
+  },
+  "classifier": {
+    "version": "0.1.0",
+    "url": "https://cdn.jsdelivr.net/gh/foron23/carbos-weights@0.1.0/classifier.int8.onnx",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "bytes": 1,
+    "classes": ["tortilla", "paella", "lentejas"]
+  }
+}

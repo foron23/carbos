@@ -17,8 +17,10 @@ de tu dispositivo.
 Fase 1 (nucleo) en marcha. Ya estan: **catalogo curado** (154 alimentos, generado desde Ciqual
 2020 con `make catalog`), diario con totales por dia/comida/semana, registro de insulina,
 **captura de foto on-device**, export JSON y **export cifrado** (Argon2id + AES-GCM), **ES/EN**,
-PWA offline e instalable y migracion de esquema. **Pendiente**: el clasificador de foto (runtime
-ONNX con los pesos fuera del repo) y la medida del error sobre Nutrition5k.
+PWA offline e instalable y migracion de esquema. Ya esta el **runtime de inferencia** (ONNX en Web
+Worker, WebGPU con fallback WASM, descarga diferida con sha256 y cache, manifest en
+`public/model-manifest.example.json`). **Pendiente**: publicar los pesos (hoy no existe el repo de
+pesos, asi que la deteccion degrada a entrada manual) y la medida del error sobre Nutrition5k.
 
 Detalle por entregable: [`docs/specs/02-fase1.md`](docs/specs/02-fase1.md).
 
