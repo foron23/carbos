@@ -1,7 +1,5 @@
-import { DEFAULT_CLASSMAP, resolveClass } from '../catalog';
-import { CATALOG } from '../catalog';
-import { classify } from './classifier';
 import { detect } from './detector';
+import { classifyTopK } from './labels';
 import { fetchManifest, loadAsset, verifySha256 } from './loader';
 import {
   CLASSIFIER_INPUT,
@@ -142,6 +140,7 @@ async function runClassifier(
   session: Session,
   bitmap: ImageBitmap,
   box: PixelBox,
+  classes: readonly string[],
 ): Promise<TopKEntry[]> {
   const crop = expand(box, CROP_MARGIN, bitmap.width, bitmap.height);
   const rgba = drawTo(bitmap, CLASSIFIER_INPUT, CLASSIFIER_INPUT, crop);
@@ -156,11 +155,7 @@ async function runClassifier(
   const output = outputs[session.outputNames[0] ?? 'logits'];
   const logits = output?.data as ArrayLike<number> | undefined;
   if (!logits) throw new Error('decode: clasificador sin salida');
-  return classify(logits, TOP_K).map((entry) => {
-    const label = String(entry.index);
-    const resolved = resolveClass(DEFAULT_CLASSMAP, label, CATALOG);
-    return { label, classId: resolved ? resolved.food.id : null, p: entry.p };
-  });
+  return classifyTopK(logits, classes, TOP_K);
 }
 
 async function runDetector(
@@ -251,12 +246,18 @@ async function handleDetect(request: WorkerRequest & { type: 'detect' }): Promis
         bitmap.close();
         return;
       }
-      const topk = await runClassifier(ort, classifier, bitmap, {
-        x: box.x * bitmap.width,
-        y: box.y * bitmap.height,
-        w: box.w * bitmap.width,
-        h: box.h * bitmap.height,
-      });
+      const topk = await runClassifier(
+        ort,
+        classifier,
+        bitmap,
+        {
+          x: box.x * bitmap.width,
+          y: box.y * bitmap.height,
+          w: box.w * bitmap.width,
+          h: box.h * bitmap.height,
+        },
+        manifest.classifier.classes,
+      );
       const best = topk[0];
       results.push({
         box,

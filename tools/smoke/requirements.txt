@@ -1,0 +1,4 @@
+# Dependencias del smoke test local (modelos ONNX de prueba). Ver tools/smoke/make_models.py.
+onnx>=1.16
+numpy>=1.26
+onnxruntime>=1.18

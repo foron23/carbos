@@ -41,7 +41,8 @@ TRAIN_ARGS ?=
 EXPORT_ARGS ?=
 
 .PHONY: help setup install build test e2e lint format format-check check run dev clean \
-        build-stamp verify-bundle train-setup train train-smoke export-model catalog
+        build-stamp verify-bundle train-setup train train-smoke export-model catalog \
+        smoke-setup smoke-models smoke-clean
 
 ## help: Show this help
 help:
@@ -205,6 +206,23 @@ export-model:
 ## catalog: Regenera src/catalog/catalog.ts desde Ciqual 2020 (tools/catalog/build_catalog.py)
 catalog:
 	$(PYTHON) tools/catalog/build_catalog.py
+
+## smoke-setup: Crea tools/smoke/.venv con onnx/numpy/onnxruntime para el smoke test local
+smoke-setup:
+	$(PYTHON) -m venv tools/smoke/.venv
+	tools/smoke/.venv/bin/python -m pip install -r tools/smoke/requirements.txt
+
+## smoke-models: Genera modelos ONNX de prueba y el manifest local (no se commitea)
+smoke-models:
+	@if [ -x tools/smoke/.venv/bin/python ]; then \
+		tools/smoke/.venv/bin/python tools/smoke/make_models.py; \
+	else \
+		$(PYTHON) tools/smoke/make_models.py; \
+	fi
+
+## smoke-clean: Borra los modelos de prueba y el manifest local
+smoke-clean:
+	rm -rf public/models public/model-manifest.json
 
 ## clean: Remove build artifacts and caches
 clean:

@@ -21,10 +21,38 @@ se invocan herramientas sueltas (`npx`, `vitest`, `tsc`) si existe un target.
 | `make train`        | Entrena la cabeza nueva (linear probe) sobre el set propio                                                 |
 | `make export-model` | Exporta a ONNX int8 y escribe el manifest del clasificador                                                 |
 | `make catalog`      | Regenera `src/catalog/catalog.ts` desde Ciqual 2020 (`tools/catalog/build_catalog.py`)                     |
+| `make smoke-setup`  | Crea `tools/smoke/.venv` (onnx/numpy/onnxruntime) para el smoke test local                                 |
+| `make smoke-models` | Genera modelos ONNX **de prueba** + `public/model-manifest.json` (no se commitea)                          |
+| `make smoke-clean`  | Borra los modelos de prueba y el manifest local                                                            |
 | `make clean`        | Borra `dist/` y caches                                                                                     |
 
 > El entrenamiento es **dev time**: sus datos y pesos no entran al bundle ni al repo
 > (`.gitignore` cubre `training/data/`, `training/out/`, `*.pt`, `*.onnx`).
+
+## Smoke test local (modelos de prueba)
+
+El reconocimiento de foto necesita pesos, que **aun no estan publicados** (D24); sin
+`public/model-manifest.json` la app degrada a entrada manual. Para probar el flujo completo en
+local sin publicar nada:
+
+```bash
+make smoke-setup     # crea el venv con onnx/numpy/onnxruntime
+make smoke-models    # genera public/models/*.onnx + public/model-manifest.json
+make dev             # o: npm run dev -- --host  para probar desde el movil
+```
+
+Los modelos son **placeholder** (detector de caja fija, clasificador de logits fijos): prueban
+manifest -> descarga -> sha256 -> sesion -> deteccion -> clasificacion -> porcion, pero **no**
+reconocen comida real. Viven en `public/models/` y estan **gitignored**: no viajan al repo ni al
+artefacto de Pages. `make verify-bundle` los detecta y falla si intentas empaquetarlos; usa
+`make smoke-clean` antes de un build de release.
+
+Contrato que respetan (ver `src/model/worker.ts`):
+
+| Modelo       | Entrada                          | Salida                        |
+| ------------ | -------------------------------- | ----------------------------- |
+| detector     | `[1,3,640,640]` float32 `/255`   | `[1, 4+nc, anchors]` (YOLOv8) |
+| clasificador | `[1,3,224,224]` float32 ImageNet | logits `[1, C]`               |
 
 ## Estructura
 
@@ -42,6 +70,7 @@ src/
 e2e/           Arnés E2E (Puppeteer + Firefox headless) y escenarios.
 training/      Entrenamiento (dev time): linear_probe.py, export_onnx.py, requirements.txt.
 tools/catalog/ Generador del catalogo (selection.csv + build_catalog.py; cache en .cache/).
+tools/smoke/   Modelos ONNX de prueba y manifest local para el smoke test (make smoke-models).
 public/        manifest.webmanifest, sw.js, icon.svg (PWA minima)
 docs/          specs/ (roadmap, fase 1, despliegue, spike BEDCA, benchmark, runtime, fine-tuning, linear probe), decisiones.md, esta receta.
 ```

@@ -50,4 +50,22 @@ describe('model manifest', () => {
       }),
     ).toThrow();
   });
+
+  it('acepta una url relativa (mismo origen, smoke test local)', () => {
+    expect(() =>
+      modelManifestSchema.parse({
+        ...manifest,
+        detector: { ...manifest.detector, url: '/models/detector.onnx' },
+      }),
+    ).not.toThrow();
+  });
+
+  it('rechaza una url invalida', () => {
+    expect(() =>
+      modelManifestSchema.parse({
+        ...manifest,
+        detector: { ...manifest.detector, url: 'no es una url' },
+      }),
+    ).toThrow();
+  });
 });

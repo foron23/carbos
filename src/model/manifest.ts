@@ -2,9 +2,25 @@ import { z } from 'zod';
 
 export const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/, 'sha256 esperado en hex minusculas');
 
+const urlSchema = z
+  .string()
+  .min(1)
+  .refine(
+    (value) => {
+      if (value.startsWith('/') || value.startsWith('./') || value.startsWith('../')) return true;
+      try {
+        new URL(value);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    { message: 'url absoluta o ruta relativa esperada' },
+  );
+
 export const modelEntrySchema = z.object({
   version: z.string().min(1),
-  url: z.string().url(),
+  url: urlSchema,
   sha256: sha256Schema,
   bytes: z.number().int().positive(),
 });
