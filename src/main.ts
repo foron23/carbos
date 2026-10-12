@@ -70,8 +70,16 @@ function byId<T extends HTMLElement = HTMLElement>(id: string): T {
   return node as T;
 }
 
+/** Fecha local en ISO (YYYY-MM-DD). `toISOString` desplaza de dia fuera de UTC. */
+function isoDay(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return isoDay(new Date());
 }
 
 function uid(): string {
@@ -543,6 +551,21 @@ function wire(): void {
     currentDate = byId<HTMLInputElement>('date').value || today();
     render();
   });
+
+  const setDay = (isoDate: string): void => {
+    currentDate = isoDate;
+    byId<HTMLInputElement>('date').value = isoDate;
+    render();
+  };
+  const shiftDay = (days: number): void => {
+    const [year = 1970, month = 1, day = 1] = currentDate.split('-').map(Number);
+    const base = new Date(year, month - 1, day);
+    base.setDate(base.getDate() + days);
+    setDay(isoDay(base));
+  };
+  byId('day-prev').addEventListener('click', () => shiftDay(-1));
+  byId('day-next').addEventListener('click', () => shiftDay(1));
+  byId('day-today').addEventListener('click', () => setDay(today()));
 
   const onFile = (event: Event): void => {
     const input = event.target as HTMLInputElement;
