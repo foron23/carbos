@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { CATALOG } from '../src/catalog/catalog.ts';
+import { DEFAULT_CLASSMAP, resolveClass } from '../src/catalog/classmap.ts';
 import { classifyTopK } from '../src/model/labels.ts';
 import { modelManifestSchema } from '../src/model/manifest.ts';
 import type { ModelManifest } from '../src/model/manifest.ts';
@@ -71,6 +72,7 @@ export interface Detection {
   label: string;
   classId: string | null;
   p: number;
+  detectorClass: number;
 }
 
 function expand(box: PixelBox, margin: number, width: number, height: number): PixelBox {
@@ -106,7 +108,7 @@ export class Inference {
   async run(rgba: Rgba): Promise<Detection[]> {
     const boxes = await this.detectBoxes(rgba);
     const detections: Detection[] = [];
-    for (const box of boxes) {
+    for (const { box, classIndex } of boxes) {
       const pixel: PixelBox = {
         x: box.x * rgba.width,
         y: box.y * rgba.height,
@@ -133,12 +135,13 @@ export class Inference {
         label: best?.label ?? 'desconocido',
         classId: best?.classId ?? null,
         p: best?.p ?? 0,
+        detectorClass: classIndex,
       });
     }
     return detections;
   }
 
-  private async detectBoxes(rgba: Rgba): Promise<PixelBox[]> {
+  private async detectBoxes(rgba: Rgba): Promise<{ box: PixelBox; classIndex: number }[]> {
     const geometry = letterboxGeometry(rgba.width, rgba.height, DETECTOR_INPUT, DETECTOR_INPUT);
     const padded = letterbox(rgba, DETECTOR_INPUT, PAD_VALUE);
     const tensor = new this.ort.Tensor(
@@ -160,9 +163,10 @@ export class Inference {
       iouThreshold: IOU_THRESHOLD,
       maxDetections: MAX_DETECTIONS,
     });
-    return candidates.map((candidate) =>
-      normalizeBox(unletterboxBox(candidate.box, geometry), rgba.width, rgba.height),
-    );
+    return candidates.map((candidate) => ({
+      box: normalizeBox(unletterboxBox(candidate.box, geometry), rgba.width, rgba.height),
+      classIndex: candidate.classIndex,
+    }));
   }
 }
 
@@ -177,6 +181,46 @@ export function predictedCarbs(detections: Detection[]): {
   for (const detection of detections) {
     if (!detection.classId) continue;
     const food = CATALOG.foods.find((entry) => entry.id === detection.classId);
+    if (!food) continue;
+    resolved += 1;
+    mass += food.defaultPortionGrams;
+    carbs += (food.defaultPortionGrams * food.carbsPer100g) / 100;
+  }
+  return { carbs, mass, resolved };
+}
+
+// Clases COCO (detector) que son comida y su nombre, para usar la clase del detector.
+const COCO_FOOD_CLASS: Record<number, string> = {
+  46: 'banana',
+  47: 'apple',
+  48: 'sandwich',
+  49: 'orange',
+  50: 'broccoli',
+  51: 'carrot',
+  52: 'hot dog',
+  53: 'pizza',
+  54: 'donut',
+  55: 'cake',
+};
+
+/**
+ * Variante experimental: si la caja la detecta el detector con una clase de comida COCO,
+ * se usa esa clase (traducida por el mapa); si no, cae al clasificador de imagen.
+ */
+export function predictedCarbsDetector(detections: Detection[]): {
+  carbs: number;
+  mass: number;
+  resolved: number;
+} {
+  let carbs = 0;
+  let mass = 0;
+  let resolved = 0;
+  for (const detection of detections) {
+    const label = COCO_FOOD_CLASS[detection.detectorClass];
+    const fromDetector = label ? resolveClass(DEFAULT_CLASSMAP, label, CATALOG) : null;
+    const classId = fromDetector ? fromDetector.food.id : detection.classId;
+    if (!classId) continue;
+    const food = CATALOG.foods.find((entry) => entry.id === classId);
     if (!food) continue;
     resolved += 1;
     mass += food.defaultPortionGrams;

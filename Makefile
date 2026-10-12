@@ -40,18 +40,25 @@ TRAIN_OUT  ?= training/out
 TRAIN_ARGS ?=
 EXPORT_ARGS ?=
 
+# --- Pesos de produccion ----------------------------------------------------
+# Ver docs/specs/03-despliegue.md. Genera weights/ (en este repo) + el manifest.
+WEIGHTS_VERSION ?= 0.1.0
+WEIGHTS_REPO    ?= foron23/carbos
+WEIGHTS_BASE    ?=
+WEIGHTS_ARGS    ?=
+
 # --- Banco de evaluacion (Nutrition5k) --------------------------------------
 # Ver docs/specs/10-experimento.md. --limit 0 evalua los 709 platos del test.
 EVAL_ARGS ?= --manifest public/model-manifest.json --root public --limit 25
 
 .PHONY: help setup install build test e2e lint format format-check check run dev clean \
         build-stamp verify-bundle train-setup train train-smoke export-model catalog \
-        smoke-setup smoke-models smoke-clean eval
+        weights-manifest smoke-setup smoke-models smoke-clean eval
 
 ## help: Show this help
 help:
 	@printf '\nUsage: make <target>\n\n'
-	@grep -hE '^## ' $(MAKEFILE_LIST) | sed 's/^## //' | awk -F': ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
+	@grep -hE '^## ' $(MAKEFILE_LIST) | sed 's/^## //' | awk -F': ' '{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 	@printf '\n'
 
 ## setup: Alias for install
@@ -224,17 +231,28 @@ smoke-setup:
 	$(PYTHON) -m venv tools/smoke/.venv
 	tools/smoke/.venv/bin/python -m pip install -r tools/smoke/requirements.txt
 
-## smoke-models: Genera modelos ONNX de prueba y el manifest local (no se commitea)
+## weights-manifest: Genera weights/ y public/model-manifest.json desde los pesos reales (D24)
+weights-manifest:
+	$(PYTHON) tools/publish/build_manifest.py --version $(WEIGHTS_VERSION) \
+		--repo $(WEIGHTS_REPO) $(if $(WEIGHTS_BASE),--base-url $(WEIGHTS_BASE)) $(WEIGHTS_ARGS)
+
+## smoke-models: Genera modelos ONNX de prueba y un manifest local de smoke
 smoke-models:
 	@if [ -x tools/smoke/.venv/bin/python ]; then \
 		tools/smoke/.venv/bin/python tools/smoke/make_models.py; \
 	else \
 		$(PYTHON) tools/smoke/make_models.py; \
 	fi
+	@echo "aviso: manifest de smoke (version 'smoke'); 'make smoke-clean' restaura el de produccion"
 
-## smoke-clean: Borra los modelos de prueba y el manifest local
+## smoke-clean: Borra los modelos de prueba y restaura el manifest de produccion
 smoke-clean:
-	rm -rf public/models public/model-manifest.json
+	rm -rf public/models
+	@if git ls-files --error-unmatch public/model-manifest.json >/dev/null 2>&1; then \
+		git checkout -- public/model-manifest.json; \
+	else \
+		rm -f public/model-manifest.json; \
+	fi
 
 ## eval: Corre el banco de Nutrition5k sobre el manifest de modelos (ver docs/specs/10-experimento.md)
 eval:

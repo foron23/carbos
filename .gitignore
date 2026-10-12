@@ -15,13 +15,16 @@ __pycache__/
 *.pyc
 *.pt
 *.onnx
+# Excepcion: pesos publicados en este mismo repo, servidos por jsDelivr (D24);
+# viven fuera de public/ para no entrar en el artefacto de Pages.
+!weights/
+!weights/*.onnx
 
 # Cache de la tabla Ciqual descargada por tools/catalog/build_catalog.py
 tools/catalog/.cache/
 
 # Smoke test local: modelos ONNX de prueba y venv (nunca al repo)
 public/models/
-public/model-manifest.json
 tools/smoke/.venv/
 
 # Banco de evaluacion (build, cache y resultados)

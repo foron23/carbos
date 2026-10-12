@@ -1,6 +1,12 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Inference, decodePng, loadManifest, predictedCarbs } from './infer.ts';
+import {
+  Inference,
+  decodePng,
+  loadManifest,
+  predictedCarbs,
+  predictedCarbsDetector,
+} from './infer.ts';
 import { summarize } from './metrics.ts';
 import type { Row } from './metrics.ts';
 import { loadTestDishes } from './nutrition5k.ts';
@@ -24,12 +30,16 @@ async function exists(path: string): Promise<boolean> {
 async function loadImageBytes(dish: Dish, cacheDir: string): Promise<Uint8Array | null> {
   const file = join(cacheDir, `${dish.id}.png`);
   if (await exists(file)) return new Uint8Array(await readFile(file));
-  const response = await fetch(dish.imageUrl);
-  if (!response.ok) return null;
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  await mkdir(cacheDir, { recursive: true });
-  await writeFile(file, bytes);
-  return bytes;
+  try {
+    const response = await fetch(dish.imageUrl);
+    if (!response.ok) return null;
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    await mkdir(cacheDir, { recursive: true });
+    await writeFile(file, bytes);
+    return bytes;
+  } catch {
+    return null;
+  }
 }
 
 async function pool<T>(
@@ -56,11 +66,13 @@ async function main(): Promise<void> {
   const concurrency = Math.max(1, Number(arg('--concurrency', '4')) || 4);
   const outDir = arg('--out', 'eval/results');
   const cacheDir = arg('--cache', 'eval/cache/images');
+  const dataCache = arg('--data-cache', 'eval/cache');
+  const source = arg('--source', 'image');
 
   const manifest = await loadManifest(manifestPath);
   const inference = await Inference.create(manifest, root);
 
-  let dishes = await loadTestDishes();
+  let dishes = await loadTestDishes(fetch, dataCache);
   if (limit > 0) dishes = dishes.slice(0, limit);
   console.log(`Platos a evaluar: ${dishes.length} (concurrencia ${concurrency})`);
 
@@ -75,7 +87,8 @@ async function main(): Promise<void> {
     }
     const rgba = decodePng(bytes);
     const detections = await inference.run(rgba);
-    const { carbs, mass, resolved } = predictedCarbs(detections);
+    const { carbs, mass, resolved } =
+      source === 'detector' ? predictedCarbsDetector(detections) : predictedCarbs(detections);
     rows.push({
       id: dish.id,
       trueCarb: dish.totalCarb,
@@ -101,6 +114,7 @@ async function main(): Promise<void> {
     evaluated: rows.length,
     missingImages: missing,
     concurrency,
+    source,
     detector: {
       version: manifest.detector.version,
       sha256: manifest.detector.sha256,
@@ -115,7 +129,7 @@ async function main(): Promise<void> {
     summary,
     rows,
   };
-  const file = join(outDir, `nutrition5k-${manifest.classifier.version}-${stamp}.json`);
+  const file = join(outDir, `nutrition5k-${manifest.classifier.version}-${source}-${stamp}.json`);
   await writeFile(file, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
 
   console.log(`Evaluados: ${rows.length} (sin imagen: ${missing})`);

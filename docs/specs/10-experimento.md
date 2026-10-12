@@ -158,9 +158,13 @@ Mismo detector (YOLO11n COCO) para todos; 202 de 709 platos no tienen cenital.
 
 | Candidato                              | Tamano     | MAE carb    | %MAE    | Cobertura  |
 | -------------------------------------- | ---------- | ----------- | ------- | ---------- |
-| **MobileNetV3-Large ImageNet int8**    | **5.7 MB** | **15.63 g** | 79.4 %  | **28.4 %** |
+| **MobileNetV3-Large ImageNet int8**    | **5.7 MB** | **15.19 g** | 77.2 %  | **34.1 %** |
 | Swin Food-101 int8                     | 93 MB      | 22.63 g     | 115.0 % | 25.5 %     |
 | Food-101 subset fine-tuned (34 clases) | 3.2 MB     | 28.40 g     | 144.3 % | 17.1 %     |
+
+Numeros actualizados tras alinear las etiquetas del modelo con el catalogo (normalizacion + aliases
+ImageNet, D31): la cobertura sube de 28.4 % a 34.1 % sin tocar el modelo (ver
+[`11-comparacion-modelos.md`](11-comparacion-modelos.md)).
 
 Lectura:
 
@@ -168,8 +172,10 @@ Lectura:
   93 MB): el catalogo es de **ingredientes**, y ImageNet cubre fruta/verdura mejor que Food-101.
 - El **fine-tuned (34 clases)** valida el pipeline de punta a punta (top-1 74.4 % en su test),
   pero su cobertura es baja por conocer pocas clases.
-- **Ninguno se acerca al catalogo**: la cobertura (~28 %) sigue siendo el cuello de botella, y el
+- **Ninguno se acerca al catalogo**: la cobertura (~34 %) sigue siendo el cuello de botella, y el
   MAE lo refleja. Confirma la necesidad de **fine-tuning al catalogo** o **destilacion**.
+- Usar la **clase del detector** (COCO) sube la cobertura a 75.9 % pero **empeora** el MAE
+  (19.84 g): cobertura sin precision no ayuda.
 
 ## Siguiente: destilacion (D32)
 

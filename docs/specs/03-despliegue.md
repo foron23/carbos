@@ -83,7 +83,7 @@ El `ci.yml` actual se mantiene para PRs y ramas; en `main` este workflow repite 
 para no desplegar nunca un artefacto que no paso la puerta. Alternativa: disparar por
 `workflow_run` sobre el CI verde (una sola ejecucion de checks, algo mas de latencia).
 
-## Pesos fuera del repo (D18/D24)
+## Pesos fuera del artefacto (D18/D24)
 
 Contrato: `public/model-manifest.json` (versionado en el repo, sin pesos) con una entrada por
 modelo. Como la v1 es **multi-item** (D21), hay dos: **detector** y **clasificador**.
@@ -95,8 +95,9 @@ modelo. Como la v1 es **multi-item** (D21), hay dos: **detector** y **clasificad
 }
 ```
 
-- **Alojamiento**: **jsDelivr** (sobre una release o rama de pesos) o **GitHub Releases**. Ambos
-  sirven con CORS permisivo (`Access-Control-Allow-Origin: *`).
+- **Alojamiento**: los pesos viven en **este mismo repo** (`weights/`, fuera de `public/` para no
+  entrar en el artefacto de Pages) y se sirven por **jsDelivr desde un tag** (`weights-<version>`).
+  jsDelivr sirve con CORS permisivo (`Access-Control-Allow-Origin: *`).
 - **Descarga diferida**: el usuario la pide; se muestra **tamano y progreso**; se guarda en
   Cache Storage `carbos-models-vN`.
 - **Integridad**: tras descargar, `crypto.subtle.digest('SHA-256', ...)` debe coincidir con el manifest.
@@ -104,8 +105,35 @@ modelo. Como la v1 es **multi-item** (D21), hay dos: **detector** y **clasificad
   gestiona la app). Evita inflar el cache del SW y su reversion en cada build.
 - **Cache-busting**: assets con hash (Vite ya lo hace) y el nombre del cache del SW atado a la
   version del build (inyectar `__BUILD__` o leer un `version.json` generado).
-- **Repo de pesos**: si se usa jsDelivr, los binarios viven en un repo/release aparte del de la
-  app; el codigo de Carbos solo referencia URL + sha256.
+
+### Publicar los pesos (produccion)
+
+1. Exporta los modelos (ver [`10-experimento.md`](10-experimento.md)): YOLO11n COCO (detector) y
+   MobileNetV3-Large ImageNet int8 (clasificador). Viven en `eval/cache/models/` (gitignored).
+2. Genera los pesos y el manifest con nombres canonicos:
+
+   ```bash
+   make weights-manifest WEIGHTS_VERSION=0.1.0
+   ```
+
+   Copia los ONNX a `weights/detector.onnx` y `weights/classifier.int8.onnx` (versionados) y escribe
+   `public/model-manifest.json` con `sha256`, `bytes` y las clases del clasificador, apuntando a
+   `https://cdn.jsdelivr.net/gh/foron23/carbos@weights-0.1.0/weights/...`.
+
+3. Commitea `weights/` y `public/model-manifest.json` y crea el tag (que jsDelivr sirve):
+
+   ```bash
+   git add weights public/model-manifest.json
+   git commit -m "pesos: v0.1.0"
+   git tag weights-0.1.0
+   git push origin main weights-0.1.0
+   ```
+
+4. Para probar el flujo de foto en local sin red: `make smoke-models` (y `make smoke-clean`
+   restaura el manifest de produccion).
+
+El `sha256` casa porque se commitean los **bytes exactos** que sirve jsDelivr; no reexportes ni
+recuantices despues de generar el manifest. La app descarga una sola vez y verifica el hash.
 
 ## Dominio personalizado (opcional)
 
@@ -130,4 +158,5 @@ Anadir `public/CNAME` con el dominio (p. ej. `carbos.app`), apuntar DNS a Pages 
 - [ ] Verificar `base: './'`, `sw.js` y manifest relativos
 - [ ] `https://foron23.github.io/carbos/` carga e instala como PWA
 - [ ] El service worker no precachea los pesos
-- [ ] (Cuando existan) publicar `model-manifest.json` con detector y clasificador (URL + sha256)
+- [ ] Publicar los pesos con `make weights-manifest` y commitear `public/model-manifest.json`
+      (URL + sha256 + clases)

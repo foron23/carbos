@@ -197,7 +197,45 @@ export const DEFAULT_CLASSMAP: ClassMap = {
   lemonade: 'limonada',
   cola: 'refresco_cola',
   beer: 'cerveza',
+  // Aliases para las etiquetas de ImageNet (D31): el modelo publico emite
+  // nombres WordNet con espacios/mayusculas (p.ej. "Granny Smith", "head cabbage").
+  // Se normalizan a snake_case antes de resolver (ver normalizeLabel).
+  granny_smith: 'manzana',
+  head_cabbage: 'repollo',
+  french_loaf: 'pan_blanco',
+  bagel: 'pan_blanco',
+  pretzel: 'pan_blanco',
+  spaghetti_squash: 'calabaza',
+  acorn_squash: 'calabaza',
+  butternut_squash: 'calabaza',
+  guacamole: 'aguacate',
+  cheeseburger: 'hamburguesa',
+  carbonara: 'pasta_cocida',
+  chocolate_sauce: 'chocolate_negro',
+  potpie: 'empanadilla',
+  ice_lolly: 'helado',
+  trifle: 'bizcocho',
+  // Clases de hongos de ImageNet (frecuentes en platos) -> champinon.
+  coral_fungus: 'champinon',
+  agaric: 'champinon',
+  gyromitra: 'champinon',
+  stinkhorn: 'champinon',
+  earthstar: 'champinon',
+  hen_of_the_woods: 'champinon',
+  bolete: 'champinon',
 };
+
+/**
+ * Normaliza la etiqueta de un modelo publico a la forma de las claves del mapa:
+ * minusculas, sin espacios sobrantes y separando por `_` (espacios y guiones).
+ * Los indices del modelo llegan como `classes[index]`; p.ej. "Granny Smith" -> "granny_smith".
+ */
+export function normalizeLabel(label: string): string {
+  return label
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+}
 
 export function missingClassTargets(map: ClassMap, catalog: Catalog): string[] {
   const ids = new Set(catalog.foods.map((food) => food.id));
@@ -205,7 +243,7 @@ export function missingClassTargets(map: ClassMap, catalog: Catalog): string[] {
 }
 
 export function foodForClass(map: ClassMap, label: string): string | null {
-  return map[label] ?? null;
+  return map[label] ?? map[normalizeLabel(label)] ?? null;
 }
 
 export function classForFood(map: ClassMap, foodId: string): string | null {

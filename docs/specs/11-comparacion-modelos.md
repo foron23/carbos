@@ -3,9 +3,11 @@
 > [!abstract] TL;DR
 > Comparacion de clasificadores publicos y uno propio (fine-tuned) con el **mismo detector**
 > (YOLO11n COCO) sobre el **split de test de Nutrition5k** (507 platos con cenital). Gana un
-> **clasificador general pequeno** (MobileNetV3-Large ImageNet int8, 5.7 MB): MAE 15.63 g y
-> cobertura 28.4 %. Ninguno se acerca al catalogo: la **cobertura** es el cuello de botella y
-> apunta al fine-tuning al catalogo o a la destilacion.
+> **clasificador general pequeno** (MobileNetV3-Large ImageNet int8, 5.7 MB): MAE 15.19 g y
+> cobertura 34.1 %. Ninguno se acerca al catalogo: la **cobertura** es el cuello de botella y
+> apunta al fine-tuning al catalogo o a la destilacion. Un mapeo de etiquetas ImageNet al catalogo
+> (normalizacion + aliases, D31) ya sube la cobertura de 28.4 % a 34.1 %; usar la **clase del
+> detector** la sube a 75.9 % pero **empeora el MAE** (19.84 g): cobertura sin precision no ayuda.
 
 Mecanica del banco en [`05-benchmark.md`](05-benchmark.md); diseno en
 [`10-experimento.md`](10-experimento.md).
@@ -25,7 +27,7 @@ carb/100 g)`. El error mide, sobre todo, clasificacion + porciones por defecto.
 
 | Candidato                                  | Tamano     | MAE carb    | %MAE    | IC95           | MAE masa | Cobertura  |
 | ------------------------------------------ | ---------- | ----------- | ------- | -------------- | -------- | ---------- |
-| **MobileNetV3-Large ImageNet int8**        | **5.7 MB** | **15.63 g** | 79.4 %  | [14.31, 16.73] | 154.6 g  | **28.4 %** |
+| **MobileNetV3-Large ImageNet int8**        | **5.7 MB** | **15.19 g** | 77.2 %  | [14.10, 16.27] | 147.8 g  | **34.1 %** |
 | Swin Food-101 int8                         | 93 MB      | 22.63 g     | 115.0 % | [20.69, 25.49] | 172.6 g  | 25.5 %     |
 | MobileNetV3-Large Food-101 subset (propio) | 3.2 MB     | 28.40 g     | 144.3 % | [25.85, 30.86] | 167.7 g  | 17.1 %     |
 
@@ -51,8 +53,27 @@ Descartados: `AlexKoff88/mobilenet_v2_food101` (ONNX muerto, logits ~1e-9);
   cobertura; mas capacidad no compensa una taxonomia desalineada.
 - **El fine-tuned propio** valida el pipeline (entrenar -> exportar -> benchmark) pero solo conoce
   34 clases, asi que su cobertura cae. Con las 101 clases y datos alineados al catalogo subiria.
-- **La cobertura manda**: ~28 % significa que ~7 de cada 10 items caen en "desconocido" y aportan
+- **La cobertura manda**: ~34 % significa que ~2 de cada 3 items caen en "desconocido" y aportan
   0 g; el MAE lo refleja. No es un problema de precision del clasificador, es de **taxonomia**.
+- **La clase del detector engana**: el detector ya etiqueta clases COCO de comida (carrot,
+  broccoli, apple...) con cobertura del 75.9 %, pero su MAE es peor (19.84 g): confunde alimentos
+  entre si ("carrot" como cajon de sastre). Mas cobertura **no** es mejor error.
+
+## Mapeo al catalogo y clase del detector (D31)
+
+El mapa de clases (`src/catalog/classmap.ts`) traducia las etiquetas del modelo, pero lo hacia sin
+normalizar: los modelos publicos emiten nombres WordNet ("Granny Smith", "ice cream", "head
+cabbage") y solo **15 de las 1000** clases de ImageNet coincidian exactamente con una clave del
+mapa. La correccion (`normalizeLabel` + aliases ImageNet -> catalogo, incluidos los hongos) sube la
+cobertura de **28.4 % a 34.1 %** y baja el MAE de 15.63 a **15.19 g**, sin tocar el modelo.
+
+| Fuente de la clase                     | MAE carb    | Cobertura  | Lectura                       |
+| -------------------------------------- | ----------- | ---------- | ----------------------------- |
+| Clasificador de imagen (ImageNet int8) | **15.19 g** | 34.1 %     | mejor error; es el elegido    |
+| Clase del detector (COCO) con fallback | 19.84 g     | **75.9 %** | mas cobertura, peor precision |
+
+La conclusion no cambia: el limite es de **taxonomia** (que el modelo hable el idioma del catalogo),
+no de recall. El siguiente paso sigue siendo fine-tuning/distilacion al catalogo (D32).
 
 ## Reproducibilidad
 
@@ -66,7 +87,13 @@ python3 tools/shortlist/build_manifests.py
 
 # barrido completo (cache de imagenes + concurrencia)
 make eval EVAL_ARGS="--manifest eval/cache/manifest-mobilenet_v3_large_imagenet.json --root eval/cache --limit 0 --concurrency 6"
+
+# variante "clase del detector" (COCO) con fallback al clasificador
+make eval EVAL_ARGS="--manifest eval/cache/manifest-mobilenet_v3_large_imagenet.json --root eval/cache --limit 0 --concurrency 6 --source detector"
 ```
+
+Imagenes y metadatos se cachean en `eval/cache/` (gitignored); con la cache el barrido es
+reproducible sin red.
 
 Resultados en `eval/results/nutrition5k-<candidato>-<fecha>.json` (gitignored).
 

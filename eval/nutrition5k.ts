@@ -36,11 +36,37 @@ async function getText(fetcher: Fetcher, url: string): Promise<string> {
   return response.text();
 }
 
-export async function loadTestDishes(fetcher: Fetcher = fetch): Promise<Dish[]> {
+/**
+ * Descarga (o lee de cache) un recurso de texto del dataset. La cache evita
+ * volver a pedir los CSV de metadatos (el benchmark es reproducible offline).
+ */
+async function cachedText(fetcher: Fetcher, url: string, cacheDir?: string, name?: string) {
+  if (cacheDir && name) {
+    const { readFile, mkdir, writeFile } = await import('node:fs/promises');
+    const { join } = await import('node:path');
+    const file = join(cacheDir, name);
+    try {
+      return await readFile(file, 'utf8');
+    } catch {
+      const text = await getText(fetcher, url);
+      await mkdir(cacheDir, { recursive: true });
+      await writeFile(file, text, 'utf8');
+      return text;
+    }
+  }
+  return getText(fetcher, url);
+}
+
+export async function loadTestDishes(fetcher: Fetcher = fetch, cacheDir?: string): Promise<Dish[]> {
   const [meta1, meta2, split] = await Promise.all([
-    getText(fetcher, `${BASE}/metadata/dish_metadata_cafe1.csv`),
-    getText(fetcher, `${BASE}/metadata/dish_metadata_cafe2.csv`),
-    getText(fetcher, `${BASE}/dish_ids/splits/rgb_test_ids.txt`),
+    cachedText(fetcher, `${BASE}/metadata/dish_metadata_cafe1.csv`, cacheDir, 'metadata/cafe1.csv'),
+    cachedText(fetcher, `${BASE}/metadata/dish_metadata_cafe2.csv`, cacheDir, 'metadata/cafe2.csv'),
+    cachedText(
+      fetcher,
+      `${BASE}/dish_ids/splits/rgb_test_ids.txt`,
+      cacheDir,
+      'metadata/rgb_test_ids.txt',
+    ),
   ]);
   const meta = new Map([...parseMetadata(meta1), ...parseMetadata(meta2)]);
   const dishes: Dish[] = [];

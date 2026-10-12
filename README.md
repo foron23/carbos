@@ -23,16 +23,19 @@ Fase 1 (nucleo) en marcha. Ya estan: **catalogo curado** (154 alimentos, generad
 2020 con `make catalog`), diario con totales por dia/comida/semana, registro de insulina,
 **captura de foto on-device**, export JSON y **export cifrado** (Argon2id + AES-GCM), **ES/EN**,
 PWA offline e instalable y migracion de esquema. Ya esta el **runtime de inferencia** (ONNX en Web
-Worker, WebGPU con fallback WASM, descarga diferida con sha256 y cache, manifest en
-`public/model-manifest.example.json`) y el **banco de medida** sobre Nutrition5k (`make eval`).
-**Pendiente**: elegir y publicar los **pesos reales** (D28; hoy no existe el repo de pesos, asi que
-la deteccion degrada a entrada manual) y correr el banco con ellos. Para probar el flujo de foto en
-local sin pesos: `make smoke-models`.
+Worker, WebGPU con fallback WASM, descarga diferida con sha256 y cache) y el **banco de medida**
+sobre Nutrition5k (`make eval`). El modelo elegido (D28) es **YOLO11n COCO + MobileNetV3-Large
+ImageNet int8**; los pesos viven en `weights/` (5.7 MB + 10.7 MB) y se publican desde este mismo
+repo por jsDelivr (`weights-0.1.0`, D24), con el manifest en `public/model-manifest.json`. Para
+probar el flujo de foto en local sin red: `make smoke-models`.
 
-**Benchmark (Nutrition5k, 507 platos):** el mejor candidato es **MobileNetV3-Large ImageNet int8**
-(5.7 MB): MAE 15.63 g, cobertura 28.4 %. Ningun modelo publico se acerca al catalogo: el siguiente
-paso es **fine-tuning al catalogo** o **destilacion** (D32). Detalle en
-[`docs/specs/10-experimento.md`](docs/specs/10-experimento.md).
+**Benchmark (Nutrition5k, 507 platos, 2026-10-12):** el mejor candidato es **MobileNetV3-Large
+ImageNet int8** (5.7 MB; etiquetas ImageNet normalizadas y mapeadas al catalogo, D31): **MAE
+15.19 g, cobertura 34.1 %** (IC95 [14.10, 16.27]). Ningun modelo publico se acerca al catalogo: el
+siguiente paso es **fine-tuning al catalogo** o **destilacion** (D32). Aviso: Nutrition5k son
+cafeterias de California, asi que la cifra es **comparable**, no representativa de cocina espanola;
+el set propio pesado sigue como **deuda declarada** (D25). Detalle en
+[`docs/specs/11-comparacion-modelos.md`](docs/specs/11-comparacion-modelos.md).
 
 Detalle por entregable: [`docs/specs/02-fase1.md`](docs/specs/02-fase1.md).
 

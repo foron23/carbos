@@ -6,6 +6,7 @@ import {
   classForFood,
   foodForClass,
   missingClassTargets,
+  normalizeLabel,
   resolveClass,
 } from './classmap';
 import { foodById, searchFoods } from './search';
@@ -34,6 +35,16 @@ describe('mapa de clases (E2)', () => {
   it('deja pasar la clase desconocida sin resolver', () => {
     expect(resolveClass(DEFAULT_CLASSMAP, 'platillo_volador', CATALOG)).toBeNull();
     expect(UNKNOWN_CLASS).toBe('desconocido');
+  });
+
+  it('normaliza etiquetas de modelos publicos (D31)', () => {
+    expect(normalizeLabel('Granny Smith')).toBe('granny_smith');
+    expect(normalizeLabel('  ice cream ')).toBe('ice_cream');
+    expect(normalizeLabel('French-loaf')).toBe('french_loaf');
+    expect(resolveClass(DEFAULT_CLASSMAP, 'Granny Smith', CATALOG)?.food.id).toBe('manzana');
+    expect(resolveClass(DEFAULT_CLASSMAP, 'head cabbage', CATALOG)?.food.id).toBe('repollo');
+    expect(resolveClass(DEFAULT_CLASSMAP, 'ice cream', CATALOG)?.food.id).toBe('helado');
+    expect(resolveClass(DEFAULT_CLASSMAP, 'bell pepper', CATALOG)?.food.id).toBe('pimiento_rojo');
   });
 });
 

@@ -21,14 +21,14 @@ Registro de decisiones cerradas. Cada decision es una restriccion de diseno, no 
 
 ## Parametros cerrados (D13-D18)
 
-| #   | Decision              | Detalle                                                                                                                              |
-| --- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| D13 | **Licencia**          | AGPL-3.0 (copyleft fuerte: evita forks propietarios)                                                                                 |
-| D14 | **Modelo y descarga** | Clasificador pequeno + tabla local, con los pesos en **descarga diferida** (10-25 MB una sola vez; usable en todos los dispositivos) |
-| D15 | **Idiomas**           | ES y EN desde el inicio                                                                                                              |
-| D16 | **Accesibilidad**     | Requisito de la v1: texto escalable, contraste alto, uso a una mano                                                                  |
-| D17 | **Construccion**      | Maquina de trabajo; prueba en el movil; la Pi publica el estatico                                                                    |
-| D18 | **Hosting**           | GitHub Pages (repo publico, sin backend) y los **pesos fuera del repo** (Hugging Face Hub o jsDelivr)                                |
+| #   | Decision              | Detalle                                                                                                                                                           |
+| --- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D13 | **Licencia**          | AGPL-3.0 (copyleft fuerte: evita forks propietarios)                                                                                                              |
+| D14 | **Modelo y descarga** | Clasificador pequeno + tabla local, con los pesos en **descarga diferida** (10-25 MB una sola vez; usable en todos los dispositivos)                              |
+| D15 | **Idiomas**           | ES y EN desde el inicio                                                                                                                                           |
+| D16 | **Accesibilidad**     | Requisito de la v1: texto escalable, contraste alto, uso a una mano                                                                                               |
+| D17 | **Construccion**      | Maquina de trabajo; prueba en el movil; la Pi publica el estatico                                                                                                 |
+| D18 | **Hosting**           | GitHub Pages (repo publico, sin backend) y los **pesos fuera del artefacto** de Pages (en `weights/` del mismo repo, servidos por jsDelivr desde un tag; ver D24) |
 
 ## Parametros cerrados de Fase 1 (D19-D32)
 
@@ -39,7 +39,7 @@ Registro de decisiones cerradas. Cada decision es una restriccion de diseno, no 
 | D21 | **Granularidad**            | **Multi-item** en v1: detector de alimentos + clasificador por region (alinea con D12)                                                                                                                                                                                                           |
 | D22 | **Runtime**                 | `onnxruntime-web` con WebGPU y fallback WASM, en Web Worker                                                                                                                                                                                                                                      |
 | D23 | **Export cifrado**          | **Argon2 (wasm)** para derivar clave + AES-GCM; sobre versionado con parametros KDF                                                                                                                                                                                                              |
-| D24 | **Pesos**                   | Fuera del repo en **jsDelivr / GitHub Releases**; manifest con URL, sha256, bytes y version                                                                                                                                                                                                      |
+| D24 | **Pesos**                   | **En este mismo repo** (`weights/`, fuera de `public/`), servidos por **jsDelivr desde un tag** `weights-<version>`; manifest con URL, sha256, bytes y version                                                                                                                                   |
 | D25 | **Medida v1**               | Benchmark externo (**Nutrition5k**) en la v1; el set propio pesado con bascula queda como deuda posterior                                                                                                                                                                                        |
 | D26 | **Catalogo**                | **Empaquetado** en el build (decenas de KB); solo los pesos salen del repo                                                                                                                                                                                                                       |
 | D27 | **Detector**                | **Cajas (bounding boxes)**, no mascaras: suficiente para ubicar y contar items, mas barato                                                                                                                                                                                                       |
