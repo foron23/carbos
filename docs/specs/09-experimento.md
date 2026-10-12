@@ -149,3 +149,29 @@ a diferencia del de transformers):
 
 Conclusion: la via fiable y pequena es **torchvision**; para alinear con el catalogo hay que
 **entrenar/afinar** (o destilar), no basta un clasificador publico.
+
+## Barrido completo (2026-10-12, 507 platos, split de test)
+
+Mismo detector (YOLO11n COCO) para todos; 202 de 709 platos no tienen cenital.
+
+| Candidato                              | Tamano     | MAE carb    | %MAE    | Cobertura  |
+| -------------------------------------- | ---------- | ----------- | ------- | ---------- |
+| **MobileNetV3-Large ImageNet int8**    | **5.7 MB** | **15.63 g** | 79.4 %  | **28.4 %** |
+| Swin Food-101 int8                     | 93 MB      | 22.63 g     | 115.0 % | 25.5 %     |
+| Food-101 subset fine-tuned (34 clases) | 3.2 MB     | 28.40 g     | 144.3 % | 17.1 %     |
+
+Lectura:
+
+- **Gana un clasificador general pequeno** (ImageNet, 5.7 MB) a uno de platos grande (Food-101,
+  93 MB): el catalogo es de **ingredientes**, y ImageNet cubre fruta/verdura mejor que Food-101.
+- El **fine-tuned (34 clases)** valida el pipeline de punta a punta (top-1 74.4 % en su test),
+  pero su cobertura es baja por conocer pocas clases.
+- **Ninguno se acerca al catalogo**: la cobertura (~28 %) sigue siendo el cuello de botella, y el
+  MAE lo refleja. Confirma la necesidad de **fine-tuning al catalogo** o **destilacion**.
+
+## Siguiente: destilacion (D32)
+
+El teacher fiable es Swin Food-101 int8 (o el ImageNet); el student, un MobileNetV3. Con imagenes
+**sin etiquetar** (Nutrition5k + fotos de usuarios) se generan pseudo-etiquetas del teacher y se
+entrena el student, que se exporta con torchvision (fiable). Mantiene la taxonomia del teacher;
+para alinearse al catalogo hace falta el feedback de usuarios (ver [`10-feedback.md`](10-feedback.md)).
