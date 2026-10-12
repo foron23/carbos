@@ -28,3 +28,6 @@ tools/smoke/.venv/
 eval/.build/
 eval/cache/
 eval/results/
+
+# Shortlist de modelos (venv de conversion)
+tools/shortlist/.venv/

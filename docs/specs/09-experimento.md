@@ -97,3 +97,42 @@ classes). El clasificador debe declarar `classes` como **etiquetas del mapa de c
 - **Porcion por defecto**: al no predecir masa, el error de porcion aparece como error sistematico;
   el banco lo hace **visible** (componente) en lugar de esconderlo.
 - **Descarga**: el tarball completo son 181 GB; el banco usa solo metadata + RGB cenital.
+
+## Pipeline de shortlist
+
+Los scripts viven en `tools/shortlist/` y dejan los pesos en `eval/cache/models/` (gitignored).
+
+```bash
+# 1. Clasificadores ONNX ya publicados (Swin Food-101 int8, 93 MB)
+python3 tools/shortlist/fetch_classifiers.py
+
+# 2. Detector: exporta YOLO11n COCO a ONNX (requiere el venv de la shortlist)
+python3 -m venv tools/shortlist/.venv
+tools/shortlist/.venv/bin/pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+tools/shortlist/.venv/bin/pip install ultralytics
+tools/shortlist/.venv/bin/python tools/shortlist/export_yolo11n.py
+
+# 3. Manifests por candidato y banco
+python3 tools/shortlist/build_manifests.py
+make eval EVAL_ARGS="--manifest eval/cache/manifest-swin_food101_int8.json --root eval/cache --limit 30"
+```
+
+`convert_classifier.py` (HF -> ONNX) existe pero **no se usa**: el exportador infla el grafo
+(~255 MB para un EfficientNet-B0 de 19 MB de pesos).
+
+## Primer barrido (2026-10-12)
+
+- **Detector**: YOLO11n COCO (ONNX, 10.7 MB, AGPL-3.0) — funciona, salida `[1,84,8400]`.
+- **Clasificador**: Swin Food-101 int8 (ONNX, 93 MB, Apache-2.0).
+- **30 platos** con cenital: **MAE carbohidratos 17.25 g (86.7 %)**, IC95 [10.14, 25.42];
+  MAE masa 186.5 g; **cobertura 27.8 %** (coincide con el 24 % de solape Food-101↔mapa).
+
+Hallazgos:
+
+- `AlexKoff88/mobilenet_v2_food101` (ONNX "listo") esta **muerto**: logits ~1e-9 con imagen real.
+- `onnx-community/swin...q4f16` **no corre** en ORT CPU (fallo de canales en Conv); int8 y fp16 si.
+- La conversion HF->ONNX infla el grafo; **falta un clasificador pequeno (<25 MB) fiable**.
+
+Conclusion provisional: sin un clasificador alineado al catalogo, la **cobertura** (~28 %) y el
+error de porcion mandan; es la senal para el **fine-tuning (D32)** o para un detector de comida
+mejor. Pendiente: clasificador pequeno fiable y barrido completo (`--limit 0`).
