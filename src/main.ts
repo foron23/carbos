@@ -312,6 +312,7 @@ function renderDraft(): void {
       grams.type = 'number';
       grams.min = '0';
       grams.step = '1';
+      grams.inputMode = 'decimal';
       grams.value = String(item.grams);
       grams.setAttribute('aria-label', tr('field.grams'));
       grams.addEventListener('change', () => {
@@ -565,6 +566,24 @@ async function refresh(): Promise<void> {
 }
 
 function wire(): void {
+  const ONBOARDED_KEY = 'carbos.onboarded';
+  const onboarding = byId('onboarding');
+  let onboarded = true;
+  try {
+    onboarded = localStorage.getItem(ONBOARDED_KEY) === '1';
+  } catch {
+    onboarded = true;
+  }
+  if (!onboarded) onboarding.hidden = false;
+  byId('onboarding-start').addEventListener('click', () => {
+    try {
+      localStorage.setItem(ONBOARDED_KEY, '1');
+    } catch {
+      /* almacenamiento no disponible */
+    }
+    onboarding.hidden = true;
+  });
+
   byId<HTMLInputElement>('date').value = currentDate;
   localeSelect.value = locale;
 
@@ -627,7 +646,11 @@ function wire(): void {
   });
 
   byId('register').addEventListener('click', () => {
-    if (draft.items.length === 0) return;
+    const registerStatus = byId('register-status');
+    if (draft.items.length === 0) {
+      registerStatus.textContent = tr('register.empty');
+      return;
+    }
     const confidence =
       detections.length > 0
         ? detections.reduce((sum, result) => sum + result.score, 0) / detections.length
@@ -658,6 +681,7 @@ function wire(): void {
       detectionMeta = null;
       detectionEngine = '';
       photoStatusKey = null;
+      registerStatus.textContent = tr('register.done');
       return refresh();
     });
   });
@@ -669,10 +693,34 @@ function wire(): void {
     void putInsulin({ id: uid(), date: currentDate, time, units, kind }).then(refresh);
   });
 
+  const LAST_EXPORT_KEY = 'carbos.lastExport';
+  const renderExportReminder = (): void => {
+    const reminder = byId('export-reminder');
+    let last: string | null = null;
+    try {
+      last = localStorage.getItem(LAST_EXPORT_KEY);
+    } catch {
+      last = null;
+    }
+    const days = last === null ? null : Math.floor((Date.now() - Number(last)) / 86400000);
+    const stale = days === null || !Number.isFinite(days) || days >= 7;
+    reminder.hidden = !stale;
+    if (stale) reminder.textContent = tr('export.reminder');
+  };
+  const markExported = (): void => {
+    try {
+      localStorage.setItem(LAST_EXPORT_KEY, String(Date.now()));
+    } catch {
+      /* almacenamiento no disponible */
+    }
+    renderExportReminder();
+  };
+
   byId('export').addEventListener('click', () => {
     void loadVault().then((current) => {
       downloadText(`carbos-${today()}.json`, toJson(current), 'application/json');
       byId('copy-status').textContent = tr('export.done');
+      markExported();
     });
   });
 
@@ -683,6 +731,7 @@ function wire(): void {
       .then((text) => {
         downloadText(`carbos-${today()}.carbos`, text, 'application/json');
         byId('copy-status').textContent = tr('export.done');
+        markExported();
       });
   });
 
