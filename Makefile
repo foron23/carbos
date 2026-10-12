@@ -24,6 +24,15 @@ GO       ?= go
 # --- Tunables ---------------------------------------------------------------
 PORT     ?= 8000
 
+# --- Identidad de build (despliegue) ----------------------------------------
+# Se sella en el service worker para invalidar el cache en cada publicacion.
+BUILD_ID ?= dev
+
+# --- E2E --------------------------------------------------------------------
+# Firefox para la prueba E2E. Por defecto, el del sistema si existe; en CI se
+# instala el que Puppeteer espera y se llama con `E2E_FIREFOX=` (vacio).
+E2E_FIREFOX ?= $(wildcard /usr/bin/firefox)
+
 # --- Entrenamiento (cabeza nueva) -------------------------------------------
 # Ver docs/specs/08-linear-probe.md. El codigo de entrenamiento vive en training/.
 TRAIN_DATA ?= training/data
@@ -32,7 +41,7 @@ TRAIN_ARGS ?=
 EXPORT_ARGS ?=
 
 .PHONY: help setup install build test e2e lint format format-check check run dev clean \
-        train-setup train train-smoke export-model catalog
+        build-stamp verify-bundle train-setup train train-smoke export-model catalog
 
 ## help: Show this help
 help:
@@ -87,7 +96,17 @@ endif
 
 ## e2e: Prueba E2E real en Firefox headless sobre el build (requiere firefox)
 e2e: build
-	$(NPM) run e2e
+	CARBOS_FIREFOX="$(E2E_FIREFOX)" $(NPM) run e2e
+
+## build-stamp: Build + sella el service worker con BUILD_ID (cache-busting de Pages)
+build-stamp: build
+	node -e "const fs=require('fs');const p='dist/sw.js';if(fs.existsSync(p)){const id=process.env.BUILD_ID||'$(BUILD_ID)';fs.writeFileSync(p,fs.readFileSync(p,'utf8').replace(/__BUILD__/g,id));}"
+
+## verify-bundle: Falla si dist/ lleva pesos de modelo (D18/D24: viven fuera)
+verify-bundle:
+	@files="$$(find dist -type f \( -name '*.onnx' -o -name '*.pt' -o -name '*.bin' -o -name '*.tflite' -o -name '*.onnx.data' \) 2>/dev/null | sort)"; \
+	if [ -n "$$files" ]; then echo "El artefacto contiene pesos de modelo: $$files" >&2; exit 1; fi; \
+	echo "Artefacto sin pesos: ok."
 
 ## lint: Run linters / static analysis
 lint:

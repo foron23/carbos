@@ -4,10 +4,20 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
+    name: Puerta (format + lint + tests)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,4 +26,51 @@ jobs:
           cache: npm
       - run: make setup
       - run: make check
-      - run: make build
+
+  e2e:
+    name: E2E (Firefox de Puppeteer)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: make setup
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: puppeteer-firefox-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Instalar el Firefox que Puppeteer espera
+        run: npx --no-install puppeteer browsers install firefox
+      - run: make e2e E2E_FIREFOX=
+      - name: Subir capturas E2E
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: e2e/screenshots
+          if-no-files-found: ignore
+          retention-days: 7
+
+  build:
+    name: Build estatico
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: make setup
+      - run: make build-stamp
+        env:
+          BUILD_ID: ${{ github.sha }}
+      - run: make verify-bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 7

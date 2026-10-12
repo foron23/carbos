@@ -9,7 +9,7 @@ import { scenarios } from './scenarios.mjs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.E2E_PORT ?? 4173);
 const HOST = '127.0.0.1';
-const FIREFOX = process.env.CARBOS_FIREFOX ?? '/usr/bin/firefox';
+const FIREFOX = process.env.CARBOS_FIREFOX || undefined;
 
 const PNG_1PX =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
@@ -28,11 +28,9 @@ async function main() {
     logLevel: 'silent',
   });
   const base = `http://${HOST}:${PORT}/`;
-  const browser = await puppeteer.launch({
-    browser: 'firefox',
-    executablePath: FIREFOX,
-    headless: true,
-  });
+  const launchOptions = { browser: 'firefox', headless: true };
+  if (FIREFOX) launchOptions.executablePath = FIREFOX;
+  const browser = await puppeteer.launch(launchOptions);
 
   try {
     for (const scenario of scenarios) {

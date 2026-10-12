@@ -16,24 +16,53 @@ concurrency:
 
 jobs:
   build:
+    name: Puerta + build + artefacto
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+
       - run: make setup
       - run: make check
-      - run: make build
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: puppeteer-firefox-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Instalar el Firefox que Puppeteer espera
+        run: npx --no-install puppeteer browsers install firefox
+      - run: make e2e E2E_FIREFOX=
+
+      - name: Build sellado con el commit
+        run: make build-stamp
+        env:
+          BUILD_ID: ${{ github.sha }}
+
+      - name: Verificar que no viajan pesos de modelo
+        run: make verify-bundle
+
+      - name: Verificar el sellado del service worker
+        run: |
+          if ! grep -q "${{ github.sha }}" dist/sw.js; then
+            echo "dist/sw.js no esta sellado con el commit; el cache no se invalidaria." >&2
+            exit 1
+          fi
+          echo "Service worker sellado."
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
+    name: Publicar en GitHub Pages
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

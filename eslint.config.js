@@ -27,6 +27,13 @@ export default tseslint.config(
     },
   },
   {
+    files: ['*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: { module: 'writable', require: 'readonly' },
+    },
+  },
+  {
     files: ['e2e/**/*.mjs'],
     languageOptions: {
       globals: {
