@@ -10,9 +10,11 @@ de tu dispositivo.
 - Plan por fases: [`docs/specs/01-roadmap.md`](docs/specs/01-roadmap.md)
 - Fase 1 (nucleo): [`docs/specs/02-fase1.md`](docs/specs/02-fase1.md)
 - Despliegue (GitHub Pages): [`docs/specs/03-despliegue.md`](docs/specs/03-despliegue.md)
+- Interfaz y accesibilidad (UX): [`docs/specs/09-ui-ux.md`](docs/specs/09-ui-ux.md)
 - Experimento (benchmark): [`docs/specs/10-experimento.md`](docs/specs/10-experimento.md)
 - Comparacion de modelos (writeup): [`docs/specs/11-comparacion-modelos.md`](docs/specs/11-comparacion-modelos.md)
 - Feedback de usuarios (diferido): [`docs/specs/12-feedback.md`](docs/specs/12-feedback.md)
+- Atajos de correccion y lectura del dia: [`docs/specs/13-atajos-y-dia.md`](docs/specs/13-atajos-y-dia.md)
 - Contrato de trabajo: [`docs/receta-de-codigo.md`](docs/receta-de-codigo.md)
 
 ## Estado
