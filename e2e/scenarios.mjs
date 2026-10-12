@@ -203,8 +203,31 @@ export const scenarios = [
         (el) => el.textContent,
       );
       assertEqual(slot, 'Breakfast', 'las comidas se traducen');
+      assertEqual(await page.title(), 'Carbos · carbs on your device', 'el titulo sigue al idioma');
+      assertEqual(
+        await page.$eval('link[rel="manifest"]', (el) => el.getAttribute('href')),
+        './manifest.en.webmanifest',
+        'el manifest sigue al idioma',
+      );
+
       await setValue(page, '#locale', 'es');
       await waitForText(page, 'header p', 'Cuenta carbohidratos');
+      assertEqual(
+        await page.title(),
+        'Carbos · carbohidratos en tu dispositivo',
+        'el titulo vuelve al castellano',
+      );
+
+      for (const tag of ['es', 'en']) {
+        await setValue(page, '#locale', tag);
+        await page.waitForFunction((lang) => document.documentElement.lang === lang, {}, tag);
+        const sinTraducir = await page.$$eval('#app [data-i18n]', (nodes) =>
+          nodes
+            .filter((node) => (node.textContent ?? '').trim() === '')
+            .map((node) => node.getAttribute('data-i18n') ?? ''),
+        );
+        assertEqual(sinTraducir.length, 0, `cadenas sin traducir en ${tag}: ${sinTraducir}`);
+      }
       await screenshot(page, 'idioma');
     },
   },
