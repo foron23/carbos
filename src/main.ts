@@ -35,7 +35,34 @@ interface Draft {
 }
 
 let locale: Locale = detectLocale();
-let currentDate = today();
+
+/**
+ * El dia mostrado se recuerda para no perderlo al recargar. Sin esto la vista
+ * vuelve a "hoy" y las comidas registradas en otro dia parecen no haberse
+ * guardado. `sessionStorage` sobrevive a la recarga pero no a una apertura
+ * nueva, donde se vuelve a "hoy".
+ */
+const VIEW_DATE_KEY = 'carbos.viewDate';
+const VIEW_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function readViewDate(): string | null {
+  try {
+    const stored = sessionStorage.getItem(VIEW_DATE_KEY);
+    return stored && VIEW_DATE_RE.test(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeViewDate(isoDate: string): void {
+  try {
+    sessionStorage.setItem(VIEW_DATE_KEY, isoDate);
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
+let currentDate = readViewDate() ?? today();
 let insulin: InsulinHandle | null = null;
 
 /** Mensajes de estado: se guarda la clave para poder retraducirlos. */
@@ -621,11 +648,13 @@ function wire(): void {
 
   byId<HTMLInputElement>('date').addEventListener('change', () => {
     currentDate = byId<HTMLInputElement>('date').value || today();
+    storeViewDate(currentDate);
     render();
   });
 
   const setDay = (isoDate: string): void => {
     currentDate = isoDate;
+    storeViewDate(isoDate);
     byId<HTMLInputElement>('date').value = isoDate;
     render();
   };

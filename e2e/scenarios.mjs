@@ -130,6 +130,30 @@ export const scenarios = [
     },
   },
   {
+    name: 'recuerda el dia al recargar y conserva la comida',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await click(page, '#day-today');
+      await click(page, '#day-prev');
+      const selected = await page.$eval('#date', (el) => el.value);
+      await addFood(page, 'pan');
+      await register(page);
+      await waitForText(page, '#diary', 'Pan');
+      await reload(page);
+      await waitFor(page, '#app header h1');
+      await waitForText(page, '#diary', 'Pan');
+      assertEqual(
+        await page.$eval('#date', (el) => el.value),
+        selected,
+        'el dia seleccionado se conserva tras recargar',
+      );
+      const meals = await readStore(page, 'meals');
+      assertEqual(meals.length, 1, 'la comida sigue guardada');
+      assertEqual(meals[0]?.date, selected, 'la comida conserva su fecha');
+      await screenshot(page, 'dia-recordado');
+    },
+  },
+  {
     name: 'registra insulina sin calcular nada',
     async run(page, ctx) {
       await openApp(page, ctx.base);
