@@ -98,6 +98,14 @@ endif
 e2e: build
 	CARBOS_FIREFOX="$(E2E_FIREFOX)" $(NPM) run e2e
 
+## audit-uiux: Audita la UI sobre el build (desborde, nombres accesibles, tactil)
+audit-uiux: build
+	CARBOS_FIREFOX="$(E2E_FIREFOX)" $(NPM) run audit-uiux
+
+## shots: Guarda capturas de los estados de la UI en e2e/screenshots/uiux/
+shots: build
+	CARBOS_FIREFOX="$(E2E_FIREFOX)" $(NPM) run shots
+
 ## build-stamp: Build + sella el service worker con BUILD_ID (cache-busting de Pages)
 build-stamp: build
 	node -e "const fs=require('fs');const p='dist/sw.js';if(fs.existsSync(p)){const id=process.env.BUILD_ID||'$(BUILD_ID)';fs.writeFileSync(p,fs.readFileSync(p,'utf8').replace(/__BUILD__/g,id));}"
