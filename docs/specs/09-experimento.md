@@ -136,3 +136,16 @@ Hallazgos:
 Conclusion provisional: sin un clasificador alineado al catalogo, la **cobertura** (~28 %) y el
 error de porcion mandan; es la senal para el **fine-tuning (D32)** o para un detector de comida
 mejor. Pendiente: clasificador pequeno fiable y barrido completo (`--limit 0`).
+
+### Segundo candidato: MobileNetV3-Large ImageNet
+
+`tools/shortlist/export_torchvision.py` exporta backbones de torchvision (exportador **fiable**,
+a diferencia del de transformers):
+
+- **MobileNetV3-Large ImageNet int8**: **5.7 MB** (fp32 21.9 MB). 30 platos: **MAE 18.04 g
+  (90.7 %)**, cobertura **11.1 %** (solape ImageNet↔mapa: 18 clases).
+- Comparado con Swin Food-101 int8 (93 MB): MAE 17.25 g, cobertura 27.8 %. Food-101 alinea algo
+  mejor que ImageNet, pero ninguno se acerca al catalogo.
+
+Conclusion: la via fiable y pequena es **torchvision**; para alinear con el catalogo hay que
+**entrenar/afinar** (o destilar), no basta un clasificador publico.
