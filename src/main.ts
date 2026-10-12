@@ -24,7 +24,7 @@ import { createDetectionClient } from './model';
 import type { DetectionClient, DetectionResult, InferencePhase, TopKEntry } from './model';
 import { decryptVault, encryptVault, isEncrypted } from './export/crypto';
 import { setupInsulin } from './insulin';
-import type { InsulinStrings } from './insulin';
+import type { InsulinHandle } from './insulin';
 
 const SLOTS: readonly MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
@@ -36,6 +36,19 @@ interface Draft {
 
 let locale: Locale = detectLocale();
 let currentDate = today();
+let insulin: InsulinHandle | null = null;
+
+/** Mensajes de estado: se guarda la clave para poder retraducirlos. */
+const statusKeys = new Map<string, StringKey>();
+
+function setStatus(id: string, key: StringKey): void {
+  byId(id).textContent = tr(key);
+  statusKeys.set(id, key);
+}
+
+function relocalizeStatuses(): void {
+  for (const [id, key] of statusKeys) byId(id).textContent = tr(key);
+}
 let draft: Draft = { slot: 'breakfast', origin: 'manual', items: [] };
 let capture: CapturedImage | null = null;
 let vault: Vault = emptyVault();
@@ -70,8 +83,16 @@ function byId<T extends HTMLElement = HTMLElement>(id: string): T {
   return node as T;
 }
 
+/** Fecha local en ISO (YYYY-MM-DD). `toISOString` desplaza de dia fuera de UTC. */
+function isoDay(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return isoDay(new Date());
 }
 
 function uid(): string {
@@ -88,8 +109,27 @@ function slotOptions(): string {
 
 const app = byId('app');
 app.innerHTML = `
-  <header>
-    <div class="row between">
+  <section id="onboarding" class="onboarding" hidden aria-labelledby="onboarding-title">
+    <h2 id="onboarding-title" data-i18n="onboarding.title"></h2>
+    <ol>
+      <li>
+        <strong data-i18n="onboarding.privacyTitle"></strong>
+        <p data-i18n="onboarding.privacyBody"></p>
+      </li>
+      <li>
+        <strong data-i18n="onboarding.storageTitle"></strong>
+        <p data-i18n="onboarding.storageBody"></p>
+      </li>
+      <li>
+        <strong data-i18n="onboarding.scopeTitle"></strong>
+        <p data-i18n="onboarding.scopeBody"></p>
+      </li>
+    </ol>
+    <button id="onboarding-start" type="button" class="primary" data-i18n="onboarding.start"></button>
+  </section>
+
+  <header class="topbar">
+    <div class="bar">
       <h1>Carbos</h1>
       <label class="lang">
         <span data-i18n="nav.language"></span>
@@ -99,23 +139,28 @@ app.innerHTML = `
     <p class="muted" data-i18n="app.tagline"></p>
   </header>
 
-  <fieldset>
+  <fieldset class="card hero daybar">
     <legend data-i18n="section.today"></legend>
+    <p class="hero-figure">
+      <output id="day-total" class="total" aria-live="polite"></output>
+      <span class="chip"><span data-i18n="diary.week"></span>: <output id="week-total"></output></span>
+    </p>
     <label for="date" data-i18n="field.date"></label>
-    <input id="date" type="date" />
-    <p><span data-i18n="label.total"></span>:
-      <output id="day-total" class="total" aria-live="polite">0 g</output></p>
-    <p class="muted"><span data-i18n="diary.week"></span>:
-      <output id="week-total">0 g</output></p>
+    <div class="row daynav">
+      <button id="day-prev" type="button" data-i18n-aria="nav.prevDay">\u2039</button>
+      <input id="date" type="date" />
+      <button id="day-next" type="button" data-i18n-aria="nav.nextDay">\u203a</button>
+      <button id="day-today" type="button" data-i18n="nav.today"></button>
+    </div>
   </fieldset>
 
-  <fieldset>
+  <fieldset class="card">
     <legend data-i18n="section.photo"></legend>
     <img id="photo-preview" class="preview" alt="" hidden />
     <p id="photo-status" class="muted" data-i18n="photo.none" aria-live="polite"></p>
     <div class="row">
-      <label class="btn"><input id="camera-input" type="file" accept="image/*" capture="environment" hidden /><span data-i18n="button.takePhoto"></span></label>
-      <label class="btn"><input id="file-input" type="file" accept="image/*" hidden /><span data-i18n="button.chooseFile"></span></label>
+      <label class="btn"><input id="camera-input" class="sr-only" type="file" accept="image/*" capture="environment" data-i18n-aria="button.takePhoto" /><span data-i18n="button.takePhoto"></span></label>
+      <label class="btn"><input id="file-input" class="sr-only" type="file" accept="image/*" data-i18n-aria="button.chooseFile" /><span data-i18n="button.chooseFile"></span></label>
     </div>
     <p class="muted" data-i18n="text.photoNote"></p>
     <div id="detect-panel" hidden>
@@ -126,7 +171,7 @@ app.innerHTML = `
     </div>
   </fieldset>
 
-  <fieldset>
+  <fieldset class="card">
     <legend data-i18n="section.addFood"></legend>
     <label for="draft-slot" data-i18n="field.slot"></label>
     <select id="draft-slot">${slotOptions()}</select>
@@ -137,22 +182,23 @@ app.innerHTML = `
     <ul id="search-results" class="results"></ul>
     <h3 data-i18n="draft.items"></h3>
     <ul id="draft-items" class="draft"></ul>
-    <p><span data-i18n="label.total"></span>: <output id="draft-total" aria-live="polite">0 g</output></p>
+    <p><span data-i18n="label.total"></span>: <output id="draft-total" aria-live="polite"></output></p>
     <p><button id="register" type="button" class="primary" data-i18n="button.register"></button></p>
+    <p id="register-status" class="muted" aria-live="polite"></p>
     <p class="muted" data-i18n="text.estimateNote"></p>
   </fieldset>
 
-  <fieldset>
+  <fieldset class="card">
     <legend data-i18n="section.diary"></legend>
     <ul id="diary"></ul>
   </fieldset>
 
-  <fieldset>
+  <fieldset class="card">
     <legend data-i18n="section.insulinLog"></legend>
     <p class="muted" data-i18n="insulin.note"></p>
     <div class="grid">
       <label><span data-i18n="field.time"></span><input id="ins-time" type="time" /></label>
-      <label><span data-i18n="field.units"></span><input id="ins-units" type="number" min="0" step="0.1" value="0" /></label>
+      <label><span data-i18n="field.units"></span><input id="ins-units" type="number" inputmode="decimal" min="0" step="0.1" value="0" /></label>
       <label><span data-i18n="field.kind"></span>
         <select id="ins-kind">
           <option value="bolus" data-i18n="kind.bolus"></option>
@@ -164,27 +210,32 @@ app.innerHTML = `
     <ul id="insulin-list"></ul>
   </fieldset>
 
-  <fieldset>
-    <legend data-i18n="section.copy"></legend>
+  <details class="card">
+    <summary data-i18n="section.copy"></summary>
+    <p id="export-reminder" class="muted" hidden></p>
     <label for="export-pass" data-i18n="export.passwordPrompt"></label>
     <input id="export-pass" type="password" autocomplete="new-password" />
     <p class="muted" data-i18n="export.passwordHint"></p>
     <div class="row">
       <button id="export" type="button" data-i18n="button.exportJson"></button>
       <button id="export-enc" type="button" data-i18n="button.exportEncrypted"></button>
-      <label class="btn"><input id="import" type="file" accept="application/json,.json,.carbos" hidden /><span data-i18n="button.import"></span></label>
+      <label class="btn"><input id="import" class="sr-only" type="file" accept="application/json,.json,.carbos" data-i18n-aria="button.import" /><span data-i18n="button.import"></span></label>
     </div>
     <p id="copy-status" class="muted" aria-live="polite"></p>
     <p class="muted" data-i18n="storage.notice"></p>
-  </fieldset>
+  </details>
 
-  <fieldset>
-    <legend data-i18n="section.settings"></legend>
+  <details class="card">
+    <summary data-i18n="section.settings"></summary>
     <p><button id="persist" type="button" data-i18n="button.persist"></button></p>
     <p id="persist-status" class="muted" aria-live="polite"></p>
     <label class="check"><input id="insulin-toggle" type="checkbox" /> <span data-i18n="settings.insulinModule"></span></label>
     <div id="insulin-host" hidden></div>
-  </fieldset>
+  </details>
+
+  <footer>
+    <p class="notice" role="note" data-i18n="footer.disclaimer"></p>
+  </footer>
 `;
 
 const localeSelect = byId<HTMLSelectElement>('locale');
@@ -206,6 +257,13 @@ function applyI18n(): void {
     if (key && isStringKey(key)) node.setAttribute('aria-label', tr(key));
   }
   document.documentElement.lang = locale;
+  document.title = tr('app.title');
+  const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
+  if (description) description.content = tr('app.tagline');
+  const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+  if (manifest) {
+    manifest.href = locale === 'en' ? './manifest.en.webmanifest' : './manifest.webmanifest';
+  }
 }
 
 function downloadText(filename: string, text: string, type: string): void {
@@ -274,6 +332,7 @@ function renderDraft(): void {
       grams.type = 'number';
       grams.min = '0';
       grams.step = '1';
+      grams.inputMode = 'decimal';
       grams.value = String(item.grams);
       grams.setAttribute('aria-label', tr('field.grams'));
       grams.addEventListener('change', () => {
@@ -519,6 +578,8 @@ function render(): void {
   renderSearch();
   renderDiary();
   renderInsulin();
+  relocalizeStatuses();
+  insulin?.refresh();
 }
 
 async function refresh(): Promise<void> {
@@ -527,6 +588,24 @@ async function refresh(): Promise<void> {
 }
 
 function wire(): void {
+  const ONBOARDED_KEY = 'carbos.onboarded';
+  const onboarding = byId('onboarding');
+  let onboarded = true;
+  try {
+    onboarded = localStorage.getItem(ONBOARDED_KEY) === '1';
+  } catch {
+    onboarded = true;
+  }
+  if (!onboarded) onboarding.hidden = false;
+  byId('onboarding-start').addEventListener('click', () => {
+    try {
+      localStorage.setItem(ONBOARDED_KEY, '1');
+    } catch {
+      /* almacenamiento no disponible */
+    }
+    onboarding.hidden = true;
+  });
+
   byId<HTMLInputElement>('date').value = currentDate;
   localeSelect.value = locale;
 
@@ -536,6 +615,7 @@ function wire(): void {
       locale = value;
       storeLocale(locale);
       render();
+      renderExportReminder();
     }
   });
 
@@ -543,6 +623,21 @@ function wire(): void {
     currentDate = byId<HTMLInputElement>('date').value || today();
     render();
   });
+
+  const setDay = (isoDate: string): void => {
+    currentDate = isoDate;
+    byId<HTMLInputElement>('date').value = isoDate;
+    render();
+  };
+  const shiftDay = (days: number): void => {
+    const [year = 1970, month = 1, day = 1] = currentDate.split('-').map(Number);
+    const base = new Date(year, month - 1, day);
+    base.setDate(base.getDate() + days);
+    setDay(isoDay(base));
+  };
+  byId('day-prev').addEventListener('click', () => shiftDay(-1));
+  byId('day-next').addEventListener('click', () => shiftDay(1));
+  byId('day-today').addEventListener('click', () => setDay(today()));
 
   const onFile = (event: Event): void => {
     const input = event.target as HTMLInputElement;
@@ -574,7 +669,10 @@ function wire(): void {
   });
 
   byId('register').addEventListener('click', () => {
-    if (draft.items.length === 0) return;
+    if (draft.items.length === 0) {
+      setStatus('register-status', 'register.empty');
+      return;
+    }
     const confidence =
       detections.length > 0
         ? detections.reduce((sum, result) => sum + result.score, 0) / detections.length
@@ -605,6 +703,7 @@ function wire(): void {
       detectionMeta = null;
       detectionEngine = '';
       photoStatusKey = null;
+      setStatus('register-status', 'register.done');
       return refresh();
     });
   });
@@ -616,10 +715,34 @@ function wire(): void {
     void putInsulin({ id: uid(), date: currentDate, time, units, kind }).then(refresh);
   });
 
+  const LAST_EXPORT_KEY = 'carbos.lastExport';
+  const renderExportReminder = (): void => {
+    const reminder = byId('export-reminder');
+    let last: string | null = null;
+    try {
+      last = localStorage.getItem(LAST_EXPORT_KEY);
+    } catch {
+      last = null;
+    }
+    const days = last === null ? null : Math.floor((Date.now() - Number(last)) / 86400000);
+    const stale = days === null || !Number.isFinite(days) || days >= 7;
+    reminder.hidden = !stale;
+    if (stale) reminder.textContent = tr('export.reminder');
+  };
+  const markExported = (): void => {
+    try {
+      localStorage.setItem(LAST_EXPORT_KEY, String(Date.now()));
+    } catch {
+      /* almacenamiento no disponible */
+    }
+    renderExportReminder();
+  };
+
   byId('export').addEventListener('click', () => {
     void loadVault().then((current) => {
       downloadText(`carbos-${today()}.json`, toJson(current), 'application/json');
-      byId('copy-status').textContent = tr('export.done');
+      setStatus('copy-status', 'export.done');
+      markExported();
     });
   });
 
@@ -629,7 +752,8 @@ function wire(): void {
       .then((current) => encryptVault(current, password))
       .then((text) => {
         downloadText(`carbos-${today()}.carbos`, text, 'application/json');
-        byId('copy-status').textContent = tr('export.done');
+        setStatus('copy-status', 'export.done');
+        markExported();
       });
   });
 
@@ -637,7 +761,6 @@ function wire(): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-    const status = byId('copy-status');
     void file
       .text()
       .then((text) => {
@@ -649,41 +772,31 @@ function wire(): void {
       })
       .then((imported) => replaceVault(imported))
       .then(() => {
-        status.textContent = tr('export.imported');
+        setStatus('copy-status', 'export.imported');
         input.value = '';
         return refresh();
       })
       .catch(() => {
-        status.textContent = tr('export.importFailed');
+        setStatus('copy-status', 'export.importFailed');
       });
   });
 
   byId('persist').addEventListener('click', () => {
-    const status = byId('persist-status');
     if (!navigator.storage?.persist) {
-      status.textContent = tr('storage.denied');
+      setStatus('persist-status', 'storage.denied');
       return;
     }
     void navigator.storage.persist().then((granted) => {
-      status.textContent = granted ? tr('storage.granted') : tr('storage.denied');
+      setStatus('persist-status', granted ? 'storage.granted' : 'storage.denied');
     });
   });
 
-  const insulinStrings: InsulinStrings = {
-    title: tr('ui.insulinTitle'),
-    disclaimer: tr('ui.insulinDisclaimer'),
-    ratio: tr('ui.insulinRatio'),
-    correctionFactor: tr('ui.insulinCF'),
-    target: tr('ui.insulinTarget'),
-    current: tr('ui.insulinCurrent'),
-    carbs: tr('ui.insulinCarbs'),
-    compute: tr('button.calc'),
-    incomplete: tr('ui.insulinIncomplete'),
-    meal: tr('ui.insulinMeal'),
-    correction: tr('ui.insulinCorrection'),
-    unit: tr('unit.units'),
-  };
-  setupInsulin(byId('insulin-host'), byId<HTMLInputElement>('insulin-toggle'), insulinStrings);
+  insulin = setupInsulin(
+    byId('insulin-host'),
+    byId<HTMLInputElement>('insulin-toggle'),
+    () => locale,
+  );
+  renderExportReminder();
 }
 
 wire();
