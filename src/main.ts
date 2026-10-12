@@ -24,7 +24,7 @@ import { createDetectionClient } from './model';
 import type { DetectionClient, DetectionResult, InferencePhase, TopKEntry } from './model';
 import { decryptVault, encryptVault, isEncrypted } from './export/crypto';
 import { setupInsulin } from './insulin';
-import type { InsulinStrings } from './insulin';
+import type { InsulinHandle } from './insulin';
 
 const SLOTS: readonly MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
@@ -36,6 +36,19 @@ interface Draft {
 
 let locale: Locale = detectLocale();
 let currentDate = today();
+let insulin: InsulinHandle | null = null;
+
+/** Mensajes de estado: se guarda la clave para poder retraducirlos. */
+const statusKeys = new Map<string, StringKey>();
+
+function setStatus(id: string, key: StringKey): void {
+  byId(id).textContent = tr(key);
+  statusKeys.set(id, key);
+}
+
+function relocalizeStatuses(): void {
+  for (const [id, key] of statusKeys) byId(id).textContent = tr(key);
+}
 let draft: Draft = { slot: 'breakfast', origin: 'manual', items: [] };
 let capture: CapturedImage | null = null;
 let vault: Vault = emptyVault();
@@ -565,6 +578,8 @@ function render(): void {
   renderSearch();
   renderDiary();
   renderInsulin();
+  relocalizeStatuses();
+  insulin?.refresh();
 }
 
 async function refresh(): Promise<void> {
@@ -600,6 +615,7 @@ function wire(): void {
       locale = value;
       storeLocale(locale);
       render();
+      renderExportReminder();
     }
   });
 
@@ -653,9 +669,8 @@ function wire(): void {
   });
 
   byId('register').addEventListener('click', () => {
-    const registerStatus = byId('register-status');
     if (draft.items.length === 0) {
-      registerStatus.textContent = tr('register.empty');
+      setStatus('register-status', 'register.empty');
       return;
     }
     const confidence =
@@ -688,7 +703,7 @@ function wire(): void {
       detectionMeta = null;
       detectionEngine = '';
       photoStatusKey = null;
-      registerStatus.textContent = tr('register.done');
+      setStatus('register-status', 'register.done');
       return refresh();
     });
   });
@@ -726,7 +741,7 @@ function wire(): void {
   byId('export').addEventListener('click', () => {
     void loadVault().then((current) => {
       downloadText(`carbos-${today()}.json`, toJson(current), 'application/json');
-      byId('copy-status').textContent = tr('export.done');
+      setStatus('copy-status', 'export.done');
       markExported();
     });
   });
@@ -737,7 +752,7 @@ function wire(): void {
       .then((current) => encryptVault(current, password))
       .then((text) => {
         downloadText(`carbos-${today()}.carbos`, text, 'application/json');
-        byId('copy-status').textContent = tr('export.done');
+        setStatus('copy-status', 'export.done');
         markExported();
       });
   });
@@ -746,7 +761,6 @@ function wire(): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-    const status = byId('copy-status');
     void file
       .text()
       .then((text) => {
@@ -758,45 +772,30 @@ function wire(): void {
       })
       .then((imported) => replaceVault(imported))
       .then(() => {
-        status.textContent = tr('export.imported');
+        setStatus('copy-status', 'export.imported');
         input.value = '';
         return refresh();
       })
       .catch(() => {
-        status.textContent = tr('export.importFailed');
+        setStatus('copy-status', 'export.importFailed');
       });
   });
 
   byId('persist').addEventListener('click', () => {
-    const status = byId('persist-status');
     if (!navigator.storage?.persist) {
-      status.textContent = tr('storage.denied');
+      setStatus('persist-status', 'storage.denied');
       return;
     }
     void navigator.storage.persist().then((granted) => {
-      status.textContent = granted ? tr('storage.granted') : tr('storage.denied');
+      setStatus('persist-status', granted ? 'storage.granted' : 'storage.denied');
     });
   });
 
-  const insulinStrings: InsulinStrings = {
-    title: tr('ui.insulinTitle'),
-    disclaimer: tr('ui.insulinDisclaimer'),
-    ratio: tr('ui.insulinRatio'),
-    correctionFactor: tr('ui.insulinCF'),
-    target: tr('ui.insulinTarget'),
-    current: tr('ui.insulinCurrent'),
-    carbs: tr('ui.insulinCarbs'),
-    compute: tr('button.calc'),
-    incomplete: tr('ui.insulinIncomplete'),
-    meal: tr('ui.insulinMeal'),
-    correction: tr('ui.insulinCorrection'),
-    unit: tr('unit.units'),
-    gateTitle: tr('insulin.gateTitle'),
-    gateBody: tr('insulin.gateBody'),
-    gateAccept: tr('insulin.gateAccept'),
-    gateCancel: tr('insulin.gateCancel'),
-  };
-  setupInsulin(byId('insulin-host'), byId<HTMLInputElement>('insulin-toggle'), insulinStrings);
+  insulin = setupInsulin(
+    byId('insulin-host'),
+    byId<HTMLInputElement>('insulin-toggle'),
+    () => locale,
+  );
   renderExportReminder();
 }
 
