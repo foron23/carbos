@@ -756,6 +756,11 @@ async function startDetection(image: CapturedImage): Promise<void> {
     detections = [];
     detectionDraftIds = [];
     renderDetect();
+    // Visible solo en consola: permite diagnosticar fallos del runtime sin UI.
+    console.warn(
+      '[detect] fallo el reconocimiento:',
+      error instanceof Error ? error.message : error,
+    );
     setPhotoStatus('photo.noModel');
   }
 }
