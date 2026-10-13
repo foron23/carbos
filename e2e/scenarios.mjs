@@ -544,6 +544,11 @@ export const scenarios = [
     async run(page, ctx) {
       await installDetectionStub(page);
       await openApp(page, ctx.base);
+      // El receptor local evita tocar el endpoint de produccion al compartir.
+      await page.evaluate(
+        (url) => localStorage.setItem('carbos.contrib.endpoint', url),
+        ctx.receiverUrl,
+      );
 
       assertEqual(
         await page.$eval('#contrib-toggle', (el) => el.checked),
@@ -564,7 +569,10 @@ export const scenarios = [
       await waitForContributionCount(page, 1);
       const shared = (await readContributions(page))[0];
       assertEqual(shared.classId, 'pan_blanco', 'se encola la clase confirmada');
-      assertEqual(shared.status, 'pending', 'el recorte queda pendiente');
+      assert(
+        shared.status === 'pending' || shared.status === 'sent',
+        `el recorte se encola (estado ${shared.status})`,
+      );
 
       // (4) El recorte es JPEG valido y no arrastra los metadatos del origen.
       assertEqual(shared.type, 'image/jpeg', 'el blob es JPEG');
@@ -606,6 +614,7 @@ export const scenarios = [
     async run(page, ctx) {
       await installDetectionStub(page);
       await openApp(page, ctx.base);
+      ctx.received.length = 0;
       await page.evaluate(
         (url) => localStorage.setItem('carbos.contrib.endpoint', url),
         ctx.receiverUrl,
@@ -613,14 +622,12 @@ export const scenarios = [
 
       await uploadAndDetect(page, ctx.fixtureMetaPng);
       await click(page, '#share-photo');
-      await waitForContributionCount(page, 1);
-
-      // El flush corre al recuperar conexion (la app es offline-first).
-      await page.evaluate(() => window.dispatchEvent(new Event('online')));
-      for (let i = 0; i < 100 && ctx.received.length === 0; i += 1) {
+      // Compartir sube de inmediato, sin esperar a un evento "online".
+      for (let i = 0; i < 120 && ctx.received.length === 0; i += 1) {
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
       assertEqual(ctx.received.length, 1, 'un unico POST por lote');
+      await waitForText(page, '#share-status', 'Compartido');
       const post = ctx.received[0];
       assertEqual(post.method, 'POST', 'metodo POST');
       assertEqual(post.headers['content-type'], 'application/zip', 'Content-Type application/zip');
@@ -678,6 +685,16 @@ export const scenarios = [
         nodes.map((node) => (node.textContent ?? '').trim()),
       );
       assertEqual(draft.length, 2, 'dos alimentos en el borrador');
+
+      const boxes = await page.$$eval('#detect-overlay .detect-box', (nodes) => nodes.length);
+      assertEqual(boxes, 2, 'se dibuja un contorno por alimento');
+      const labels = await page.$$eval('#detect-overlay .detect-box-label', (nodes) =>
+        nodes.map((node) => (node.textContent ?? '').trim()),
+      );
+      assert(
+        labels.some((text) => text.includes('Pan blanco') && /\d+ g/.test(text)),
+        `la etiqueta lleva nombre y gramos: ${labels.join(' | ')}`,
+      );
 
       const gramsLarge = await page.$eval(
         '#draft-items .draft-row:nth-child(1) input[type="number"]',

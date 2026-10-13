@@ -531,14 +531,58 @@ input.timeline-time {
   border-block-end: 1px dashed var(--line-strong);
 }
 
+.preview-wrap {
+  position: relative;
+  display: inline-block;
+  inline-size: 100%;
+  line-height: 0;
+  vertical-align: top;
+  margin-block-end: 0.6rem;
+}
+
 .preview {
   display: block;
   inline-size: 100%;
-  max-block-size: 18rem;
-  margin-block-end: 0.6rem;
-  object-fit: cover;
+  block-size: auto;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
+}
+
+/* Contornos de los alimentos detectados, superpuestos a la foto. */
+.detect-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.detect-box {
+  position: absolute;
+  border: 2px solid var(--box-color, #16a34a);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--box-color, #16a34a) 16%, transparent);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
+}
+
+.detect-box-label {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: -2px;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.72rem;
+  line-height: 1.1;
+  color: #fff;
+  white-space: nowrap;
+  background: var(--box-color, #16a34a);
+  border-radius: 6px 6px 6px 0;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+  transform: translateY(-100%);
+}
+
+.detect-box--flip .detect-box-label {
+  inset-block-start: auto;
+  inset-block-end: 0;
+  border-radius: 0 6px 6px 6px;
+  transform: translateY(100%);
 }
 
 /* --- Avisos -------------------------------------------------------------- */

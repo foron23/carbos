@@ -250,7 +250,10 @@ app.innerHTML = `
 
   <fieldset class="card">
     <legend data-i18n="section.photo"></legend>
-    <img id="photo-preview" class="preview" alt="" hidden />
+    <div id="photo-wrap" class="preview-wrap" hidden>
+      <img id="photo-preview" class="preview" alt="" />
+      <div id="detect-overlay" class="detect-overlay" aria-hidden="true"></div>
+    </div>
     <p id="photo-status" class="muted" data-i18n="photo.none" aria-live="polite"></p>
     <div class="row">
       <label class="btn"><input id="camera-input" class="sr-only" type="file" accept="image/*" capture="environment" data-i18n-aria="button.takePhoto" /><span data-i18n="button.takePhoto"></span></label>
@@ -518,6 +521,7 @@ function renderDraft(): void {
   }
   const total = draft.items.reduce((sum, item) => sum + itemCarbs(item), 0);
   byId('draft-total').textContent = `${roundCarbs(total)} ${tr('unit.grams')}`;
+  renderOverlay();
 }
 
 function setPhotoStatus(key: StringKey | null): void {
@@ -526,19 +530,54 @@ function setPhotoStatus(key: StringKey | null): void {
 }
 
 function renderPhoto(): void {
+  const wrap = byId('photo-wrap');
   const preview = byId<HTMLImageElement>('photo-preview');
   const status = byId('photo-status');
   if (capture) {
     preview.src = capture.dataUrl;
     preview.hidden = false;
+    wrap.hidden = false;
     status.textContent = tr(photoStatusKey ?? 'photo.ready');
   } else {
     preview.hidden = true;
     preview.removeAttribute('src');
+    wrap.hidden = true;
     photoStatusKey = null;
     status.textContent = tr('photo.none');
   }
+  renderOverlay();
   updateShareButton();
+}
+
+/** Colores de los contornos; se repiten si hay mas detecciones. */
+const BOX_COLORS = ['#16a34a', '#2563eb', '#db2777', '#d97706', '#7c3aed', '#0891b2'];
+
+/** Dibuja la caja (contorno + etiqueta con nombre y gramos) de cada deteccion. */
+function renderOverlay(): void {
+  const overlay = byId('detect-overlay');
+  overlay.innerHTML = '';
+  if (!capture) return;
+  detections.forEach((result, index) => {
+    const itemId = detectionDraftIds[index];
+    const item = itemId ? draft.items.find((candidate) => candidate.id === itemId) : undefined;
+    const food = foodById(result.classId);
+    const box = result.box;
+    const el = document.createElement('div');
+    el.className = 'detect-box';
+    if (box.y < 0.12) el.classList.add('detect-box--flip');
+    el.style.setProperty('--box-color', BOX_COLORS[index % BOX_COLORS.length] ?? '#16a34a');
+    el.style.left = `${box.x * 100}%`;
+    el.style.top = `${box.y * 100}%`;
+    el.style.width = `${box.w * 100}%`;
+    el.style.height = `${box.h * 100}%`;
+    const label = document.createElement('span');
+    label.className = 'detect-box-label';
+    const name = item?.name ?? (food ? food.name[locale] : tr('unknown.food'));
+    const grams = item ? ` · ${Math.round(item.grams)} ${tr('unit.grams')}` : '';
+    label.textContent = `${name}${grams}`;
+    el.appendChild(label);
+    overlay.appendChild(el);
+  });
 }
 
 function updateShareButton(): void {
@@ -583,12 +622,14 @@ async function renderContribStatus(): Promise<void> {
   }
 }
 
-async function flushContributions(): Promise<void> {
+async function flushContributions(announce = false): Promise<void> {
   if (contributing) return;
   contributing = true;
+  if (announce) setStatus('share-status', 'contrib.uploading');
   try {
     // pending + failed reintentables: un fallo no es terminal hasta agotar intentos.
     const queue = (await listContributions()).filter((record) => canRetry(record));
+    let sent = 0;
     let failed = 0;
     for (let start = 0; start < queue.length; start += CONTRIB_BATCH) {
       const batch = queue.slice(start, start + CONTRIB_BATCH);
@@ -606,7 +647,8 @@ async function flushContributions(): Promise<void> {
           grantedAt: new Date(Math.min(...batch.map((record) => record.createdAt))).toISOString(),
         });
         const result = await uploadBundle(zip, { endpoint: readContribEndpoint() });
-        if (!result.ok) failed += batch.length;
+        if (result.ok) sent += batch.length;
+        else failed += batch.length;
         const settle = result.ok ? markSent : markFailed;
         await Promise.all(batch.map((record) => settle(record.id)));
       } catch {
@@ -614,10 +656,11 @@ async function flushContributions(): Promise<void> {
         await Promise.all(batch.map((record) => markFailed(record.id))).catch(() => undefined);
       }
     }
-    if (failed > 0) setStatus('share-status', 'contrib.shareFailed');
+    if (announce && failed === 0 && sent > 0) setStatus('share-status', 'contrib.sent');
+    else if (failed > 0) setStatus('share-status', 'contrib.shareFailed');
     await renderContribStatus();
   } catch {
-    /* nunca lanza: la subida es diferida y opcional */
+    if (announce) setStatus('share-status', 'contrib.shareFailed');
   } finally {
     contributing = false;
   }
@@ -684,6 +727,7 @@ function renderDetect(): void {
   const summary = byId('detect-summary');
   const list = byId('detect-results');
   updateShareButton();
+  renderOverlay();
   if (detections.length === 0) {
     panel.hidden = true;
     summary.textContent = '';
@@ -1008,7 +1052,9 @@ function wire(): void {
     if (draft.origin === 'photo' && readContribAuto() && photoImage) {
       void enqueueFrom(photoImage, photoDets, photoIds, photoItems)
         .then((count) => {
-          if (count > 0) void renderContribStatus();
+          if (count === 0) return;
+          if (navigator.onLine === false) void renderContribStatus();
+          else void flushContributions();
         })
         .catch(() => undefined);
     }
@@ -1032,9 +1078,13 @@ function wire(): void {
       detectionDraftIds,
       draft.items.map((item) => ({ ...item })),
     ).then((count) => {
-      if (count > 0) {
+      if (count === 0) return;
+      if (navigator.onLine === false) {
         setStatus('share-status', 'contrib.queued');
         void renderContribStatus();
+      } else {
+        // Sube ya; el estado pasa a "subiendo" y luego a enviado/fallo.
+        void flushContributions(true);
       }
     });
   });
