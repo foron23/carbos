@@ -108,6 +108,8 @@ def main() -> int:
                 headers={
                     "Content-Type": "application/zip",
                     "Origin": "https://carbos.foron.dev",
+                    # Cloudflare bloquea UAs tipo "Python-urllib" (error 1010).
+                    "User-Agent": "carbos-selfcheck/0.1",
                 },
                 method="POST",
             )

@@ -98,3 +98,5 @@ sobre `import_contributions.py`.
 - Privacidad: solo llega el zip con recortes sin EXIF y el id de clase; sin cuentas ni
   identificadores. La retención se controla con la regla de ciclo de vida.
 - Licencia de la contribución: **CC0-1.0** (D38).
+- **Cloudflare bloquea User-Agents de bots** (error **1010**): al probar con `curl` funciona,
+  pero con `python-urllib` hay que enviar un `User-Agent` propio (el `selfcheck` ya lo hace).
