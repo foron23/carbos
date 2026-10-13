@@ -5,7 +5,11 @@ import { dirname, join } from 'node:path';
 import { preview } from 'vite';
 import puppeteer from 'puppeteer';
 import { ensureShotsDir, screenshot } from './helpers.mjs';
-import { scenarios } from './scenarios.mjs';
+import { scenarios as coreScenarios } from './scenarios.mjs';
+import { scenarios as recordsScenarios } from './scenarios-records.mjs';
+
+// El diario editable/quitable vive en su propio fichero (spec 17 toca scenarios.mjs).
+const scenarios = [...coreScenarios, ...recordsScenarios];
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.E2E_PORT ?? 4173);

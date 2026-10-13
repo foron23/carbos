@@ -3,6 +3,8 @@ import {
   applyAlternative,
   dayCarbs,
   dayTimeline,
+  deleteInsulin,
+  deleteMeal,
   emptyVault,
   fromJson,
   itemCarbs,
@@ -129,7 +131,15 @@ function setStatus(id: string, key: StringKey): void {
 function relocalizeStatuses(): void {
   for (const [id, key] of statusKeys) byId(id).textContent = tr(key);
 }
+
+/** Borra un mensaje de estado y lo saca del mapa de retraduccion. */
+function clearStatus(id: string): void {
+  byId(id).textContent = '';
+  statusKeys.delete(id);
+}
 let draft: Draft = { origin: 'manual', items: [] };
+/** Comida registrada que se esta editando (null = se crea una nueva). */
+let editingMeal: Meal | null = null;
 let capture: CapturedImage | null = null;
 let vault: Vault = emptyVault();
 
@@ -288,10 +298,14 @@ app.innerHTML = `
       </div>
       <ul id="search-results" class="results"></ul>
     </div>
+    <p id="draft-editing" class="notice" role="status" data-i18n="diary.editing" hidden></p>
     <h3 data-i18n="draft.items"></h3>
     <ul id="draft-items" class="draft"></ul>
     <p><span data-i18n="label.total"></span>: <output id="draft-total" aria-live="polite"></output></p>
-    <p><button id="register" type="button" class="primary" data-i18n="button.register"></button></p>
+    <div class="row">
+      <button id="register" type="button" class="primary" data-i18n="button.register"></button>
+      <button id="register-cancel" type="button" data-i18n="button.cancel" hidden></button>
+    </div>
     <p id="register-status" class="muted" aria-live="polite"></p>
     <p class="muted" data-i18n="text.estimateNote"></p>
   </fieldset>
@@ -479,7 +493,6 @@ function renderDraft(): void {
       row.append(name, gramsLabel, carbs);
 
       const food = foodById(item.classId);
-
       if (food) {
         const portions = document.createElement('div');
         portions.className = 'draft-portions';
@@ -539,6 +552,10 @@ function renderDraft(): void {
   }
   const total = draft.items.reduce((sum, item) => sum + itemCarbs(item), 0);
   byId('draft-total').textContent = `${roundCarbs(total)} ${tr('unit.grams')}`;
+  const editing = editingMeal !== null;
+  byId<HTMLButtonElement>('register').textContent = tr(editing ? 'button.save' : 'button.register');
+  byId<HTMLButtonElement>('register-cancel').hidden = !editing;
+  byId('draft-editing').hidden = !editing;
   renderOverlay();
 }
 
@@ -972,6 +989,62 @@ function insulinBody(log: InsulinLog): string {
   return `${log.units} ${tr('unit.units')} · ${tr(`kind.${log.kind}` as StringKey)}`;
 }
 
+/** Botones (editar/quitar) de una entrada del diario; `id` es el nombre accesible. */
+function entryActions(
+  id: string,
+  items: { key: StringKey; cls: string; run: () => void }[],
+): HTMLDivElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'timeline-actions';
+  for (const item of items) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = item.cls;
+    button.textContent = tr(item.key);
+    button.setAttribute('aria-label', `${tr(item.key)} ${id}`);
+    button.addEventListener('click', item.run);
+    wrap.appendChild(button);
+  }
+  return wrap;
+}
+
+/** Deja de editar y vacia el borrador. */
+function resetEdit(): void {
+  editingMeal = null;
+  draft = { origin: 'manual', items: [] };
+}
+
+/** Carga una comida registrada en el borrador para ajustarla y guardarla. */
+function startEditMeal(meal: Meal): void {
+  editingMeal = meal;
+  draft = { origin: meal.origin, items: meal.items.map((item) => ({ ...item })) };
+  clearStatus('register-status');
+  renderDraft();
+  renderDiary();
+  byId('entry').scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
+function cancelEdit(): void {
+  resetEdit();
+  clearStatus('register-status');
+  renderDraft();
+  renderDiary();
+}
+
+/** Quita una comida del diario (con confirmacion: es un registro de salud). */
+function removeMeal(meal: Meal): void {
+  if (!window.confirm(tr('diary.confirmDelete'))) return;
+  void deleteMeal(meal.id).then(() => {
+    if (editingMeal?.id === meal.id) resetEdit();
+    return refresh();
+  });
+}
+
+function removeInsulin(log: InsulinLog): void {
+  if (!window.confirm(tr('diary.confirmDelete'))) return;
+  void deleteInsulin(log.id).then(refresh);
+}
+
 function renderDiary(): void {
   const list = byId('diary');
   const entries = dayTimeline(vault.meals, vault.insulin, currentDate);
@@ -1008,15 +1081,28 @@ function renderDiary(): void {
             `${food.name} ${food.grams} ${tr('unit.grams')} (${roundCarbs(itemCarbs(food))} ${tr('unit.grams')})`,
         )
         .join(' · ');
-      body.append(head, detail);
+      body.append(
+        head,
+        detail,
+        entryActions(meal.items.map((food) => food.name).join(', '), [
+          { key: 'button.edit', cls: 'edit-entry', run: () => startEditMeal(meal) },
+          { key: 'button.remove', cls: 'delete-entry', run: () => removeMeal(meal) },
+        ]),
+      );
       row.appendChild(body);
     } else {
+      const log = entry.log;
       const time = document.createElement('span');
       time.className = 'timeline-time';
-      time.textContent = entry.log.time;
-      const body = document.createElement('span');
+      time.textContent = log.time;
+      const body = document.createElement('div');
       body.className = 'timeline-body';
-      body.textContent = insulinBody(entry.log);
+      body.textContent = insulinBody(log);
+      body.appendChild(
+        entryActions(insulinBody(log), [
+          { key: 'button.remove', cls: 'delete-entry', run: () => removeInsulin(log) },
+        ]),
+      );
       row.append(time, body);
     }
     list.appendChild(row);
@@ -1119,6 +1205,7 @@ function wire(): void {
   byId<HTMLInputElement>('date').addEventListener('change', () => {
     currentDate = byId<HTMLInputElement>('date').value || today();
     storeViewDate(currentDate);
+    resetEdit();
     render();
   });
 
@@ -1126,6 +1213,7 @@ function wire(): void {
     currentDate = isoDate;
     storeViewDate(isoDate);
     byId<HTMLInputElement>('date').value = isoDate;
+    resetEdit();
     render();
   };
   const shiftDay = (days: number): void => {
@@ -1182,34 +1270,42 @@ function wire(): void {
 
   const registerButton = byId<HTMLButtonElement>('register');
   const addInsulinButton = byId<HTMLButtonElement>('add-insulin');
+  byId('register-cancel').addEventListener('click', cancelEdit);
   registerButton.addEventListener('click', () => {
     if (registerButton.disabled) return;
     if (draft.items.length === 0) {
       setStatus('register-status', 'register.empty');
       return;
     }
-    const confidence =
-      detections.length > 0
-        ? detections.reduce((sum, result) => sum + result.score, 0) / detections.length
-        : null;
-    const topk = detections.flatMap((result) =>
-      result.topk
-        .filter((entry) => entry.classId)
-        .slice(0, 1)
-        .map((entry) => ({ classId: entry.classId as string, p: entry.p })),
-    );
-    const meal: Meal = {
-      id: uid(),
-      date: currentDate,
-      time: nowTime(),
-      items: draft.items.map((item) => ({ ...item })),
-      confidence,
-      origin: draft.origin,
-      model:
-        detectionMeta && topk.length > 0
-          ? { detector: detectionMeta.detector, classifier: detectionMeta.classifier, topk }
-          : undefined,
-    };
+    const editing = editingMeal;
+    let meal: Meal;
+    if (editing) {
+      // Editar: mismo id, fecha y hora; solo cambian los alimentos.
+      meal = { ...editing, items: draft.items.map((item) => ({ ...item })) };
+    } else {
+      const confidence =
+        detections.length > 0
+          ? detections.reduce((sum, result) => sum + result.score, 0) / detections.length
+          : null;
+      const topk = detections.flatMap((result) =>
+        result.topk
+          .filter((entry) => entry.classId)
+          .slice(0, 1)
+          .map((entry) => ({ classId: entry.classId as string, p: entry.p })),
+      );
+      meal = {
+        id: uid(),
+        date: currentDate,
+        time: nowTime(),
+        items: draft.items.map((item) => ({ ...item })),
+        confidence,
+        origin: draft.origin,
+        model:
+          detectionMeta && topk.length > 0
+            ? { detector: detectionMeta.detector, classifier: detectionMeta.classifier, topk }
+            : undefined,
+      };
+    }
     const photoImage = capture;
     const photoDets = detections;
     const photoIds = detectionDraftIds;
@@ -1221,7 +1317,8 @@ function wire(): void {
       registerButton.disabled = false;
       registerCard?.removeAttribute('aria-busy');
     };
-    if (draft.origin === 'photo' && readContribAuto() && photoImage) {
+    // Editar no vuelve a compartir la foto: el consentimiento fue al crearla.
+    if (!editing && draft.origin === 'photo' && readContribAuto() && photoImage) {
       void enqueueFrom(photoImage, photoDets, photoIds, photoItems)
         .then((count) => {
           if (count === 0) return;
@@ -1232,7 +1329,7 @@ function wire(): void {
     }
     void putMeal(meal)
       .then(() => {
-        draft = { origin: 'manual', items: [] };
+        resetEdit();
         capture = null;
         detections = [];
         detectionDraftIds = [];

@@ -709,6 +709,14 @@ input.timeline-time {
   font-size: 0.85rem;
 }
 
+/* Acciones de una entrada del diario (editar / quitar). */
+.timeline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-block-start: 0.5rem;
+}
+
 /* Vacio: se anuncia, no se deja en blanco. */
 #diary li.muted:only-child,
 #draft-items li.muted:only-child,

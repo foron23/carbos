@@ -53,6 +53,18 @@ export function putInsulin(log: InsulinLog): Promise<IDBValidKey> {
   return tx(STORE_INSULIN, 'readwrite', (store) => store.put(log));
 }
 
+/** Quita una comida registrada por id (el registro diario es editable). */
+export function deleteMeal(id: string): Promise<void> {
+  return tx<undefined>(STORE_MEALS, 'readwrite', (store) => store.delete(id)).then(() => undefined);
+}
+
+/** Quita un registro de insulina por id. */
+export function deleteInsulin(id: string): Promise<void> {
+  return tx<undefined>(STORE_INSULIN, 'readwrite', (store) => store.delete(id)).then(
+    () => undefined,
+  );
+}
+
 export function allMeals(): Promise<Meal[]> {
   return tx<Meal[]>(STORE_MEALS, 'readonly', (store) => store.getAll());
 }
