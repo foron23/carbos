@@ -105,7 +105,7 @@ def search_catalog(index: list[tuple[str, str]], query: str, limit: int = 20) ->
         elif term.startswith(q):
             prefix.append(cid)
             seen.add(cid)
-    seen2 = set(exact)
+    seen2 = set(exact) | set(prefix)
     for term, cid in index:
         if cid in seen2:
             continue
