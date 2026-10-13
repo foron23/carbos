@@ -46,7 +46,9 @@ from fetch_images import load_foods  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CATALOG = ROOT / "src/catalog/catalog.ts"
-DEFAULT_QUEUE = ROOT / "data/labels/review.queue.jsonl"
+# Cola preferente: la del teacher de mejor rendimiento (L/14) si existe.
+_L14_QUEUE = ROOT / "data/labels/l14/review.queue.jsonl"
+DEFAULT_QUEUE = _L14_QUEUE if _L14_QUEUE.exists() else ROOT / "data/labels/review.queue.jsonl"
 DEFAULT_OUT = ROOT / "data/confirmed"
 DEFAULT_LOG = ROOT / "data/labels/confirmed.jsonl"
 # Los modos automaticos (--accept-agree / --accept-folder) NO son revision humana:
