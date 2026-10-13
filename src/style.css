@@ -20,6 +20,22 @@
   --radius-sm: 0.65rem;
   --shadow: 0 1px 2px rgb(16 24 20 / 6%), 0 14px 28px -20px rgb(16 24 20 / 45%);
   --page: 34rem;
+  /* Separacion de tarjetas: en claro la sombra basta; en oscuro se apoya en la linea. */
+  --card-line: #e3e7e2;
+  /* Escala tipografica unica (F): h2 base queda por debajo del h1. */
+  --text-xs: 0.72rem;
+  --text-sm: 0.82rem;
+  --text-base: 0.95rem;
+  --text-lg: 1.05rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.4rem;
+  /* Movimiento por tokens (B1): aditivo, nunca unico portador de significado. */
+  --dur-instant: 90ms;
+  --dur-fast: 140ms;
+  --dur-base: 200ms;
+  --dur-slow: 300ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasis: cubic-bezier(0.2, 0, 0, 1.35);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -35,6 +51,7 @@
     --accent-soft: #16241e;
     --danger: #f0837a;
     --shadow: 0 1px 2px rgb(0 0 0 / 45%), 0 18px 34px -22px rgb(0 0 0 / 80%);
+    --card-line: #303a34;
   }
 }
 
@@ -44,11 +61,16 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  scroll-padding-top: calc(var(--daybar-h, 0px) + env(safe-area-inset-top));
 }
 
 body {
   margin: 0;
-  padding: clamp(0.75rem, 3vw, 1.5rem);
+  padding: max(clamp(0.75rem, 3vw, 1.5rem), env(safe-area-inset-top))
+    max(clamp(0.75rem, 3vw, 1.5rem), env(safe-area-inset-right))
+    max(clamp(0.75rem, 3vw, 1.5rem), env(safe-area-inset-bottom))
+    max(clamp(0.75rem, 3vw, 1.5rem), env(safe-area-inset-left));
+  overscroll-behavior-y: contain;
   font-family:
     system-ui,
     -apple-system,
@@ -67,6 +89,12 @@ body {
   margin-inline: auto;
 }
 
+/* El contenido principal es un unico item de #app: conserva el ritmo vertical. */
+#app > main {
+  display: grid;
+  gap: 0.85rem;
+}
+
 /* --- Tipografia ---------------------------------------------------------- */
 
 h1,
@@ -77,29 +105,44 @@ h3 {
 
 h1 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: var(--text-2xl);
+}
+
+/* h2 base por debajo del h1 (antes el del onboarding lo superaba). */
+h2 {
+  margin-block: 0.25rem;
+  font-size: var(--text-xl);
 }
 
 h3 {
   margin-block: 0.75rem 0.25rem;
-  font-size: 0.95rem;
+  font-size: var(--text-base);
 }
 
 p {
   margin-block: 0.5rem;
 }
 
-/* --- Barra superior ------------------------------------------------------ */
+/* --- Cabecera pegajosa compacta (A1) ------------------------------------ */
 
 .topbar {
+  position: sticky;
+  inset-block-start: env(safe-area-inset-top);
+  z-index: 10;
   display: grid;
-  gap: 0.15rem;
-  padding-block: 0.25rem;
+  gap: 0.08rem;
+  padding-block: 0.22rem 0.28rem;
+  padding-inline: 0.9rem;
+  min-inline-size: 0;
+  background: var(--surface);
+  border: 1px solid var(--card-line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .topbar .bar {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
 }
@@ -108,18 +151,53 @@ p {
   margin: 0;
 }
 
+.tagline {
+  line-height: 1.2;
+}
+
+/* Resumen del dia: #day-total protagonista; chip y mini-semana secundarios. */
+.day-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+}
+
+.day-summary .total {
+  font-size: clamp(1.5rem, 7.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+/* Mini-semana: siete barras finas, secundarias frente al total. */
+.day-summary .week-bars {
+  flex: 1 1 6rem;
+  margin: 0;
+}
+
+.day-summary .week-bar {
+  block-size: 0.75rem;
+}
+
+.header-disclaimer {
+  font-size: 0.7rem;
+  line-height: 1.25;
+  color: var(--muted);
+}
+
 .lang {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 
 .lang select {
   padding-block: 0.2rem;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 
 /* --- Tarjetas ------------------------------------------------------------ */
@@ -132,7 +210,7 @@ details {
   margin: 0;
   padding: 1.1rem 1rem 0.9rem;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid var(--card-line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
@@ -160,34 +238,32 @@ fieldset {
 
 /* --- El dia: unica cifra protagonista ----------------------------------- */
 
-.daybar {
-  position: sticky;
-  inset-block-start: 0;
-  z-index: 5;
+.chip output {
+  /* El chip lleva un dato: numeros tabulares y peso, no texto de apoyo. */
+  color: var(--fg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
-.hero {
-  background: linear-gradient(180deg, var(--accent-soft), var(--surface) 65%);
+/* Enlaza "comida registrada" con la cifra que cambio (B2). */
+#day-total.pulse {
+  animation: day-pulse var(--dur-slow) var(--ease-emphasis);
 }
 
-.hero-figure {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.75rem;
-  margin: 0 0 0.9rem;
-}
+@keyframes day-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
 
-.hero-figure .total {
-  font-size: clamp(2.5rem, 13vw, 3.25rem);
-  font-weight: 700;
-  letter-spacing: -0.035em;
-  line-height: 1;
+  50% {
+    transform: scale(1.08);
+  }
 }
 
 .chip {
-  padding: 0.15rem 0.6rem;
-  font-size: 0.8rem;
+  padding: 0.1rem 0.55rem;
+  font-size: 0.75rem;
   color: var(--muted);
   background: var(--surface);
   border: 1px solid var(--line-strong);
@@ -204,7 +280,15 @@ fieldset {
 }
 
 .daynav input[type='date'] {
-  flex: 1 1 7rem;
+  flex: 1 1 4rem;
+  min-inline-size: 0;
+}
+
+/* La navegacion de dia cabe en un solo renglon aunque el ancho sea minimo;
+   `min-inline-size: 0` evita que su min-content ensanche la rejilla de #app. */
+.topbar .daynav {
+  flex-wrap: nowrap;
+  min-inline-size: 0;
 }
 
 /* --- Semana en barras (Lun-Dom) ----------------------------------------- */
@@ -236,9 +320,27 @@ fieldset {
 
 .week-fill {
   inline-size: 100%;
-  block-size: calc(var(--fill, 0) * 100%);
+  /* La altura es estable; el cambio de semana solo anima transform (B2/B4). */
+  block-size: 100%;
+  transform-origin: bottom;
+  transform: scaleY(var(--fill, 0));
   background: var(--accent);
   border-radius: calc(var(--radius-sm) - 0.15rem);
+  transition: transform var(--dur-base) var(--ease-standard);
+  /* Entrada escalonada: solo al (re)construir las barras (B4). */
+  animation: week-rise var(--dur-slow) var(--ease-standard) backwards;
+  animation-delay: calc(min(var(--i, 0), 7) * 40ms);
+}
+
+@keyframes week-rise {
+  from {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleY(var(--fill, 0));
+    opacity: 1;
+  }
 }
 
 .week-day[data-active] .week-bar {
@@ -250,6 +352,60 @@ fieldset {
   font-size: 0.7rem;
   line-height: 1;
   color: var(--muted);
+}
+
+/* --- Superficie de entrada unica (A2/A3) -------------------------------- */
+
+.segmented {
+  display: flex;
+  gap: 0.25rem;
+  margin-block-end: 0.85rem;
+  padding: 0.2rem;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.seg {
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.75rem;
+  margin: 0;
+  padding-inline: 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  border-radius: calc(var(--radius-sm) - 0.2rem);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+/* Radio nativo, visualmente integrado pero enfocable (foco en la etiqueta). */
+.seg input[type='radio'] {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.seg:has(input:checked) {
+  color: var(--accent-fg);
+  background: var(--accent);
+}
+
+.seg:has(input:focus-visible) {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* --- Controles ----------------------------------------------------------- */
@@ -269,6 +425,15 @@ button {
   background: var(--surface);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+label,
+summary,
+.btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 input,
@@ -293,9 +458,11 @@ button,
   font-weight: 500;
   cursor: pointer;
   transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    transform 0.06s ease;
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard),
+    outline-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-instant) var(--ease-standard);
 }
 
 button:hover,
@@ -315,12 +482,29 @@ button.primary {
   border-color: var(--accent);
 }
 
+/* Sin `filter`: no transiciona; el realce va por `background-color` (B2). */
 button.primary:hover {
-  filter: brightness(1.07);
+  background: color-mix(in srgb, var(--accent) 88%, var(--fg));
+  border-color: color-mix(in srgb, var(--accent) 88%, var(--fg));
+}
+
+button:disabled,
+button:disabled:hover {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-color: var(--line-strong);
+}
+
+button:disabled:active {
+  transform: none;
 }
 
 .btn {
   margin: 0;
+}
+
+:focus {
+  scroll-margin-top: calc(var(--daybar-h, 0px) + env(safe-area-inset-top));
 }
 
 :focus-visible {
@@ -415,6 +599,12 @@ output {
   gap: 0.35rem;
 }
 
+#search-results {
+  max-height: 40dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 button.result {
   inline-size: 100%;
   justify-content: flex-start;
@@ -454,7 +644,7 @@ button.result {
 }
 
 .draft-row button {
-  min-height: 2.25rem;
+  min-height: 2.75rem;
   padding: 0.35rem 0.6rem;
   font-size: 0.85rem;
 }
@@ -467,7 +657,7 @@ button.result {
 .draft-portions {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
+  gap: 0.4rem;
 }
 
 .draft-shortcuts button,
@@ -548,6 +738,26 @@ input.timeline-time {
   border-radius: var(--radius-sm);
 }
 
+/* Giro indeterminado mientras dura el Promise de deteccion (B2): unico continuo. */
+#photo-status.busy::after {
+  content: '';
+  display: inline-block;
+  inline-size: 0.85em;
+  block-size: 0.85em;
+  margin-inline-start: 0.45em;
+  vertical-align: -0.12em;
+  border: 2px solid var(--line-strong);
+  border-block-start-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
 /* Contornos de los alimentos detectados, superpuestos a la foto. */
 .detect-overlay {
   position: absolute;
@@ -558,9 +768,26 @@ input.timeline-time {
 .detect-box {
   position: absolute;
   border: 2px solid var(--box-color, #16a34a);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: color-mix(in srgb, var(--box-color, #16a34a) 16%, transparent);
   box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
+}
+
+/* Entrada de las cajas al resolver la deteccion (B2): escalonada por --i. */
+.detect-box--enter {
+  animation: detect-in var(--dur-fast) var(--ease-standard) backwards;
+  animation-delay: calc(min(var(--i, 0), 7) * 40ms);
+}
+
+@keyframes detect-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .detect-box-label {
@@ -573,15 +800,20 @@ input.timeline-time {
   color: #fff;
   white-space: nowrap;
   background: var(--box-color, #16a34a);
-  border-radius: 6px 6px 6px 0;
+  border-radius: var(--radius-sm) var(--radius-sm) var(--radius-sm) 0;
   box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
   transform: translateY(-100%);
+}
+
+/* Paletas claras (verde, ambar, cian): texto oscuro para superar 4.5:1. */
+.detect-box-label.ink {
+  color: #000;
 }
 
 .detect-box--flip .detect-box-label {
   inset-block-start: auto;
   inset-block-end: 0;
-  border-radius: 0 6px 6px 6px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) var(--radius-sm);
   transform: translateY(100%);
 }
 
@@ -607,10 +839,16 @@ input.timeline-time {
   margin-block-end: 0;
 }
 
+/* El pie no reaplica los insets laterales: `body` ya los compensa en los cuatro
+   lados; sumarlos aqui duplicaria el margen en paisaje con muesca. */
+footer {
+  padding-inline: 0;
+}
+
 footer .notice {
   color: var(--muted);
   background: var(--surface);
-  border-inline-start-color: var(--line-strong);
+  border-inline-start-color: var(--accent);
 }
 
 .inset {
@@ -625,6 +863,10 @@ details > summary {
   align-items: center;
   min-height: 2.75rem;
   cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    outline-color var(--dur-fast) var(--ease-standard);
 }
 
 details[open] > summary {
@@ -637,10 +879,12 @@ details > summary::after {
   margin-inline-start: auto;
   font-size: 0.9rem;
   color: var(--muted);
+  /* El chevron gira con transform (B2), no cambiando `content`. */
+  transition: transform var(--dur-fast) var(--ease-standard);
 }
 
 details[open] > summary::after {
-  content: '\25BE';
+  transform: rotate(90deg);
 }
 
 /* --- Onboarding ---------------------------------------------------------- */
@@ -650,9 +894,10 @@ details[open] > summary::after {
   inset: 0;
   z-index: 50;
   display: grid;
-  align-content: center;
+  align-content: safe center;
   gap: 0.5rem;
-  padding: 1.5rem;
+  padding: max(1.5rem, env(safe-area-inset-top)) max(1.5rem, env(safe-area-inset-right))
+    max(1.5rem, env(safe-area-inset-bottom)) max(1.5rem, env(safe-area-inset-left));
   overflow-y: auto;
   background: var(--bg);
 }
@@ -665,7 +910,7 @@ details[open] > summary::after {
 
 .onboarding h2 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: var(--text-xl);
 }
 
 .onboarding ol {
@@ -758,12 +1003,41 @@ details[open] > summary::after {
   display: none;
 }
 
+@media (max-width: 26rem) {
+  .daynav input[type='date'] {
+    flex: 1 0 100%;
+  }
+
+  .timeline-row {
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+  }
+
+  /* La navegacion vive ahora en la cabecera compacta (A1): la fecha comparte
+     renglon con los botones en vez de forzar uno propio. La regla C5 de arriba
+     queda intacta para cualquier otro contexto. */
+  .topbar .daynav input[type='date'] {
+    flex: 1 1 0;
+  }
+
+  /* Cabecera compacta: el eslogan no hace falta con la pantalla estrecha. */
+  .topbar .tagline {
+    display: none;
+  }
+}
+
 /* --- Movimiento --------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* `*` no alcanza a los pseudo-elementos: el giro del indicador tambien se apaga. */
+@media (prefers-reduced-motion: reduce) {
+  #photo-status.busy::after {
+    animation: none !important;
   }
 }
 

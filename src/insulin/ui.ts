@@ -68,15 +68,16 @@ export function setupInsulin(
     const locale = getLocale();
     host.hidden = false;
     host.innerHTML = `
-      <div class="notice" role="note">
-        <strong data-i18n="insulin.gateTitle">${text(locale, 'insulin.gateTitle')}</strong>
-        <p data-i18n="insulin.gateBody">${text(locale, 'insulin.gateBody')}</p>
+      <div class="notice" role="alertdialog" aria-modal="true" aria-labelledby="ins-gate-title" aria-describedby="ins-gate-body" tabindex="-1">
+        <strong id="ins-gate-title" data-i18n="insulin.gateTitle">${text(locale, 'insulin.gateTitle')}</strong>
+        <p id="ins-gate-body" data-i18n="insulin.gateBody">${text(locale, 'insulin.gateBody')}</p>
         <div class="row">
           <button id="ins-gate-accept" type="button" class="primary" data-i18n="insulin.gateAccept">${text(locale, 'insulin.gateAccept')}</button>
           <button id="ins-gate-cancel" type="button" data-i18n="insulin.gateCancel">${text(locale, 'insulin.gateCancel')}</button>
         </div>
       </div>
     `;
+    host.querySelector<HTMLElement>('[role="alertdialog"]')?.focus();
     host.querySelector('#ins-gate-accept')?.addEventListener('click', () => {
       setInsulinEnabled(true);
       toggle.checked = true;
@@ -86,6 +87,7 @@ export function setupInsulin(
       setInsulinEnabled(false);
       toggle.checked = false;
       clear();
+      toggle.focus();
     });
   };
 

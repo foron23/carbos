@@ -151,6 +151,8 @@ let detectionMeta: { detector: string; classifier: string } | null = null;
 let photoStatusKey: StringKey | null = null;
 let detectAbort: AbortController | null = null;
 let detectionClient: DetectionClient | null = null;
+/** La entrada escalonada de las cajas corre solo al resolver la deteccion (B2). */
+let animateDetectBoxes = false;
 
 /**
  * Hook estrecho para el arnes E2E (mismo patron que `__carbosChatStub`): si
@@ -202,7 +204,7 @@ function tr(key: StringKey): string {
 
 const app = byId('app');
 app.innerHTML = `
-  <section id="onboarding" class="onboarding" hidden aria-labelledby="onboarding-title">
+  <section id="onboarding" class="onboarding" hidden role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
     <h2 id="onboarding-title" data-i18n="onboarding.title"></h2>
     <ol>
       <li>
@@ -229,54 +231,63 @@ app.innerHTML = `
         <select id="locale"></select>
       </label>
     </div>
-    <p class="muted" data-i18n="app.tagline"></p>
-  </header>
-
-  <fieldset class="card hero daybar">
-    <legend data-i18n="section.today"></legend>
-    <p class="hero-figure">
+    <p class="tagline muted" data-i18n="app.tagline"></p>
+    <div class="day-summary">
       <output id="day-total" class="total" aria-live="polite"></output>
       <span class="chip"><span data-i18n="diary.week"></span>: <output id="week-total"></output></span>
-    </p>
-    <ul id="week-bars" class="week-bars" aria-hidden="true"></ul>
-    <label for="date" data-i18n="field.date"></label>
+      <ul id="week-bars" class="week-bars"></ul>
+    </div>
+    <label class="sr-only" for="date" data-i18n="field.date"></label>
     <div class="row daynav">
       <button id="day-prev" type="button" data-i18n-aria="nav.prevDay">\u2039</button>
       <input id="date" type="date" />
       <button id="day-next" type="button" data-i18n-aria="nav.nextDay">\u203a</button>
       <button id="day-today" type="button" data-i18n="nav.today"></button>
     </div>
-  </fieldset>
+    <p id="header-disclaimer" class="header-disclaimer" role="note" data-i18n="footer.disclaimerShort"></p>
+  </header>
 
-  <fieldset class="card">
-    <legend data-i18n="section.photo"></legend>
-    <div id="photo-wrap" class="preview-wrap" hidden>
-      <img id="photo-preview" class="preview" alt="" />
-      <div id="detect-overlay" class="detect-overlay" aria-hidden="true"></div>
+  <main>
+  <fieldset id="entry" class="card entry">
+    <legend id="entry-legend" data-i18n="section.addFood"></legend>
+    <h2 class="sr-only" data-i18n="section.addFood"></h2>
+    <div class="segmented" role="radiogroup" aria-labelledby="entry-legend">
+      <label class="seg">
+        <input type="radio" name="entry-mode" id="entry-mode-photo" checked />
+        <span data-i18n="section.photo"></span>
+      </label>
+      <label class="seg">
+        <input type="radio" name="entry-mode" id="entry-mode-search" />
+        <span data-i18n="button.search"></span>
+      </label>
     </div>
-    <p id="photo-status" class="muted" data-i18n="photo.none" aria-live="polite"></p>
-    <div class="row">
-      <label class="btn"><input id="camera-input" class="sr-only" type="file" accept="image/*" capture="environment" data-i18n-aria="button.takePhoto" /><span data-i18n="button.takePhoto"></span></label>
-      <label class="btn"><input id="file-input" class="sr-only" type="file" accept="image/*" data-i18n-aria="button.chooseFile" /><span data-i18n="button.chooseFile"></span></label>
+    <div id="photo-panel" class="entry-panel">
+      <div id="photo-wrap" class="preview-wrap" hidden>
+        <img id="photo-preview" class="preview" alt="" />
+        <div id="detect-overlay" class="detect-overlay" aria-hidden="true"></div>
+      </div>
+      <p id="photo-status" class="muted" data-i18n="photo.none" aria-live="polite"></p>
+      <div class="row">
+        <label class="btn"><input id="camera-input" class="sr-only" type="file" accept="image/*" capture="environment" data-i18n-aria="button.takePhoto" /><span data-i18n="button.takePhoto"></span></label>
+        <label class="btn"><input id="file-input" class="sr-only" type="file" accept="image/*" data-i18n-aria="button.chooseFile" /><span data-i18n="button.chooseFile"></span></label>
+      </div>
+      <p class="muted" data-i18n="text.photoNote"></p>
+      <div id="detect-panel" hidden>
+        <p id="detect-summary" class="muted" aria-live="polite"></p>
+        <h3 data-i18n="photo.detected"></h3>
+        <ul id="detect-results" class="draft"></ul>
+        <p class="muted" data-i18n="photo.resultsNote"></p>
+      </div>
+      <p><button id="share-photo" type="button" data-i18n="contrib.share" hidden></button></p>
+      <p id="share-status" class="muted" aria-live="polite"></p>
     </div>
-    <p class="muted" data-i18n="text.photoNote"></p>
-    <div id="detect-panel" hidden>
-      <p id="detect-summary" class="muted" aria-live="polite"></p>
-      <h3 data-i18n="photo.detected"></h3>
-      <ul id="detect-results" class="draft"></ul>
-      <p class="muted" data-i18n="photo.resultsNote"></p>
+    <div id="search-panel" class="entry-panel" hidden>
+      <label for="food-search" data-i18n="field.search"></label>
+      <div class="row">
+        <input id="food-search" type="search" autocomplete="off" />
+      </div>
+      <ul id="search-results" class="results"></ul>
     </div>
-    <p><button id="share-photo" type="button" data-i18n="contrib.share" hidden></button></p>
-    <p id="share-status" class="muted" aria-live="polite"></p>
-  </fieldset>
-
-  <fieldset class="card">
-    <legend data-i18n="section.addFood"></legend>
-    <label for="food-search" data-i18n="field.search"></label>
-    <div class="row">
-      <input id="food-search" type="search" autocomplete="off" />
-    </div>
-    <ul id="search-results" class="results"></ul>
     <h3 data-i18n="draft.items"></h3>
     <ul id="draft-items" class="draft"></ul>
     <p><span data-i18n="label.total"></span>: <output id="draft-total" aria-live="polite"></output></p>
@@ -287,11 +298,13 @@ app.innerHTML = `
 
   <fieldset class="card">
     <legend data-i18n="section.diary"></legend>
+    <h2 class="sr-only" data-i18n="section.diary"></h2>
     <ul id="diary"></ul>
   </fieldset>
 
   <fieldset class="card">
     <legend data-i18n="section.insulinLog"></legend>
+    <h2 class="sr-only" data-i18n="section.insulinLog"></h2>
     <p class="muted" data-i18n="insulin.note"></p>
     <div class="grid">
       <label><span data-i18n="field.time"></span><input id="ins-time" type="time" /></label>
@@ -306,9 +319,11 @@ app.innerHTML = `
     <p><button id="add-insulin" type="button" data-i18n="button.addInsulin"></button></p>
   </fieldset>
 
+  <p id="export-reminder" class="notice" role="status" hidden></p>
+
   <details class="card">
     <summary data-i18n="section.copy"></summary>
-    <p id="export-reminder" class="muted" hidden></p>
+    <h2 class="sr-only" data-i18n="section.copy"></h2>
     <label for="export-pass" data-i18n="export.passwordPrompt"></label>
     <input id="export-pass" type="password" autocomplete="new-password" />
     <p class="muted" data-i18n="export.passwordHint"></p>
@@ -323,6 +338,7 @@ app.innerHTML = `
 
   <details class="card" id="settings">
     <summary data-i18n="section.settings"></summary>
+    <h2 class="sr-only" data-i18n="section.settings"></h2>
     <p><button id="persist" type="button" data-i18n="button.persist"></button></p>
     <p id="persist-status" class="muted" aria-live="polite"></p>
     <label class="check"><input id="insulin-toggle" type="checkbox" /> <span data-i18n="settings.insulinModule"></span></label>
@@ -334,6 +350,7 @@ app.innerHTML = `
     <p><button id="contrib-clear" type="button" data-i18n="contrib.clear"></button></p>
     <p class="muted" data-i18n="contrib.note"></p>
   </details>
+  </main>
 
   <footer>
     <p class="notice" role="note" data-i18n="footer.disclaimer"></p>
@@ -406,7 +423,7 @@ function renderSearch(): void {
   const query = byId<HTMLInputElement>('food-search').value;
   const list = byId('search-results');
   if (query.trim().length < 2) {
-    list.innerHTML = '';
+    list.innerHTML = `<li class="muted">${tr('search.hint')}</li>`;
     return;
   }
   const results = searchFoods(query, 8, CATALOG);
@@ -462,6 +479,7 @@ function renderDraft(): void {
       row.append(name, gramsLabel, carbs);
 
       const food = foodById(item.classId);
+
       if (food) {
         const portions = document.createElement('div');
         portions.className = 'draft-portions';
@@ -535,15 +553,16 @@ function renderPhoto(): void {
   const status = byId('photo-status');
   if (capture) {
     preview.src = capture.dataUrl;
+    preview.alt = tr('photo.previewAlt');
     preview.hidden = false;
     wrap.hidden = false;
     status.textContent = tr(photoStatusKey ?? 'photo.ready');
   } else {
     preview.hidden = true;
+    preview.alt = '';
     preview.removeAttribute('src');
     wrap.hidden = true;
-    photoStatusKey = null;
-    status.textContent = tr('photo.none');
+    status.textContent = tr(photoStatusKey ?? 'photo.none');
   }
   renderOverlay();
   updateShareButton();
@@ -552,11 +571,28 @@ function renderPhoto(): void {
 /** Colores de los contornos; se repiten si hay mas detecciones. */
 const BOX_COLORS = ['#16a34a', '#2563eb', '#db2777', '#d97706', '#7c3aed', '#0891b2'];
 
+/**
+ * Elige el color de texto (negro o blanco) con mayor contraste WCAG sobre la
+ * paleta de la caja. Ni el blanco ni el negro solos llegan a 4.5:1 en las seis
+ * paletas, asi que la eleccion es por color (F del pase v2).
+ */
+function boxLabelInk(hex: string): string {
+  const channel = (offset: number): number => parseInt(hex.slice(offset, offset + 2), 16) / 255;
+  const linear = (value: number): number =>
+    value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  const luminance =
+    0.2126 * linear(channel(1)) + 0.7152 * linear(channel(3)) + 0.0722 * linear(channel(5));
+  const onWhite = 1.05 / (luminance + 0.05);
+  const onBlack = (luminance + 0.05) / 0.05;
+  return onWhite >= onBlack ? '#ffffff' : '#000000';
+}
+
 /** Dibuja la caja (contorno + etiqueta con nombre y gramos) de cada deteccion. */
 function renderOverlay(): void {
   const overlay = byId('detect-overlay');
   overlay.innerHTML = '';
   if (!capture) return;
+  const entering = animateDetectBoxes;
   detections.forEach((result, index) => {
     const itemId = detectionDraftIds[index];
     const item = itemId ? draft.items.find((candidate) => candidate.id === itemId) : undefined;
@@ -564,14 +600,18 @@ function renderOverlay(): void {
     const box = result.box;
     const el = document.createElement('div');
     el.className = 'detect-box';
+    el.style.setProperty('--i', String(index));
+    if (entering) el.classList.add('detect-box--enter');
     if (box.y < 0.12) el.classList.add('detect-box--flip');
-    el.style.setProperty('--box-color', BOX_COLORS[index % BOX_COLORS.length] ?? '#16a34a');
+    const boxColor = BOX_COLORS[index % BOX_COLORS.length] ?? '#16a34a';
+    el.style.setProperty('--box-color', boxColor);
     el.style.left = `${box.x * 100}%`;
     el.style.top = `${box.y * 100}%`;
     el.style.width = `${box.w * 100}%`;
     el.style.height = `${box.h * 100}%`;
     const label = document.createElement('span');
     label.className = 'detect-box-label';
+    label.classList.toggle('ink', boxLabelInk(boxColor) === '#000000');
     const name = item?.name ?? (food ? food.name[locale] : tr('unknown.food'));
     const grams = item ? ` · ${Math.round(item.grams)} ${tr('unit.grams')}` : '';
     label.textContent = `${name}${grams}`;
@@ -718,8 +758,12 @@ function applyDetections(results: DetectionResult[]): void {
     // La porcion inicial se guia por el tamano de la caja detectada (E6/D35).
     return pushFood(food, suggestPortion(result.box, food.defaultPortionGrams).grams);
   });
+  animateDetectBoxes = true;
   renderDraft();
   renderDetect();
+  window.requestAnimationFrame(() => {
+    animateDetectBoxes = false;
+  });
 }
 
 function renderDetect(): void {
@@ -748,7 +792,13 @@ function renderDetect(): void {
     row.className = 'draft-row';
     const name = document.createElement('span');
     name.className = 'draft-name';
-    name.textContent = `${topkLabel(best)} · ${Math.round(best.p * 100)}%`;
+    // Nombre, confianza y gramos estimados: el ajuste de gramos vive en el
+    // borrador compartido, pero la fila de deteccion ya anuncia la porcion (A3).
+    const draftItem = detectionDraftIds[index]
+      ? draft.items.find((candidate) => candidate.id === detectionDraftIds[index])
+      : undefined;
+    const grams = draftItem ? ` · ${Math.round(draftItem.grams)} ${tr('unit.grams')}` : '';
+    name.textContent = `${topkLabel(best)} · ${Math.round(best.p * 100)}%${grams}`;
     row.appendChild(name);
     const alternatives = selectableTopk(result.topk);
     if (alternatives.length > 1) {
@@ -784,6 +834,10 @@ async function startDetection(image: CapturedImage): Promise<void> {
   renderDraft();
   renderDetect();
   setPhotoStatus('photo.detecting');
+  const photoSurface = byId('photo-preview');
+  photoSurface.setAttribute('aria-busy', 'true');
+  const statusEl = byId('photo-status');
+  statusEl.classList.add('busy');
   try {
     const outcome = await getDetectionClient().detect(
       { dataUrl: image.dataUrl, width: image.width, height: image.height },
@@ -813,6 +867,11 @@ async function startDetection(image: CapturedImage): Promise<void> {
       error instanceof Error ? error.message : error,
     );
     setPhotoStatus('photo.noModel');
+  } finally {
+    if (detectAbort === controller) {
+      photoSurface.removeAttribute('aria-busy');
+      statusEl.classList.remove('busy');
+    }
   }
 }
 
@@ -820,23 +879,57 @@ function renderWeekBars(days: WeekDay[]): void {
   const list = byId('week-bars');
   const max = Math.max(0, ...days.map((day) => day.carbs));
   const weekday = new Intl.DateTimeFormat(locale, { weekday: 'narrow', timeZone: 'UTC' });
-  list.innerHTML = '';
-  for (const day of days) {
-    const item = document.createElement('li');
-    item.className = 'week-day';
-    if (day.active) item.dataset.active = '';
-    const bar = document.createElement('span');
-    bar.className = 'week-bar';
-    const fill = document.createElement('span');
-    fill.className = 'week-fill';
-    fill.style.setProperty('--fill', String(max > 0 ? day.carbs / max : 0));
-    bar.appendChild(fill);
-    const label = document.createElement('span');
-    label.className = 'week-label';
-    label.textContent = weekday.format(new Date(`${day.date}T00:00:00Z`));
-    item.append(bar, label);
-    list.appendChild(item);
+  const weekdayLong = new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' });
+  list.setAttribute('aria-label', tr('diary.week'));
+
+  // Reconciliacion (B4): si la semana conserva su forma (mismas fechas y
+  // longitud) se actualizan los nodos existentes; reconstruir solo cuando la
+  // forma cambia, para que la entrada escalonada corra unicamente entonces.
+  const sameShape =
+    list.children.length === days.length &&
+    days.every((day, index) => {
+      const item = list.children[index] as HTMLElement | undefined;
+      return item?.dataset.date === day.date;
+    });
+
+  if (!sameShape) {
+    list.innerHTML = '';
+    days.forEach((day, index) => {
+      const item = document.createElement('li');
+      item.className = 'week-day';
+      item.dataset.date = day.date;
+      const bar = document.createElement('span');
+      bar.className = 'week-bar';
+      const fill = document.createElement('span');
+      fill.className = 'week-fill';
+      // --i alimenta el retardo escalonado de la entrada (B2).
+      fill.style.setProperty('--i', String(index));
+      bar.appendChild(fill);
+      const label = document.createElement('span');
+      label.className = 'week-label';
+      label.setAttribute('aria-hidden', 'true');
+      const value = document.createElement('span');
+      value.className = 'sr-only';
+      item.append(bar, label, value);
+      list.appendChild(item);
+    });
   }
+
+  days.forEach((day, index) => {
+    const item = list.children[index] as HTMLElement | undefined;
+    if (!item) return;
+    if (day.active) item.dataset.active = '';
+    else delete item.dataset.active;
+    const date = new Date(`${day.date}T00:00:00Z`);
+    const fill = item.querySelector<HTMLElement>('.week-fill');
+    if (fill) fill.style.setProperty('--fill', String(max > 0 ? day.carbs / max : 0));
+    const label = item.querySelector<HTMLElement>('.week-label');
+    if (label) label.textContent = weekday.format(date);
+    const value = item.querySelector<HTMLElement>('.sr-only');
+    if (value) {
+      value.textContent = `${weekdayLong.format(date)} · ${roundCarbs(day.carbs)} ${tr('unit.grams')}`;
+    }
+  });
 }
 
 function renderToday(): void {
@@ -846,6 +939,17 @@ function renderToday(): void {
   const weekTotal = days.reduce((sum, day) => sum + day.carbs, 0);
   byId('week-total').textContent = `${roundCarbs(weekTotal)} ${tr('unit.grams')}`;
   renderWeekBars(days);
+}
+
+/**
+ * Pulso de la cifra del dia al registrar correctamente (B2). El movimiento no es
+ * el unico portador: "Comida registrada" (`aria-live`) lo anuncia igual.
+ */
+function pulseDayTotal(): void {
+  const total = byId('day-total');
+  total.classList.remove('pulse');
+  window.requestAnimationFrame(() => total.classList.add('pulse'));
+  window.setTimeout(() => total.classList.remove('pulse'), 400);
 }
 
 function timeInput(value: string, onCommit: (time: string) => void): HTMLInputElement {
@@ -919,6 +1023,27 @@ function renderDiary(): void {
   }
 }
 
+const LAST_EXPORT_KEY = 'carbos.lastExport';
+
+/**
+ * El recordatorio de copia sale del `<details>` plegable (E2): es un aviso en
+ * flujo, con `role="status"`, y se reevalua en cada `render()` para que
+ * aparezca o desaparezca segun el estado sin abrir Copia.
+ */
+function renderExportReminder(): void {
+  const reminder = byId('export-reminder');
+  let last: string | null = null;
+  try {
+    last = localStorage.getItem(LAST_EXPORT_KEY);
+  } catch {
+    last = null;
+  }
+  const days = last === null ? null : Math.floor((Date.now() - Number(last)) / 86400000);
+  const stale = days === null || !Number.isFinite(days) || days >= 7;
+  reminder.hidden = !stale;
+  if (stale) reminder.textContent = tr('export.reminder');
+}
+
 function render(): void {
   applyI18n();
   localeSelect.value = locale;
@@ -928,9 +1053,17 @@ function render(): void {
   renderDetect();
   renderSearch();
   renderDiary();
+  renderExportReminder();
   relocalizeStatuses();
   insulin?.refresh();
   chat?.refresh();
+  requestAnimationFrame(publishDaybarHeight);
+}
+
+function publishDaybarHeight(): void {
+  const topbar = document.querySelector<HTMLElement>('.topbar');
+  if (!topbar) return;
+  document.documentElement.style.setProperty('--daybar-h', `${topbar.offsetHeight}px`);
 }
 
 async function refresh(): Promise<void> {
@@ -948,7 +1081,18 @@ function wire(): void {
   } catch {
     onboarded = true;
   }
-  if (!onboarded) onboarding.hidden = false;
+  const setSiblingsInert = (on: boolean): void => {
+    for (const sibling of Array.from(app.children)) {
+      if (sibling === onboarding) continue;
+      if (on) sibling.setAttribute('inert', '');
+      else sibling.removeAttribute('inert');
+    }
+  };
+  if (!onboarded) {
+    onboarding.hidden = false;
+    setSiblingsInert(true);
+    requestAnimationFrame(() => byId('onboarding-start').focus());
+  }
   byId('onboarding-start').addEventListener('click', () => {
     try {
       localStorage.setItem(ONBOARDED_KEY, '1');
@@ -956,6 +1100,8 @@ function wire(): void {
       /* almacenamiento no disponible */
     }
     onboarding.hidden = true;
+    setSiblingsInert(false);
+    byId<HTMLInputElement>('date').focus();
   });
 
   byId<HTMLInputElement>('date').value = currentDate;
@@ -967,7 +1113,6 @@ function wire(): void {
       locale = value;
       storeLocale(locale);
       render();
-      renderExportReminder();
     }
   });
 
@@ -1006,7 +1151,10 @@ function wire(): void {
         void startDetection(image);
       })
       .catch(() => {
-        /* imagen no legible: seguimos con la entrada manual */
+        // Fallo de imagen visible y entradas rearmadas para reintentar (E3).
+        setPhotoStatus('photo.error');
+        byId<HTMLInputElement>('camera-input').value = '';
+        byId<HTMLInputElement>('file-input').value = '';
       });
   };
   byId<HTMLInputElement>('camera-input').addEventListener('change', onFile);
@@ -1018,7 +1166,24 @@ function wire(): void {
     searchTimer = window.setTimeout(renderSearch, 120);
   });
 
-  byId('register').addEventListener('click', () => {
+  // Conmutador de la superficie unica (A2): Foto por defecto, Buscar oculto.
+  // Los radios nativos solo revelan un panel; no hay logica de dominio nueva.
+  const photoPanel = byId('photo-panel');
+  const searchPanel = byId('search-panel');
+  const applyEntryMode = (): void => {
+    const photo = byId<HTMLInputElement>('entry-mode-photo').checked;
+    photoPanel.hidden = !photo;
+    searchPanel.hidden = photo;
+  };
+  for (const radio of app.querySelectorAll<HTMLInputElement>('input[name="entry-mode"]')) {
+    radio.addEventListener('change', applyEntryMode);
+  }
+  applyEntryMode();
+
+  const registerButton = byId<HTMLButtonElement>('register');
+  const addInsulinButton = byId<HTMLButtonElement>('add-insulin');
+  registerButton.addEventListener('click', () => {
+    if (registerButton.disabled) return;
     if (draft.items.length === 0) {
       setStatus('register-status', 'register.empty');
       return;
@@ -1049,6 +1214,13 @@ function wire(): void {
     const photoDets = detections;
     const photoIds = detectionDraftIds;
     const photoItems = draft.items.map((item) => ({ ...item }));
+    const registerCard = registerButton.closest('fieldset');
+    registerButton.disabled = true;
+    registerCard?.setAttribute('aria-busy', 'true');
+    const rearm = (): void => {
+      registerButton.disabled = false;
+      registerCard?.removeAttribute('aria-busy');
+    };
     if (draft.origin === 'photo' && readContribAuto() && photoImage) {
       void enqueueFrom(photoImage, photoDets, photoIds, photoItems)
         .then((count) => {
@@ -1058,17 +1230,26 @@ function wire(): void {
         })
         .catch(() => undefined);
     }
-    void putMeal(meal).then(() => {
-      draft = { origin: 'manual', items: [] };
-      capture = null;
-      detections = [];
-      detectionDraftIds = [];
-      detectionMeta = null;
-      detectionEngine = '';
-      photoStatusKey = null;
-      setStatus('register-status', 'register.done');
-      return refresh();
-    });
+    void putMeal(meal)
+      .then(() => {
+        draft = { origin: 'manual', items: [] };
+        capture = null;
+        detections = [];
+        detectionDraftIds = [];
+        detectionMeta = null;
+        detectionEngine = '';
+        photoStatusKey = null;
+        setStatus('register-status', 'register.done');
+        return refresh();
+      })
+      .then(() => pulseDayTotal())
+      .catch((error) => {
+        console.warn(
+          '[register] no se pudo registrar la comida:',
+          error instanceof Error ? error.message : error,
+        );
+      })
+      .finally(rearm);
   });
 
   byId('share-photo').addEventListener('click', () => {
@@ -1102,27 +1283,29 @@ function wire(): void {
     });
   });
 
-  byId('add-insulin').addEventListener('click', () => {
+  addInsulinButton.addEventListener('click', () => {
+    if (addInsulinButton.disabled) return;
     const time = byId<HTMLInputElement>('ins-time').value || '00:00';
     const units = Number.parseFloat(byId<HTMLInputElement>('ins-units').value) || 0;
     const kind = byId<HTMLSelectElement>('ins-kind').value as InsulinKind;
-    void putInsulin({ id: uid(), date: currentDate, time, units, kind }).then(refresh);
+    const insulinCard = addInsulinButton.closest('fieldset');
+    addInsulinButton.disabled = true;
+    insulinCard?.setAttribute('aria-busy', 'true');
+    const rearm = (): void => {
+      addInsulinButton.disabled = false;
+      insulinCard?.removeAttribute('aria-busy');
+    };
+    void putInsulin({ id: uid(), date: currentDate, time, units, kind })
+      .then(refresh)
+      .catch((error) => {
+        console.warn(
+          '[insulin] no se pudo registrar:',
+          error instanceof Error ? error.message : error,
+        );
+      })
+      .finally(rearm);
   });
 
-  const LAST_EXPORT_KEY = 'carbos.lastExport';
-  const renderExportReminder = (): void => {
-    const reminder = byId('export-reminder');
-    let last: string | null = null;
-    try {
-      last = localStorage.getItem(LAST_EXPORT_KEY);
-    } catch {
-      last = null;
-    }
-    const days = last === null ? null : Math.floor((Date.now() - Number(last)) / 86400000);
-    const stale = days === null || !Number.isFinite(days) || days >= 7;
-    reminder.hidden = !stale;
-    if (stale) reminder.textContent = tr('export.reminder');
-  };
   const markExported = (): void => {
     try {
       localStorage.setItem(LAST_EXPORT_KEY, String(Date.now()));
@@ -1216,6 +1399,7 @@ void renderContribStatus();
 window.addEventListener('online', () => {
   void flushContributions();
 });
+window.addEventListener('resize', publishDaybarHeight);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
