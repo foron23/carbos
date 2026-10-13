@@ -33,6 +33,17 @@ import { setupInsulin } from './insulin';
 import type { InsulinHandle } from './insulin';
 import { isChatEnabled, setChatDisabled, setChatEnabled, setupChat } from './chat';
 import type { ChatHandle } from './chat';
+import { cropToJpeg } from './contrib/crop';
+import {
+  addContribution,
+  canRetry,
+  clearContributions,
+  listContributions,
+  markFailed,
+  markSent,
+} from './contrib/queue';
+import { buildBundle } from './contrib/bundle';
+import { DEFAULT_ENDPOINT, uploadBundle } from './contrib/upload';
 
 interface Draft {
   origin: 'manual' | 'photo';
@@ -40,6 +51,39 @@ interface Draft {
 }
 
 let locale: Locale = detectLocale();
+
+const APP_VERSION = '0.0.0';
+const CONTRIB_AUTO_KEY = 'carbos.contrib.auto';
+const CONTRIB_ENDPOINT_KEY = 'carbos.contrib.endpoint';
+const CONTRIB_BATCH = 50;
+
+/** Evita que dos flush (arranque + evento online) suban el mismo lote a la vez. */
+let contributing = false;
+
+function readContribAuto(): boolean {
+  try {
+    return localStorage.getItem(CONTRIB_AUTO_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeContribAuto(enabled: boolean): void {
+  try {
+    localStorage.setItem(CONTRIB_AUTO_KEY, enabled ? '1' : '0');
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
+/** Endpoint configurable (spec 15); por defecto el Worker de Cloudflare. */
+function readContribEndpoint(): string {
+  try {
+    return localStorage.getItem(CONTRIB_ENDPOINT_KEY) || DEFAULT_ENDPOINT;
+  } catch {
+    return DEFAULT_ENDPOINT;
+  }
+}
 
 /**
  * El dia mostrado se recuerda para no perderlo al recargar. Sin esto la vista
@@ -106,8 +150,17 @@ let photoStatusKey: StringKey | null = null;
 let detectAbort: AbortController | null = null;
 let detectionClient: DetectionClient | null = null;
 
+/**
+ * Hook estrecho para el arnes E2E (mismo patron que `__carbosChatStub`): si
+ * `globalThis.__carbosDetectionStub` esta definido, se usa en lugar del worker
+ * real. Si no, es completamente inerte.
+ */
 function getDetectionClient(): DetectionClient {
-  if (!detectionClient) detectionClient = createDetectionClient();
+  if (!detectionClient) {
+    const stub = (globalThis as { __carbosDetectionStub?: DetectionClient | null })
+      .__carbosDetectionStub;
+    detectionClient = stub ?? createDetectionClient();
+  }
   return detectionClient;
 }
 
@@ -208,6 +261,8 @@ app.innerHTML = `
       <ul id="detect-results" class="draft"></ul>
       <p class="muted" data-i18n="photo.resultsNote"></p>
     </div>
+    <p><button id="share-photo" type="button" data-i18n="contrib.share" hidden></button></p>
+    <p id="share-status" class="muted" aria-live="polite"></p>
   </fieldset>
 
   <fieldset class="card">
@@ -269,6 +324,10 @@ app.innerHTML = `
     <div id="insulin-host" hidden></div>
     <label class="check"><input id="chat-toggle" type="checkbox" /> <span data-i18n="settings.chatModule"></span></label>
     <div id="chat-host" hidden></div>
+    <label class="check"><input id="contrib-toggle" type="checkbox" /> <span data-i18n="settings.contribAuto"></span></label>
+    <p id="contrib-status" class="muted" aria-live="polite" data-i18n="contrib.none"></p>
+    <p><button id="contrib-clear" type="button" data-i18n="contrib.clear"></button></p>
+    <p class="muted" data-i18n="contrib.note"></p>
   </details>
 
   <footer>
@@ -477,6 +536,89 @@ function renderPhoto(): void {
     photoStatusKey = null;
     status.textContent = tr('photo.none');
   }
+  updateShareButton();
+}
+
+function updateShareButton(): void {
+  const confirmed = draft.items.some(
+    (item) => Boolean(item.classId) && detectionDraftIds.includes(item.id),
+  );
+  byId<HTMLButtonElement>('share-photo').hidden = !(capture && confirmed);
+}
+
+async function enqueueFrom(
+  image: CapturedImage | null,
+  dets: DetectionResult[],
+  ids: string[],
+  items: FoodItem[],
+): Promise<number> {
+  if (!image) return 0;
+  let queued = 0;
+  for (let index = 0; index < ids.length; index += 1) {
+    const id = ids[index];
+    if (!id) continue;
+    const detection = dets[index];
+    const item = items.find((candidate) => candidate.id === id);
+    if (!detection || !item?.classId) continue;
+    try {
+      const blob = await cropToJpeg(image, detection.box);
+      await addContribution({ classId: item.classId, blob });
+      queued += 1;
+    } catch {
+      /* recorte o encolado fallido: seguimos con el resto */
+    }
+  }
+  return queued;
+}
+
+async function renderContribStatus(): Promise<void> {
+  try {
+    const count = (await listContributions()).filter((record) => canRetry(record)).length;
+    byId('contrib-status').textContent =
+      count > 0 ? `${count} - ${tr('contrib.queueLabel')}` : tr('contrib.none');
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
+async function flushContributions(): Promise<void> {
+  if (contributing) return;
+  contributing = true;
+  try {
+    // pending + failed reintentables: un fallo no es terminal hasta agotar intentos.
+    const queue = (await listContributions()).filter((record) => canRetry(record));
+    let failed = 0;
+    for (let start = 0; start < queue.length; start += CONTRIB_BATCH) {
+      const batch = queue.slice(start, start + CONTRIB_BATCH);
+      if (batch.length === 0) continue;
+      try {
+        const images = await Promise.all(
+          batch.map(async (record) => ({
+            classId: record.classId,
+            data: new Uint8Array(await record.blob.arrayBuffer()),
+          })),
+        );
+        const zip = await buildBundle(images, {
+          appVersion: APP_VERSION,
+          // El consentimiento es el momento de encolar, no el del reintento.
+          grantedAt: new Date(Math.min(...batch.map((record) => record.createdAt))).toISOString(),
+        });
+        const result = await uploadBundle(zip, { endpoint: readContribEndpoint() });
+        if (!result.ok) failed += batch.length;
+        const settle = result.ok ? markSent : markFailed;
+        await Promise.all(batch.map((record) => settle(record.id)));
+      } catch {
+        failed += batch.length;
+        await Promise.all(batch.map((record) => markFailed(record.id))).catch(() => undefined);
+      }
+    }
+    if (failed > 0) setStatus('share-status', 'contrib.shareFailed');
+    await renderContribStatus();
+  } catch {
+    /* nunca lanza: la subida es diferida y opcional */
+  } finally {
+    contributing = false;
+  }
 }
 
 function foodById(id: string | null | undefined): Food | undefined {
@@ -535,6 +677,7 @@ function renderDetect(): void {
   const panel = byId('detect-panel');
   const summary = byId('detect-summary');
   const list = byId('detect-results');
+  updateShareButton();
   if (detections.length === 0) {
     panel.hidden = true;
     summary.textContent = '';
@@ -737,6 +880,7 @@ function render(): void {
 async function refresh(): Promise<void> {
   vault = await loadVault();
   render();
+  void renderContribStatus();
 }
 
 function wire(): void {
@@ -845,6 +989,17 @@ function wire(): void {
           ? { detector: detectionMeta.detector, classifier: detectionMeta.classifier, topk }
           : undefined,
     };
+    const photoImage = capture;
+    const photoDets = detections;
+    const photoIds = detectionDraftIds;
+    const photoItems = draft.items.map((item) => ({ ...item }));
+    if (draft.origin === 'photo' && readContribAuto() && photoImage) {
+      void enqueueFrom(photoImage, photoDets, photoIds, photoItems)
+        .then((count) => {
+          if (count > 0) void renderContribStatus();
+        })
+        .catch(() => undefined);
+    }
     void putMeal(meal).then(() => {
       draft = { origin: 'manual', items: [] };
       capture = null;
@@ -855,6 +1010,33 @@ function wire(): void {
       photoStatusKey = null;
       setStatus('register-status', 'register.done');
       return refresh();
+    });
+  });
+
+  byId('share-photo').addEventListener('click', () => {
+    void enqueueFrom(
+      capture,
+      detections,
+      detectionDraftIds,
+      draft.items.map((item) => ({ ...item })),
+    ).then((count) => {
+      if (count > 0) {
+        setStatus('share-status', 'contrib.queued');
+        void renderContribStatus();
+      }
+    });
+  });
+
+  const contribToggle = byId<HTMLInputElement>('contrib-toggle');
+  contribToggle.checked = readContribAuto();
+  contribToggle.addEventListener('change', () => {
+    writeContribAuto(contribToggle.checked);
+  });
+
+  byId('contrib-clear').addEventListener('click', () => {
+    void clearContributions().then(() => {
+      setStatus('share-status', 'contrib.cleared');
+      return renderContribStatus();
     });
   });
 
@@ -967,6 +1149,11 @@ function wire(): void {
 
 wire();
 void refresh();
+void flushContributions();
+void renderContribStatus();
+window.addEventListener('online', () => {
+  void flushContributions();
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
