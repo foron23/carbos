@@ -6,6 +6,7 @@ import {
   captureDownload,
   clearDatabase,
   click,
+  readContributions,
   readStore,
   reload,
   screenshot,
@@ -14,6 +15,7 @@ import {
   unregisterServiceWorkers,
   uploadFile,
   waitFor,
+  waitForContributionCount,
   waitForText,
 } from './helpers.mjs';
 
@@ -38,6 +40,85 @@ async function addFood(page, query, resultIndex = 0) {
 
 async function register(page) {
   await click(page, '#register');
+}
+
+/**
+ * Instala el hook E2E de deteccion (mismo patron que __carbosChatStub): una
+ * deteccion sintetica con clase del catalogo y caja normalizada, para ejercitar
+ * el flujo de consentimiento -> recorte -> cola sin depender de los pesos.
+ */
+async function installDetectionStub(page) {
+  await page.evaluateOnNewDocument(() => {
+    globalThis.__carbosDetectionStub = {
+      detect: () =>
+        Promise.resolve({
+          results: [
+            {
+              box: { x: 0.25, y: 0.25, w: 0.5, h: 0.5 },
+              score: 0.9,
+              label: 'pan blanco',
+              classId: 'pan_blanco',
+              topk: [{ label: 'pan blanco', classId: 'pan_blanco', p: 0.9 }],
+            },
+          ],
+          engine: 'stub',
+          detector: 'stub',
+          classifier: 'stub',
+        }),
+      dispose: () => {},
+    };
+  });
+}
+
+async function uploadAndDetect(page, fixture) {
+  // El input conserva el fichero anterior: hay que vaciarlo para que un segundo
+  // disparo con el mismo fichero vuelva a emitir `change`.
+  await page.$eval('#file-input', (el) => {
+    el.value = '';
+  });
+  await uploadFile(page, '#file-input', fixture);
+  await page.waitForSelector('#share-photo:not([hidden])', { timeout: 10000 });
+}
+
+/** `true` si el JPEG tiene un segmento APP1 con firma Exif (EXIF/GPS). */
+function hasExifApp1(bytes) {
+  if (!(bytes[0] === 0xff && bytes[1] === 0xd8)) return false;
+  let i = 2;
+  while (i + 4 <= bytes.length) {
+    if (bytes[i] !== 0xff) return false;
+    const marker = bytes[i + 1];
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+      i += 2;
+      continue;
+    }
+    if (marker === 0xda || marker === 0xd9) return false;
+    const length = (bytes[i + 2] << 8) | bytes[i + 3];
+    if (marker === 0xe1) {
+      const sig = String.fromCharCode(
+        bytes[i + 4],
+        bytes[i + 5],
+        bytes[i + 6],
+        bytes[i + 7],
+        bytes[i + 8],
+        bytes[i + 9],
+      );
+      if (sig === 'Exif\0\0') return true;
+    }
+    i += 2 + length;
+  }
+  return false;
+}
+
+/** `true` si la secuencia ASCII `text` aparece en `bytes`. */
+function containsAscii(bytes, text) {
+  const needle = Array.from(text, (char) => char.charCodeAt(0));
+  outer: for (let i = 0; i + needle.length <= bytes.length; i += 1) {
+    for (let j = 0; j < needle.length; j += 1) {
+      if (bytes[i + j] !== needle[j]) continue outer;
+    }
+    return true;
+  }
+  return false;
 }
 
 export const scenarios = [
@@ -454,6 +535,110 @@ export const scenarios = [
         await page.setOfflineMode(false);
       }
       await screenshot(page, 'pwa-offline');
+    },
+  },
+  {
+    name: 'comparte recortes sin EXIF solo con consentimiento',
+    async run(page, ctx) {
+      await installDetectionStub(page);
+      await openApp(page, ctx.base);
+
+      assertEqual(
+        await page.$eval('#contrib-toggle', (el) => el.checked),
+        false,
+        'el toggle global esta apagado por defecto',
+      );
+
+      // (1) Con el toggle apagado, registrar una foto NO encola nada.
+      await uploadAndDetect(page, ctx.fixtureMetaPng);
+      await register(page);
+      await waitForText(page, '#diary', 'Pan blanco');
+      await waitForContributionCount(page, 0);
+      assertEqual((await readContributions(page)).length, 0, 'toggle apagado: registrar no encola');
+
+      // (1) Solo el boton "compartir esta foto" encola (toggle sigue apagado).
+      await uploadAndDetect(page, ctx.fixtureMetaPng);
+      await click(page, '#share-photo');
+      await waitForContributionCount(page, 1);
+      const shared = (await readContributions(page))[0];
+      assertEqual(shared.classId, 'pan_blanco', 'se encola la clase confirmada');
+      assertEqual(shared.status, 'pending', 'el recorte queda pendiente');
+
+      // (4) El recorte es JPEG valido y no arrastra los metadatos del origen.
+      assertEqual(shared.type, 'image/jpeg', 'el blob es JPEG');
+      assert(
+        shared.bytes[0] === 0xff && shared.bytes[1] === 0xd8 && shared.bytes[2] === 0xff,
+        'cabecera JPEG (ff d8 ff)',
+      );
+      assert(shared.size > 0, 'el recorte no esta vacio');
+      assert(!hasExifApp1(shared.bytes), 'el recorte no tiene segmento APP1 EXIF/GPS');
+      assert(
+        !containsAscii(shared.bytes, ctx.metaMarker),
+        'no sobrevive la marca de metadatos de la imagen de origen',
+      );
+
+      // (2) Con el toggle encendido, registrar una foto encola los recortes.
+      await page.$eval('#contrib-toggle', (el) => {
+        el.checked = true;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await uploadAndDetect(page, ctx.fixtureMetaPng);
+      await register(page);
+      await waitForContributionCount(page, 2);
+      assertEqual((await readContributions(page)).length, 2, 'toggle encendido: registrar encola');
+
+      // (5) Desactivar el toggle no borra lo encolado; el borrado es manual.
+      await page.$eval('#contrib-toggle', (el) => {
+        el.checked = false;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      assertEqual((await readContributions(page)).length, 2, 'desactivar no borra la cola');
+      await click(page, '#contrib-clear');
+      await waitForContributionCount(page, 0);
+      assertEqual((await readContributions(page)).length, 0, 'la cola se borra a mano');
+      await screenshot(page, 'contribuciones-consentimiento');
+    },
+  },
+  {
+    name: 'sube el bundle v1 al endpoint con fetch y sin duplicar',
+    async run(page, ctx) {
+      await installDetectionStub(page);
+      await openApp(page, ctx.base);
+      await page.evaluate(
+        (url) => localStorage.setItem('carbos.contrib.endpoint', url),
+        ctx.receiverUrl,
+      );
+
+      await uploadAndDetect(page, ctx.fixtureMetaPng);
+      await click(page, '#share-photo');
+      await waitForContributionCount(page, 1);
+
+      // El flush corre al recuperar conexion (la app es offline-first).
+      await page.evaluate(() => window.dispatchEvent(new Event('online')));
+      for (let i = 0; i < 100 && ctx.received.length === 0; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      assertEqual(ctx.received.length, 1, 'un unico POST por lote');
+      const post = ctx.received[0];
+      assertEqual(post.method, 'POST', 'metodo POST');
+      assertEqual(post.headers['content-type'], 'application/zip', 'Content-Type application/zip');
+      assertEqual(post.body.subarray(0, 2).toString('latin1'), 'PK', 'el cuerpo es un zip');
+      assert(post.body.includes(Buffer.from('consent.json')), 'el zip lleva consent.json');
+      assert(post.body.includes(Buffer.from('pan_blanco')), 'el zip lleva la clase confirmada');
+
+      let status = '';
+      for (let i = 0; i < 60; i += 1) {
+        status = (await readContributions(page))[0]?.status ?? '';
+        if (status === 'sent') break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      assertEqual(status, 'sent', 'el item pasa a sent tras el 2xx');
+
+      // Un segundo disparo no reenvia lo ya enviado (sin duplicar).
+      await page.evaluate(() => window.dispatchEvent(new Event('online')));
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      assertEqual(ctx.received.length, 1, 'no se reenvia lo ya marcado como sent');
+      await screenshot(page, 'contribuciones-subida');
     },
   },
 ];

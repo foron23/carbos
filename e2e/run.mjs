@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { preview } from 'vite';
@@ -14,6 +15,36 @@ const FIREFOX = process.env.CARBOS_FIREFOX || undefined;
 const PNG_1PX =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
+/** Marca unica que se inyecta en los metadatos de la imagen de origen. */
+const META_MARKER = 'CARBOS_GPS_41.3902_2.1656_EXIF';
+
+function crc32(buffer) {
+  let crc = 0xffffffff;
+  for (const byte of buffer) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = crc & 1 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1;
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+/**
+ * Inserta un chunk `tEXt` (metadatos) antes del IEND. El canvas de la app no lo
+ * conserva: es la prueba de que el recorte sale limpio (spec 15, criterio 4).
+ */
+function pngWithTextChunk(png, keyword, text) {
+  const type = Buffer.from('tEXt', 'latin1');
+  const data = Buffer.concat([Buffer.from(`${keyword}\0`, 'latin1'), Buffer.from(text, 'latin1')]);
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length, 0);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(Buffer.concat([type, data])), 0);
+  const chunk = Buffer.concat([length, type, data, crc]);
+  const iend = png.subarray(png.length - 12);
+  return Buffer.concat([png.subarray(0, png.length - 12), chunk, iend]);
+}
+
 const results = [];
 
 async function main() {
@@ -22,12 +53,43 @@ async function main() {
   await mkdir(tmpDir, { recursive: true });
   const fixturePng = join(tmpDir, 'sample.png');
   await writeFile(fixturePng, Buffer.from(PNG_1PX, 'base64'));
+  const fixtureMetaPng = join(tmpDir, 'sample-meta.png');
+  await writeFile(
+    fixtureMetaPng,
+    pngWithTextChunk(Buffer.from(PNG_1PX, 'base64'), 'Comment', META_MARKER),
+  );
 
   const server = await preview({
     preview: { port: PORT, strictPort: true, host: HOST },
     logLevel: 'silent',
   });
   const base = `http://${HOST}:${PORT}/`;
+
+  // Receptor de contribuciones para el E2E de subida: guarda los POST crudos.
+  const received = [];
+  const receiver = createServer((req, res) => {
+    const cors = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      Vary: 'Origin',
+    };
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, cors);
+      res.end();
+      return;
+    }
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
+      received.push({ method: req.method, headers: req.headers, body: Buffer.concat(chunks) });
+      res.writeHead(200, { ...cors, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, id: 'e2e', key: 'contrib/e2e.zip' }));
+    });
+  });
+  await new Promise((resolve) => receiver.listen(0, HOST, resolve));
+  const receiverUrl = `http://${HOST}:${receiver.address().port}/api/contrib`;
+
   const launchOptions = { browser: 'firefox', headless: true };
   if (FIREFOX) launchOptions.executablePath = FIREFOX;
   const browser = await puppeteer.launch(launchOptions);
@@ -39,7 +101,15 @@ async function main() {
       page.on('dialog', (dialog) => {
         void dialog.accept();
       });
-      const ctx = { base, tmpDir, fixturePng };
+      const ctx = {
+        base,
+        tmpDir,
+        fixturePng,
+        fixtureMetaPng,
+        metaMarker: META_MARKER,
+        receiverUrl,
+        received,
+      };
       const started = Date.now();
       try {
         await scenario.run(page, ctx);
@@ -63,6 +133,7 @@ async function main() {
   } finally {
     await browser.close();
     await server.close();
+    await new Promise((resolve) => receiver.close(resolve));
   }
 
   const passed = results.filter((r) => r.ok).length;

@@ -116,6 +116,82 @@ export async function clearDatabase(page) {
   );
 }
 
+/**
+ * Lee el store IndexedDB `contributions` y devuelve, por cada registro, el id,
+ * la clase, el estado y los bytes del JPEG como array de numeros (para poder
+ * inspeccionar la cabecera y comprobar que no lleva EXIF/GPS).
+ */
+export async function readContributions(page) {
+  return page.evaluate(async () => {
+    const records = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('carbos');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains('contributions')) {
+          db.close();
+          resolve([]);
+          return;
+        }
+        const tx = db.transaction('contributions', 'readonly');
+        const all = tx.objectStore('contributions').getAll();
+        all.onsuccess = () => {
+          db.close();
+          resolve(all.result);
+        };
+        all.onerror = () => {
+          db.close();
+          reject(all.error);
+        };
+      };
+    });
+    const out = [];
+    for (const record of records) {
+      const buffer = await record.blob.arrayBuffer();
+      out.push({
+        classId: record.classId,
+        status: record.status,
+        attempts: record.attempts,
+        type: record.blob.type,
+        size: record.blob.size,
+        bytes: Array.from(new Uint8Array(buffer)),
+      });
+    }
+    return out;
+  });
+}
+
+/** Espera a que el store `contributions` tenga exactamente `count` registros. */
+export async function waitForContributionCount(page, count, timeout = 8000) {
+  await page.waitForFunction(
+    (want) =>
+      new Promise((resolve) => {
+        const request = indexedDB.open('carbos');
+        request.onerror = () => resolve(false);
+        request.onsuccess = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains('contributions')) {
+            db.close();
+            resolve(want === 0);
+            return;
+          }
+          const tx = db.transaction('contributions', 'readonly');
+          const all = tx.objectStore('contributions').getAll();
+          all.onsuccess = () => {
+            db.close();
+            resolve(all.result.length === want);
+          };
+          all.onerror = () => {
+            db.close();
+            resolve(false);
+          };
+        };
+      }),
+    { timeout },
+    count,
+  );
+}
+
 export async function unregisterServiceWorkers(page) {
   await page
     .evaluate(async () => {
