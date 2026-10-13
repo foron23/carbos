@@ -42,32 +42,34 @@ async function register(page) {
   await click(page, '#register');
 }
 
+const DEFAULT_DETECTION = [
+  {
+    box: { x: 0.25, y: 0.25, w: 0.5, h: 0.5 },
+    score: 0.9,
+    label: 'pan blanco',
+    classId: 'pan_blanco',
+    topk: [{ label: 'pan blanco', classId: 'pan_blanco', p: 0.9 }],
+  },
+];
+
 /**
- * Instala el hook E2E de deteccion (mismo patron que __carbosChatStub): una
- * deteccion sintetica con clase del catalogo y caja normalizada, para ejercitar
- * el flujo de consentimiento -> recorte -> cola sin depender de los pesos.
+ * Instala el hook E2E de deteccion (mismo patron que __carbosChatStub): una o
+ * varias detecciones sinteticas con clase del catalogo y caja normalizada, para
+ * ejercitar el flujo sin depender de los pesos.
  */
-async function installDetectionStub(page) {
-  await page.evaluateOnNewDocument(() => {
+async function installDetectionStub(page, results = DEFAULT_DETECTION) {
+  await page.evaluateOnNewDocument((injected) => {
     globalThis.__carbosDetectionStub = {
       detect: () =>
         Promise.resolve({
-          results: [
-            {
-              box: { x: 0.25, y: 0.25, w: 0.5, h: 0.5 },
-              score: 0.9,
-              label: 'pan blanco',
-              classId: 'pan_blanco',
-              topk: [{ label: 'pan blanco', classId: 'pan_blanco', p: 0.9 }],
-            },
-          ],
+          results: injected,
           engine: 'stub',
           detector: 'stub',
           classifier: 'stub',
         }),
       dispose: () => {},
     };
-  });
+  }, results);
 }
 
 async function uploadAndDetect(page, fixture) {
@@ -639,6 +641,56 @@ export const scenarios = [
       await new Promise((resolve) => setTimeout(resolve, 400));
       assertEqual(ctx.received.length, 1, 'no se reenvia lo ya marcado como sent');
       await screenshot(page, 'contribuciones-subida');
+    },
+  },
+  {
+    name: 'deduplica detecciones repetidas y guia la porcion por la caja',
+    async run(page, ctx) {
+      await installDetectionStub(page, [
+        {
+          box: { x: 0, y: 0, w: 0.8, h: 0.8 },
+          score: 0.9,
+          label: 'pan blanco',
+          classId: 'pan_blanco',
+          topk: [{ label: 'pan blanco', classId: 'pan_blanco', p: 0.9 }],
+        },
+        {
+          box: { x: 0.3, y: 0.3, w: 0.4, h: 0.4 },
+          score: 0.5,
+          label: 'pan blanco',
+          classId: 'pan_blanco',
+          topk: [{ label: 'pan blanco', classId: 'pan_blanco', p: 0.5 }],
+        },
+        {
+          box: { x: 0.1, y: 0.1, w: 0.2, h: 0.2 },
+          score: 0.4,
+          label: 'apple',
+          classId: 'manzana',
+          topk: [{ label: 'apple', classId: 'manzana', p: 0.4 }],
+        },
+      ]);
+      await openApp(page, ctx.base);
+      await uploadAndDetect(page, ctx.fixturePng);
+
+      const rows = await page.$$eval('#detect-results .draft-row', (nodes) => nodes.length);
+      assertEqual(rows, 2, 'el pan repetido se une en una sola deteccion');
+      const draft = await page.$$eval('#draft-items .draft-row .draft-name', (nodes) =>
+        nodes.map((node) => (node.textContent ?? '').trim()),
+      );
+      assertEqual(draft.length, 2, 'dos alimentos en el borrador');
+
+      const gramsLarge = await page.$eval(
+        '#draft-items .draft-row:nth-child(1) input[type="number"]',
+        (el) => Number(el.value),
+      );
+      await click(page, '#draft-items .draft-row:nth-child(1) .draft-portions button:nth-child(2)');
+      const gramsMedium = await page.$eval(
+        '#draft-items .draft-row:nth-child(1) input[type="number"]',
+        (el) => Number(el.value),
+      );
+      assertEqual(gramsMedium, 60, 'mediano coincide con la porcion por defecto del catalogo');
+      assert(gramsLarge > gramsMedium, 'una caja grande sugiere mas porcion que mediano');
+      await screenshot(page, 'deteccion-dedupe-porcion');
     },
   },
 ];

@@ -14,6 +14,41 @@ export function selectableTopk<T extends { classId: string | null }>(
   return result;
 }
 
+export interface DetectionBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface RawDetection {
+  classId: string | null;
+  score: number;
+  box: DetectionBox;
+}
+
+/**
+ * Une las detecciones que resuelven a la misma clase del catalogo, quedandose
+ * con la de mayor confianza. El detector generico (COCO) suele emitir varias
+ * cajas para un mismo alimento; sin esto cada caja se convierte en un item
+ * repetido. Las detecciones sin clase resuelta se conservan (el panel las
+ * muestra como "desconocido") pero no generan alimento. El resultado va
+ * ordenado por confianza descendente.
+ */
+export function mergeDetections<T extends RawDetection>(results: readonly T[]): T[] {
+  const best = new Map<string, T>();
+  const unresolved: T[] = [];
+  for (const result of results) {
+    if (!result.classId) {
+      unresolved.push(result);
+      continue;
+    }
+    const previous = best.get(result.classId);
+    if (!previous || result.score > previous.score) best.set(result.classId, result);
+  }
+  return [...best.values(), ...unresolved].sort((a, b) => b.score - a.score);
+}
+
 export interface AlternativeFood {
   id: string;
   name: string;

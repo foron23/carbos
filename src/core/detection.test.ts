@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyAlternative, selectableTopk } from './detection';
+import { applyAlternative, mergeDetections, selectableTopk } from './detection';
 
 describe('alternativas del detector', () => {
   it('selectableTopk descarta las entradas sin clase resuelta', () => {
@@ -40,5 +40,43 @@ describe('alternativas del detector', () => {
       carbsPer100g: 50,
       classId: 'bread',
     });
+  });
+});
+
+describe('mergeDetections', () => {
+  const box = (w: number, h: number) => ({ x: 0, y: 0, w, h });
+  const det = (classId: string | null, score: number, w = 0.5, h = 0.5) => ({
+    classId,
+    score,
+    box: box(w, h),
+  });
+
+  it('une la misma clase y conserva la de mayor confianza', () => {
+    const merged = mergeDetections([
+      det('pan_blanco', 0.4),
+      det('manzana', 0.6),
+      det('pan_blanco', 0.9),
+      det('pan_blanco', 0.2),
+    ]);
+    expect(merged.map((entry) => entry.classId)).toEqual(['pan_blanco', 'manzana']);
+    expect(merged[0]?.score).toBe(0.9);
+  });
+
+  it('ordena por confianza descendente', () => {
+    const merged = mergeDetections([det('a', 0.3), det('b', 0.8), det('c', 0.5)]);
+    expect(merged.map((entry) => entry.score)).toEqual([0.8, 0.5, 0.3]);
+  });
+
+  it('conserva las detecciones sin clase resuelta (ordenadas por confianza)', () => {
+    const merged = mergeDetections([det(null, 0.9), det('pan', 0.3), det(null, 0.5)]);
+    expect(merged.map((entry) => entry.classId)).toEqual([null, null, 'pan']);
+  });
+
+  it('no muta la entrada y con lista vacia devuelve vacio', () => {
+    const input = [det('a', 0.5), det('a', 0.7)];
+    const copy = input.map((entry) => ({ ...entry }));
+    mergeDetections(input);
+    expect(input).toEqual(copy);
+    expect(mergeDetections([])).toEqual([]);
   });
 });

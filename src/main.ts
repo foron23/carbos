@@ -8,6 +8,7 @@ import {
   itemCarbs,
   loadVault,
   mealCarbs,
+  mergeDetections,
   portionGrams,
   PORTION_SIZES,
   putInsulin,
@@ -27,6 +28,7 @@ import type { Locale, StringKey } from './i18n';
 import { prepareImage } from './capture/image';
 import type { CapturedImage } from './capture/image';
 import { createDetectionClient } from './model';
+import { suggestPortion } from './model/portion';
 import type { DetectionClient, DetectionResult, InferencePhase, TopKEntry } from './model';
 import { decryptVault, encryptVault, isEncrypted } from './export/crypto';
 import { setupInsulin } from './insulin';
@@ -626,12 +628,12 @@ function foodById(id: string | null | undefined): Food | undefined {
   return CATALOG.foods.find((food) => food.id === id);
 }
 
-function pushFood(food: Food): string {
+function pushFood(food: Food, grams = food.defaultPortionGrams): string {
   const id = uid();
   draft.items.push({
     id,
     name: food.name[locale],
-    grams: food.defaultPortionGrams,
+    grams,
     carbsPer100g: food.carbsPer100g,
     classId: food.id,
   });
@@ -658,7 +660,9 @@ function chooseDetection(index: number, entry: TopKEntry): void {
       carbsPer100g: food.carbsPer100g,
     });
   } else {
-    detectionDraftIds[index] = pushFood(food);
+    const box = detections[index]?.box;
+    const grams = box ? suggestPortion(box, food.defaultPortionGrams).grams : undefined;
+    detectionDraftIds[index] = pushFood(food, grams);
   }
   renderDraft();
   renderDetect();
@@ -667,7 +671,9 @@ function chooseDetection(index: number, entry: TopKEntry): void {
 function applyDetections(results: DetectionResult[]): void {
   detectionDraftIds = results.map((result) => {
     const food = foodById(result.classId);
-    return food ? pushFood(food) : '';
+    if (!food) return '';
+    // La porcion inicial se guia por el tamano de la caja detectada (E6/D35).
+    return pushFood(food, suggestPortion(result.box, food.defaultPortionGrams).grams);
   });
   renderDraft();
   renderDetect();
@@ -741,11 +747,12 @@ async function startDetection(image: CapturedImage): Promise<void> {
       { onProgress: (event) => setPhotoStatus(PHASE_KEYS[event.phase]) },
     );
     if (controller.signal.aborted) return;
-    detections = outcome.results;
+    const merged = mergeDetections(outcome.results);
+    detections = merged;
     detectionEngine = outcome.engine;
     detectionMeta = { detector: outcome.detector, classifier: outcome.classifier };
-    applyDetections(outcome.results);
-    setPhotoStatus(outcome.results.length > 0 ? 'photo.detected' : 'photo.noItems');
+    applyDetections(merged);
+    setPhotoStatus(merged.length > 0 ? 'photo.detected' : 'photo.noItems');
   } catch (error) {
     if (
       controller.signal.aborted ||
