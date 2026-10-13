@@ -35,7 +35,13 @@ Clase A / 10 M Clase B** al mes; Workers, **100 000 peticiones/día**.
    ```
 
    Te dará una URL tipo `https://carbos-contrib.TU-SUBDOMINIO.workers.dev`.
-   Si definiste `routes`, también responde en `https://contrib.TUDOMINIO/api/contrib`.
+   Si definiste `routes`, también responde en `https://carbos.foron.dev/api/contrib`.
+
+   > **Ruta en tu dominio**: `carbos.foron.dev` sirve la app por nginx (tras Cloudflare).
+   > Para que `/api/contrib` llegue al Worker hay que **crear la ruta** en la zona
+   > `foron.dev`: descomenta `routes` en `wrangler.toml`
+   > (`{ pattern = "carbos.foron.dev/api/*", zone_name = "foron.dev" }`) y vuelve a
+   > `wrangler deploy`. Mientras no exista la ruta, el POST lo atiende nginx (405).
 
 5. **(Recomendado) Retención**: borra automáticamente lo viejo (privacidad):
 
@@ -69,6 +75,20 @@ python3 tools/data/import_contributions.py --bundle contrib.zip
 
 Para lotes, `rclone` con el backend `r2` (descarga el prefijo `contrib/`) y un bucle
 sobre `import_contributions.py`.
+
+## Limitar al tier gratuito (sin sobrecoste)
+
+- **Workers en plan Free**: al pasar de 100 000 peticiones/día **falla** (no factura).
+  Comprueba que el proyecto está en **Free**, no en Paid (si estuviera en Paid, sí habría
+  sobrecoste). El Worker no necesita nada de pago.
+- **R2**: el tier gratuito es **10 GB** de almacenamiento + **1 M ops Clase A / 10 M Clase B**
+  al mes. Para que sea **imposible** pasarse, el Worker impone un **tope duro de objetos**
+  (`MAX_OBJECTS`, por defecto 300): si el bucket ya está lleno, responde **507** y no guarda
+  nada. Con `MAX_OBJECTS × MAX_BYTES` por debajo de 10 GB, no hay sobrecoste posible.
+- **Retencion**: la regla de ciclo de vida (`--expire-days 90`) borra lo viejo, así el bucket
+  se mantiene lejos del tope.
+- **Canario**: activa una **notificación** de Cloudflare (Billing → Notifications / R2 usage)
+  por si el uso se acerca a los límites; es solo aviso, el tope duro ya evita el gasto.
 
 ## Notas
 

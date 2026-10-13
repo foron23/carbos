@@ -57,6 +57,15 @@ export default {
     const isZip = bytes[0] === 0x50 && bytes[1] === 0x4b; // "PK"
     if (!isZip) return json({ ok: false, error: 'no es un zip' }, 415, cors);
 
+    // Tope duro de coste: si el bucket ya tiene MAX_OBJECTS, se rechaza. Con
+    // MAX_OBJECTS * MAX_BYTES por debajo de los 10 GB gratis de R2, es imposible
+    // incurrir en sobrecoste (y la regla de ciclo de vida borra lo viejo).
+    const maxObjects = Number(env.MAX_OBJECTS || 300);
+    const listing = await env.CONTRIB.list({ limit: maxObjects });
+    if (listing.truncated) {
+      return json({ ok: false, error: 'cuota de almacenamiento alcanzada' }, 507, cors);
+    }
+
     const day = new Date().toISOString().slice(0, 10);
     const id = crypto.randomUUID();
     const key = `contrib/${day}/${id}.zip`;

@@ -9,12 +9,14 @@ bucket_name = "carbos-contributions"
 
 [vars]
 # Origenes permitidos (la app). Separa por comas; vacio = cualquiera (NO recomendado).
-ALLOWED_ORIGINS = "https://foron23.github.io"
+ALLOWED_ORIGINS = "https://carbos.foron.dev,https://foron23.github.io"
 # Tamano maximo del bundle en bytes (25 MB por defecto).
 MAX_BYTES = "26214400"
+# Tope duro de objetos en el bucket (proteccion de coste; ver README).
+MAX_OBJECTS = "300"
 
 # Opcional: servir el endpoint en tu dominio de Cloudflare.
 # Descomenta y ajusta tras crear el bucket y hacer `wrangler deploy`.
 # routes = [
-#   { pattern = "contrib.TUDOMINIO/api/*", zone_name = "TUDOMINIO" }
+#   { pattern = "carbos.foron.dev/api/*", zone_name = "foron.dev" }
 # ]
