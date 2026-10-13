@@ -19,8 +19,10 @@ foto) contribuir esa imagen con su **etiqueta confirmada**. Se acumula un datase
 
 ## Diseno propuesto
 
-- **Consentimiento explicito por foto**: nada se sube sin un "compartir esta foto" claro. Nunca
-  automatico.
+- **Consentimiento por foto (por defecto)**: nada se sube sin un "compartir esta foto" claro.
+  Ademas, en **ajustes** hay un **toggle global opcional** ("compartir automaticamente las fotos que
+  confirme") para 0 friccion; sigue siendo consentimiento explicito (una vez) y **revocable**.
+  Nunca subida silenciosa sin ningun consentimiento.
 - **Cola en el dispositivo** (IndexedDB) con estado; el usuario ve que se subira y puede borrarlo.
 - **Sin cuentas ni identificadores**: se sube solo la **imagen** (recortada) + el **id de clase**
   confirmado. Se **elimina EXIF** antes de subir. Nada de metadatos del usuario.
@@ -38,6 +40,10 @@ foto) contribuir esa imagen con su **etiqueta confirmada**. Se acumula un datase
     envio en segundo plano; **nunca subida silenciosa**.
 - **Generacion del dataset**: agregar, revisar y deduplicar las contribuciones en
   `dataset/<clase>/` para el pipeline de `training/` (fine-tuning al catalogo).
+- **Herramientas de revision (mantenedor)**: `confirm_labels.py` (CLI interactiva) y
+  `label_server.py` (**servidor local** en el navegador, `make data-label`) comparten la misma cola
+  y escriben en `data/confirmed` con `reviewed:true`. Los modos automaticos escriben en
+  `data/proposed` con `reviewed:false`: **propuesto no es confirmado**.
 
 ## Privacidad y riesgos
 
