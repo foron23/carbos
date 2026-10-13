@@ -1,0 +1,10 @@
+{
+  "format": "carbos-barcode-pack",
+  "version": 1,
+  "locale": "pt",
+  "url": "pt-rest.jsonl.gz",
+  "bytes": 77859,
+  "sha256": "9ada6348befa9987e0e35af11d4cb9a37d3ffb7bfdb693eb8842fcfeb15b6392",
+  "product_count": 3242,
+  "generated_at": "2026-10-13T19:59:22Z"
+}

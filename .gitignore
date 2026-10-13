@@ -38,5 +38,10 @@ eval/results/
 # Shortlist de modelos (venv de conversion)
 tools/shortlist/.venv/
 
+# Pack offline de codigos de barras: area de trabajo del builder (ignorada). El pack
+# "de arranque" que viaja CON la app vive en public/barcode/ y SI se versiona
+# (pequeno, ODbL-1.0 con atribucion en la UI); se regenera con `make barcode-pack`.
+tools/barcode/out/
+
 # Ficheros temporales de depuracion
 *.tmp.mjs

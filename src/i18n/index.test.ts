@@ -18,6 +18,7 @@ const SIN_ACENTO: Array<[string, string]> = [
   ['aritmetica', 'aritmética'],
   ['modulo', 'módulo'],
   ['catalogo', 'catálogo'],
+  ['codigo', 'código'],
   ['porcion', 'porción'],
   ['analitica', 'analítica'],
   ['correccion', 'corrección'],

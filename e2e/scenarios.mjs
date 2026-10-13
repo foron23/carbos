@@ -1,5 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
 import {
   assert,
   assertEqual,
@@ -99,6 +101,50 @@ async function installDetectionStub(page, results = DEFAULT_DETECTION) {
       dispose: () => {},
     };
   }, results);
+}
+
+/**
+ * Instala el hook E2E del codigo de barras (mismo patron que __carbosDetectionStub):
+ * un decodificador sintetico que devuelve siempre el EAN dado, para ejercitar el
+ * flujo sin camara ni BarcodeDetector (Firefox).
+ */
+async function installBarcodeStub(page, ean = '4006381333931') {
+  await page.evaluateOnNewDocument((code) => {
+    globalThis.__carbosBarcodeStub = { decode: () => Promise.resolve(code) };
+  }, ean);
+}
+
+/**
+ * Instala el hook E2E de red del codigo de barras (mismo patron que
+ * `__carbosBarcodeStub`): sirve el manifest de packs, el pack (gzip) y una
+ * respuesta de Open Food Facts v3 sin tocar la red real. Permite ejercitar la
+ * descarga automatizada y la resolucion en linea en Firefox.
+ */
+async function installBarcodeFetchStub(page, fixtures) {
+  await page.evaluateOnNewDocument((data) => {
+    const packBytes = Uint8Array.from(atob(data.packBase64), (c) => c.charCodeAt(0));
+    globalThis.__carbosBarcodeFetch = async (url) => {
+      if (url.includes('barcode-manifest.json')) {
+        return new Response(JSON.stringify(data.manifest), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url === data.packUrl) {
+        return new Response(packBytes, {
+          status: 200,
+          headers: { 'content-length': String(packBytes.byteLength) },
+        });
+      }
+      if (url.includes('openfoodfacts.org')) {
+        return new Response(JSON.stringify(data.off), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response('', { status: 404 });
+    };
+  }, fixtures);
 }
 
 async function uploadAndDetect(page, fixture) {
@@ -737,6 +783,137 @@ export const scenarios = [
       assertEqual(gramsMedium, 60, 'mediano coincide con la porcion por defecto del catalogo');
       assert(gramsLarge > gramsMedium, 'una caja grande sugiere mas porcion que mediano');
       await screenshot(page, 'deteccion-dedupe-porcion');
+    },
+  },
+  {
+    name: 'escanea un codigo de barras y prellena el borrador',
+    async run(page, ctx) {
+      const ean = '4006381333931';
+      await installBarcodeStub(page, ean);
+      await openApp(page, ctx.base);
+      await page.$eval('#settings', (el) => {
+        el.open = true;
+      });
+      await page.$eval('#barcode-toggle', (el) => {
+        el.checked = true;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await waitFor(page, '#barcode-host:not([hidden]) #barcode-manual');
+
+      // Camino de camara via stub: la imagen se decodifica al EAN del stub.
+      await uploadFile(page, '#barcode-input', ctx.fixturePng);
+      await waitForText(page, '#draft-items', ean);
+      assert(
+        (await text(page, '#draft-items')).includes(ean),
+        'el escaneo con el stub prellena el EAN',
+      );
+
+      // Camino manual: escribir el EAN y resolverlo prellena otro item.
+      await setValue(page, '#barcode-manual', ean);
+      await click(page, '#barcode-manual-go');
+      await page.waitForFunction(
+        () => document.querySelectorAll('#draft-items .draft-row').length === 2,
+        { timeout: 8000 },
+      );
+      const rows = await page.$$eval('#draft-items .draft-row .draft-name', (nodes) =>
+        nodes.map((node) => (node.textContent ?? '').trim()),
+      );
+      assertEqual(rows.length, 2, 'dos items prellenados con el codigo');
+      assert(
+        rows.every((name) => name === ean),
+        `los items llevan el EAN: ${rows.join(' | ')}`,
+      );
+      await screenshot(page, 'codigo-barras');
+    },
+  },
+  {
+    name: 'descarga el pack y resuelve en linea solo si se activa',
+    async run(page, ctx) {
+      const packBarcode = '4006381333931';
+      const onlineEan = '5901234123457';
+      const packLine =
+        JSON.stringify({
+          barcode: packBarcode,
+          name: { es: 'Producto de pack', en: 'Pack product' },
+          carbsPer100g: 42,
+          source: 'test',
+          savedAt: 0,
+        }) + '\n';
+      const packGz = gzipSync(Buffer.from(packLine, 'utf8'), { mtime: 0 });
+      const sha256 = createHash('sha256').update(packGz).digest('hex');
+      const packUrl = 'https://packs.test/es.jsonl.gz';
+      const manifest = {
+        format: 'carbos-barcode-packs',
+        version: 1,
+        packs: [
+          {
+            id: 'es',
+            locale: 'es',
+            url: packUrl,
+            sha256,
+            bytes: packGz.byteLength,
+            product_count: 1,
+            generated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      };
+      const off = {
+        status: 'success',
+        product: {
+          code: onlineEan,
+          product_name_es: 'Producto en linea',
+          product_name_en: 'Online product',
+          brands: 'Marca',
+          nutrition_data_per: '100g',
+          nutriments: { carbohydrates_100g: 10 },
+        },
+      };
+      await installBarcodeFetchStub(page, {
+        manifest,
+        packUrl,
+        packBase64: packGz.toString('base64'),
+        off,
+      });
+      await openApp(page, ctx.base);
+      await page.$eval('#settings', (el) => {
+        el.open = true;
+      });
+      await page.$eval('#barcode-toggle', (el) => {
+        el.checked = true;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await waitFor(page, '#barcode-host:not([hidden]) #barcode-download');
+
+      // 1) Descarga automatizada (manifest -> sha256 -> IndexedDB), sigue offline.
+      await click(page, '#barcode-download');
+      await waitForText(page, '#barcode-status', 'Pack descargado');
+      const imported = await readStore(page, 'products');
+      assertEqual(imported.length, 1, 'el pack descargado importa un producto');
+      assertEqual(imported[0]?.barcode, packBarcode, 'el producto del pack queda en el store');
+
+      // 2) Con el pack local, un EAN del pack resuelve sin red.
+      await setValue(page, '#barcode-manual', packBarcode);
+      await click(page, '#barcode-manual-go');
+      await waitForText(page, '#draft-items', 'Producto de pack');
+
+      // 3) El aviso de que "sale del dispositivo" esta presente.
+      const host = await text(page, '#barcode-host');
+      assert(
+        host.includes('sale de tu dispositivo'),
+        'el aviso de resolucion en linea esta presente',
+      );
+
+      // 4) Opt-in en linea: un EAN fuera del pack consulta (stub) y cachea.
+      await page.$eval('#barcode-online', (el) => {
+        el.checked = true;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await setValue(page, '#barcode-manual', onlineEan);
+      await click(page, '#barcode-manual-go');
+      await waitForText(page, '#draft-items', 'Producto en linea');
+      const products = await readStore(page, 'products');
+      assertEqual(products.length, 2, 'la resolucion en linea cachea el producto');
+      await screenshot(page, 'codigo-barras-online');
     },
   },
   {

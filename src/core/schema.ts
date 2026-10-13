@@ -23,6 +23,8 @@ export const foodItemSchema = z.object({
   grams: z.number().nonnegative(),
   carbsPer100g: z.number().nonnegative(),
   classId: z.string().min(1).optional(),
+  barcode: z.string().min(1).optional(),
+  brand: z.string().min(1).optional(),
 });
 
 export const mealSchema = z.object({

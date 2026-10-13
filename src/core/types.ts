@@ -17,6 +17,9 @@ export interface FoodItem {
   grams: number;
   carbsPer100g: number;
   classId?: string | undefined;
+  // Procedencia del escaneo (spec 17): aditivo, sin bump de esquema.
+  barcode?: string | undefined;
+  brand?: string | undefined;
 }
 
 export interface Meal {

@@ -3,10 +3,12 @@ import { SCHEMA_VERSION, emptyVault } from './types';
 import { upgradeMeal } from './migrate';
 
 const DB_NAME = 'carbos';
-const DB_VERSION = 2;
+// El overlay de productos escaneados suma el store `products` (DB_VERSION 2 -> 3).
+const DB_VERSION = 3;
 const STORE_MEALS = 'meals';
 const STORE_INSULIN = 'insulin';
 const STORE_CONTRIBUTIONS = 'contributions';
+const STORE_PRODUCTS = 'products';
 
 export function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -21,6 +23,9 @@ export function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_CONTRIBUTIONS)) {
         db.createObjectStore(STORE_CONTRIBUTIONS, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORE_PRODUCTS)) {
+        db.createObjectStore(STORE_PRODUCTS, { keyPath: 'barcode' });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -65,6 +70,26 @@ export function deleteInsulin(id: string): Promise<void> {
   );
 }
 
+/**
+ * Escribe muchos registros en UNA sola transaccion (importacion de packs). Evita
+ * el coste de abrir/cerrar la base por cada fila cuando el pack trae miles.
+ */
+export function putAll(storeName: string, items: readonly unknown[]): Promise<void> {
+  return openDb().then(
+    (db) =>
+      new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction(storeName, 'readwrite');
+        const store = transaction.objectStore(storeName);
+        for (const item of items) store.put(item);
+        transaction.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        transaction.onerror = () => reject(transaction.error);
+      }),
+  );
+}
+
 export function allMeals(): Promise<Meal[]> {
   return tx<Meal[]>(STORE_MEALS, 'readonly', (store) => store.getAll());
 }
@@ -96,4 +121,4 @@ export function replaceVault(vault: Vault): Promise<void> {
   );
 }
 
-export { emptyVault, STORE_CONTRIBUTIONS };
+export { emptyVault, STORE_CONTRIBUTIONS, STORE_PRODUCTS };

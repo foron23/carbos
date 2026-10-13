@@ -65,10 +65,25 @@ WEIGHTS_ARGS    ?=
 # Ver docs/specs/10-experimento.md. --limit 0 evalua los 709 platos del test.
 EVAL_ARGS ?= --manifest public/model-manifest.json --root public --limit 25
 
+# --- Pack de codigos de barras (Open Food Facts, spec 17, opcion E) ---------
+# Genera packs offline (JSONL.gz + manifest) desde la API de OFF y los deja en
+# public/barcode/, de modo que viajan JUNTO CON LA APP (mismo origen, sin CDN).
+# Un pack por pais/idioma, y cada uno partido en principal (con nutricion) y resto
+# (solo identificacion). Datos ODbL-1.0 con atribucion en la UI.
+BARCODE_COUNTRIES ?= en:spain,en:france,en:portugal,en:italy
+BARCODE_OUT       ?= public/barcode/es
+# API de busqueda de OFF particionando por prefijo de codigo (sin el dump de ~7 GB),
+# un pack por pais, partido en principal/resto. --limit 0 = pais casi entero (~1,5M
+# productos en ~27 min). Con el dump completo: BARCODE_ARGS="--input dump.jsonl.gz --split".
+BARCODE_ARGS      ?= --from-api --partition --per-country --split --limit 0 --page-size 10000 --api-delay 0.1
+# Manifest hospedado de packs, en el propio origen (URL relativa -> ./barcode/es.jsonl.gz).
+BARCODE_PACKS_MANIFEST ?= public/barcode-manifest.json
+BARCODE_BASE_URL       ?= ./barcode
+
 .PHONY: help setup install build test e2e lint format format-check check run dev clean \
         build-stamp verify-bundle train-setup train train-smoke export-model distill distill-clip \
         data-images data-review data-confirm data-label data-import data-package \
-        data-distill data-e2e data-pipeline catalog \
+        data-distill data-e2e data-pipeline catalog barcode-pack \
         weights-manifest smoke-setup smoke-models smoke-clean eval
 
 ## help: Show this help
@@ -288,6 +303,11 @@ data-pipeline: data-images data-review
 ## catalog: Regenera src/catalog/catalog.ts desde Ciqual 2020 (tools/catalog/build_catalog.py)
 catalog:
 	$(PYTHON) tools/catalog/build_catalog.py
+
+## barcode-pack: Genera el pack offline (public/barcode/) + su manifest; viaja con la app (spec 17, opcion E)
+barcode-pack:
+	$(PYTHON) tools/barcode/build_pack.py --countries $(BARCODE_COUNTRIES) --out $(BARCODE_OUT) \
+		--packs-manifest $(BARCODE_PACKS_MANIFEST) $(if $(BARCODE_BASE_URL),--base-url $(BARCODE_BASE_URL)) $(BARCODE_ARGS)
 
 ## smoke-setup: Crea tools/smoke/.venv con onnx/numpy/onnxruntime para el smoke test local
 smoke-setup:

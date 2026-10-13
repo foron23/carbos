@@ -37,6 +37,8 @@ import { setupInsulin } from './insulin';
 import type { InsulinHandle } from './insulin';
 import { isChatEnabled, setChatDisabled, setChatEnabled, setupChat } from './chat';
 import type { ChatHandle } from './chat';
+import { isBarcodeEnabled, setBarcodeEnabled, setupBarcode } from './barcode';
+import type { BarcodeAdd, BarcodeHandle } from './barcode';
 import { cropToJpeg } from './contrib/crop';
 import {
   addContribution,
@@ -119,6 +121,7 @@ function storeViewDate(isoDate: string): void {
 let currentDate = readViewDate() ?? today();
 let insulin: InsulinHandle | null = null;
 let chat: ChatHandle | null = null;
+let barcode: BarcodeHandle | null = null;
 
 /** Mensajes de estado: se guarda la clave para poder retraducirlos. */
 const statusKeys = new Map<string, StringKey>();
@@ -359,6 +362,8 @@ app.innerHTML = `
     <div id="insulin-host" hidden></div>
     <label class="check"><input id="chat-toggle" type="checkbox" /> <span data-i18n="settings.chatModule"></span></label>
     <div id="chat-host" hidden></div>
+    <label class="check"><input id="barcode-toggle" type="checkbox" /> <span data-i18n="settings.barcodeModule"></span></label>
+    <div id="barcode-host" hidden></div>
     <label class="check"><input id="contrib-toggle" type="checkbox" /> <span data-i18n="settings.contribAuto"></span></label>
     <p id="contrib-status" class="muted" aria-live="polite" data-i18n="contrib.none"></p>
     <p><button id="contrib-clear" type="button" data-i18n="contrib.clear"></button></p>
@@ -417,6 +422,31 @@ function addFoodToDraft(food: Food): void {
     carbsPer100g: food.carbsPer100g,
     classId: food.id,
   });
+  renderDraft();
+}
+
+/**
+ * Escaneo (spec 17): empuja el producto resuelto al borrador con origen manual y
+ * **resetea** las detecciones, de modo que una foto anterior no contamine la
+ * confianza ni dispare el auto-compartir. La procedencia va en `FoodItem.barcode`.
+ */
+function pushBarcodeItem(product: BarcodeAdd): void {
+  // Cancela una deteccion de foto en vuelo: si no, al resolverla rellenaria
+  // `detections` y el registro contaria una confianza/modelo de una foto ajena.
+  detectAbort?.abort();
+  draft.items.push({
+    id: uid(),
+    name: product.name,
+    grams: product.grams,
+    carbsPer100g: product.carbsPer100g,
+    barcode: product.barcode,
+    brand: product.brand,
+  });
+  draft.origin = 'manual';
+  detections = [];
+  detectionDraftIds = [];
+  detectionMeta = null;
+  detectionEngine = '';
   renderDraft();
 }
 
@@ -487,12 +517,34 @@ function renderDraft(): void {
         renderDraft();
       });
       gramsLabel.append(grams, document.createTextNode(` ${tr('unit.grams')}`));
-      const carbs = document.createElement('span');
-      carbs.className = 'muted';
-      carbs.textContent = `${roundCarbs(itemCarbs(item))} ${tr('unit.grams')}`;
-      row.append(name, gramsLabel, carbs);
-
+      // Un item escaneado que no esta en el catalogo no trae carbohidratos
+      // fiables: se dejan editar por 100 g para no registrar un 0 en silencio.
       const food = foodById(item.classId);
+      if (item.barcode !== undefined && !food) {
+        const carbsLabel = document.createElement('label');
+        const carbs = document.createElement('input');
+        carbs.type = 'number';
+        carbs.min = '0';
+        carbs.step = '0.1';
+        carbs.inputMode = 'decimal';
+        carbs.value = String(item.carbsPer100g);
+        carbs.setAttribute('aria-label', tr('field.carbsPer100g'));
+        carbs.addEventListener('change', () => {
+          item.carbsPer100g = Math.max(0, Number.parseFloat(carbs.value) || 0);
+          renderDraft();
+        });
+        carbsLabel.append(carbs, document.createTextNode(` ${tr('field.carbsPer100g')}`));
+        const total = document.createElement('span');
+        total.className = 'muted';
+        total.textContent = `${roundCarbs(itemCarbs(item))} ${tr('unit.grams')}`;
+        row.append(name, gramsLabel, carbsLabel, total);
+      } else {
+        const carbs = document.createElement('span');
+        carbs.className = 'muted';
+        carbs.textContent = `${roundCarbs(itemCarbs(item))} ${tr('unit.grams')}`;
+        row.append(name, gramsLabel, carbs);
+      }
+
       if (food) {
         const portions = document.createElement('div');
         portions.className = 'draft-portions';
@@ -1143,6 +1195,7 @@ function render(): void {
   relocalizeStatuses();
   insulin?.refresh();
   chat?.refresh();
+  barcode?.refresh();
   requestAnimationFrame(publishDaybarHeight);
 }
 
@@ -1485,6 +1538,18 @@ function wire(): void {
     refresh: () => {
       void refresh();
     },
+  });
+  barcode = setupBarcode(byId('barcode-host'), {
+    getLocale: () => locale,
+    onAdd: (product) => {
+      pushBarcodeItem(product);
+    },
+  });
+  const barcodeToggle = byId<HTMLInputElement>('barcode-toggle');
+  barcodeToggle.checked = isBarcodeEnabled();
+  barcodeToggle.addEventListener('change', () => {
+    setBarcodeEnabled(barcodeToggle.checked);
+    barcode?.refresh();
   });
   renderExportReminder();
 }
