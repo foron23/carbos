@@ -136,6 +136,17 @@ export const STRINGS = {
       'El chat interpreta lo que escribes y propone; no es consejo médico ni un dispositivo médico. Revisa y ajusta con tu equipo médico.',
     'chat.cancel': 'Cancelar',
     'settings.chatModule': 'Activar el chat experimental (opt-in)',
+    'settings.contribAuto':
+      'Compartir automáticamente las fotos que confirme (ayuda a mejorar el reconocimiento)',
+    'contrib.share': 'Compartir esta foto',
+    'contrib.queued': 'Se compartirá cuando haya conexión.',
+    'contrib.queueLabel': 'Fotos en cola',
+    'contrib.clear': 'Borrar la cola',
+    'contrib.cleared': 'Cola borrada.',
+    'contrib.note':
+      'Solo se comparte el recorte y el tipo de alimento. Sin cuentas ni identificadores. Puedes borrarlo cuando quieras.',
+    'contrib.none': 'No has compartido ninguna foto.',
+    'contrib.shareFailed': 'No se pudo compartir. Se intentará de nuevo.',
   },
   en: {
     'app.title': 'Carbos · carbs on your device',
@@ -273,6 +284,16 @@ export const STRINGS = {
       'The chat interprets what you type and proposes; it is not medical advice or a medical device. Review and adjust with your care team.',
     'chat.cancel': 'Cancel',
     'settings.chatModule': 'Enable the experimental chat (opt-in)',
+    'settings.contribAuto': 'Automatically share the photos I confirm (helps improve recognition)',
+    'contrib.share': 'Share this photo',
+    'contrib.queued': 'It will be shared when there is a connection.',
+    'contrib.queueLabel': 'Photos queued',
+    'contrib.clear': 'Clear the queue',
+    'contrib.cleared': 'Queue cleared.',
+    'contrib.note':
+      'Only the crop and the food type are shared. No accounts or identifiers. You can delete it whenever you want.',
+    'contrib.none': 'You have not shared any photo.',
+    'contrib.shareFailed': 'Could not share. It will be retried.',
   },
 } as const;
 
