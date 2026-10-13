@@ -93,6 +93,11 @@ PAGE = """<!doctype html>
       <button id="reject" class="danger" style="flex:1">r · rechazar</button>
       <button id="skip" style="flex:1">n · saltar</button>
     </div>
+    <div class="row">
+      <button id="bulk-agree" style="flex:1">✓ clase: solo agree</button>
+      <button id="bulk-all" style="flex:1">✓ clase: todas</button>
+      <button id="bulk-skip" style="flex:1">↷ saltar clase</button>
+    </div>
   </aside>
 </main>
 <footer id="foot"></footer>
@@ -108,7 +113,9 @@ function render(){
   $('bar').style.width = (100*(i/items.length)).toFixed(1)+'%';
   if(!it){ $('img').removeAttribute('src'); $('topk').innerHTML='<em>Cola terminada.</em>'; return; }
   $('img').src='/img?p='+encodeURIComponent(it.path);
-  $('meta').textContent=`${i+1}/${items.length} · carpeta: ${it.folderClass||'(ninguna)'} · ${it.agree===true?'agree':it.agree===false?'disagree':'n/a'}`;
+  const cls=it.folderClass||'(ninguna)';
+  const rem=items.filter(x=>(x.folderClass||'(ninguna)')===cls).length;
+  $('meta').textContent=`${i+1}/${items.length} · carpeta: ${cls} (${rem} restantes) · ${it.agree===true?'agree':it.agree===false?'disagree':'n/a'}`;
   $('foot').textContent=`confirmadas=${counts.accepted} rechazadas=${counts.rejected} saltadas=${counts.skipped} pendientes=${items.length-i}`;
   const tk=it.topk||[];
   $('topk').innerHTML=tk.map((p,n)=>`<button data-n="${n}" data-id="${p.id}"><span class="k">${n+1}</span>${p.id} <b>${(p.p*100).toFixed(1)}%</b></button>`).join('')
@@ -127,9 +134,18 @@ async function find(){
   $('results').innerHTML=d.matches.map(id=>`<button data-id="${id}">${id}</button>`).join('');
   $('results').querySelectorAll('button').forEach(b=>b.onclick=()=>decide('label',b.dataset.id));
 }
+async function bulk(mode){
+  const it=items[i]; if(!it||!it.folderClass) return;
+  const r=await fetch('/api/bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({class:it.folderClass,mode})});
+  const d=await r.json();
+  if(d.ok){ items=d.items||[]; counts=d.counts||counts; i=0; render(); }
+}
 $('accept').onclick=()=>{const it=items[i]; if(it&&it.folderClass) decide('accept',it.folderClass);};
 $('reject').onclick=()=>decide('reject');
 $('skip').onclick=()=>{i++;render();};
+$('bulk-agree').onclick=()=>bulk('accept-agree');
+$('bulk-all').onclick=()=>bulk('accept');
+$('bulk-skip').onclick=()=>bulk('skip');
 $('find').onclick=find;
 $('q').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();find();}});
 document.addEventListener('keydown',e=>{
@@ -158,6 +174,8 @@ class State:
         if args.limit and args.limit > 0:
             rows = rows[: args.limit]
         self.items = [r for r in rows if r["path"] not in decided]
+        # Agrupa por clase para revisar clase a clase (mucho mas eficiente en volumen).
+        self.items.sort(key=lambda r: (r.get("folderClass") or "", r["path"]))
         self.lock = threading.Lock()
         self.counts = {"accepted": 0, "rejected": 0, "skipped": 0, "errors": 0}
 
@@ -191,7 +209,39 @@ class State:
                 materialize(src, dest, False)
                 self.counts["accepted"] += 1
             append_log(self.args.log, record(row, label, "topk", True, "server"))
+            self.items = [r for r in self.items if r["path"] != path]
         return {"ok": True, "counts": self.counts}
+
+    def bulk(self, class_id: str, mode: str) -> dict:
+        """Operacion en volumen sobre todas las filas pendientes de una clase."""
+        rows = [r for r in self.items if r.get("folderClass") == class_id]
+        if not rows:
+            return {"ok": False, "error": "clase sin filas pendientes"}
+        if mode not in ("accept", "accept-agree", "skip"):
+            return {"ok": False, "error": "modo invalido"}
+        processed: set[str] = set()
+        for row in rows:
+            if mode == "accept-agree" and not row.get("agree"):
+                continue
+            processed.add(row["path"])
+            if mode == "skip":
+                with self.lock:
+                    self.counts["skipped"] += 1
+                continue
+            src = resolve_src(row["path"])
+            if not src.exists():
+                with self.lock:
+                    self.counts["errors"] += 1
+                continue
+            dest = self.args.out_dir / dest_name(row["path"], class_id)
+            with self.lock:
+                materialize(src, dest, False)
+                self.counts["accepted"] += 1
+            rec = record(row, class_id, "bulk-class", True, "server-bulk")
+            rec["bulk"] = True
+            append_log(self.args.log, rec)
+        self.items = [r for r in self.items if r["path"] not in processed]
+        return {"ok": True, "done": len(processed), "counts": self.counts, "items": self.items}
 
 
 def make_handler(state: State):
@@ -229,14 +279,20 @@ def make_handler(state: State):
             return self._send(404, b"not found", "text/plain")
 
         def do_POST(self) -> None:
-            if urlparse(self.path).path != "/api/decide":
+            path = urlparse(self.path).path
+            if path not in ("/api/decide", "/api/bulk"):
                 return self._send(404, b"not found", "text/plain")
             length = int(self.headers.get("Content-Length", 0))
             try:
                 payload = json.loads(self.rfile.read(length) or b"{}")
             except json.JSONDecodeError:
                 return self._json({"ok": False, "error": "json invalido"}, 400)
-            result = state.decide(payload.get("path", ""), payload.get("action", ""), payload.get("label"))
+            if path == "/api/bulk":
+                result = state.bulk(payload.get("class", ""), payload.get("mode", "accept"))
+            else:
+                result = state.decide(
+                    payload.get("path", ""), payload.get("action", ""), payload.get("label")
+                )
             return self._json(result, 200 if result.get("ok") else 400)
 
     return Handler
