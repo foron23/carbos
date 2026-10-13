@@ -47,6 +47,7 @@ DISTILL_CLIP_ARGS ?=
 DATA_ARGS ?= --classes pan_blanco,tomate --per-class 4
 # Revision/confirmacion de etiquetas y empaquetado del dataset.
 CONFIRM_ARGS ?= --queue data/labels/review.queue.jsonl
+IMPORT_ARGS ?= --bundle contributions.zip
 PACKAGE_ARGS ?= --images data/images --format targz --out dist/dataset --free-only
 
 # --- Pesos de produccion ----------------------------------------------------
@@ -62,7 +63,7 @@ EVAL_ARGS ?= --manifest public/model-manifest.json --root public --limit 25
 
 .PHONY: help setup install build test e2e lint format format-check check run dev clean \
         build-stamp verify-bundle train-setup train train-smoke export-model distill distill-clip \
-        data-images data-review data-confirm data-package catalog \
+        data-images data-review data-confirm data-import data-package catalog \
         weights-manifest smoke-setup smoke-models smoke-clean eval
 
 ## help: Show this help
@@ -251,6 +252,10 @@ data-review:
 ## data-confirm: Revisa la cola y materializa data/confirmed (etiquetas confirmadas)
 data-confirm:
 	python3 tools/data/confirm_labels.py $(CONFIRM_ARGS)
+
+## data-import: Importa un bundle de contribuciones de usuarios (consentimiento CC0)
+data-import:
+	python3 tools/data/import_contributions.py $(IMPORT_ARGS)
 
 ## data-package: Empaqueta el dataset (imagenes + etiquetas + atribucion) para compartir
 data-package:
