@@ -1,0 +1,20 @@
+name = "carbos-contrib"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# Bucket R2 donde caen los bundles de contribuciones (spec 12 / D38).
+[[r2_buckets]]
+binding = "CONTRIB"
+bucket_name = "carbos-contributions"
+
+[vars]
+# Origenes permitidos (la app). Separa por comas; vacio = cualquiera (NO recomendado).
+ALLOWED_ORIGINS = "https://foron23.github.io"
+# Tamano maximo del bundle en bytes (25 MB por defecto).
+MAX_BYTES = "26214400"
+
+# Opcional: servir el endpoint en tu dominio de Cloudflare.
+# Descomenta y ajusta tras crear el bucket y hacer `wrangler deploy`.
+# routes = [
+#   { pattern = "contrib.TUDOMINIO/api/*", zone_name = "TUDOMINIO" }
+# ]

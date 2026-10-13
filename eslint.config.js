@@ -57,6 +57,21 @@ export default tseslint.config(
     },
   },
   {
+    // Worker de Cloudflare (runtime propio: fetch API + WebCrypto).
+    files: ['workers/**/*.js'],
+    languageOptions: {
+      globals: {
+        Response: 'readonly',
+        Request: 'readonly',
+        Headers: 'readonly',
+        URL: 'readonly',
+        crypto: 'readonly',
+        fetch: 'readonly',
+        console: 'readonly',
+      },
+    },
+  },
+  {
     files: ['*.cjs'],
     languageOptions: {
       sourceType: 'commonjs',
