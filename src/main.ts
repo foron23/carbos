@@ -31,6 +31,8 @@ import type { DetectionClient, DetectionResult, InferencePhase, TopKEntry } from
 import { decryptVault, encryptVault, isEncrypted } from './export/crypto';
 import { setupInsulin } from './insulin';
 import type { InsulinHandle } from './insulin';
+import { isChatEnabled, setChatDisabled, setChatEnabled, setupChat } from './chat';
+import type { ChatHandle } from './chat';
 
 interface Draft {
   origin: 'manual' | 'photo';
@@ -68,6 +70,7 @@ function storeViewDate(isoDate: string): void {
 
 let currentDate = readViewDate() ?? today();
 let insulin: InsulinHandle | null = null;
+let chat: ChatHandle | null = null;
 
 /** Mensajes de estado: se guarda la clave para poder retraducirlos. */
 const statusKeys = new Map<string, StringKey>();
@@ -258,12 +261,14 @@ app.innerHTML = `
     <p class="muted" data-i18n="storage.notice"></p>
   </details>
 
-  <details class="card">
+  <details class="card" id="settings">
     <summary data-i18n="section.settings"></summary>
     <p><button id="persist" type="button" data-i18n="button.persist"></button></p>
     <p id="persist-status" class="muted" aria-live="polite"></p>
     <label class="check"><input id="insulin-toggle" type="checkbox" /> <span data-i18n="settings.insulinModule"></span></label>
     <div id="insulin-host" hidden></div>
+    <label class="check"><input id="chat-toggle" type="checkbox" /> <span data-i18n="settings.chatModule"></span></label>
+    <div id="chat-host" hidden></div>
   </details>
 
   <footer>
@@ -726,6 +731,7 @@ function render(): void {
   renderDiary();
   relocalizeStatuses();
   insulin?.refresh();
+  chat?.refresh();
 }
 
 async function refresh(): Promise<void> {
@@ -940,6 +946,22 @@ function wire(): void {
     byId<HTMLInputElement>('insulin-toggle'),
     () => locale,
   );
+  const chatToggle = byId<HTMLInputElement>('chat-toggle');
+  chatToggle.checked = isChatEnabled();
+  chatToggle.addEventListener('change', () => {
+    const enabled = chatToggle.checked;
+    setChatEnabled(enabled);
+    if (enabled) setChatDisabled(false);
+    chat?.reload();
+  });
+  chat = setupChat(byId('chat-host'), {
+    getLocale: () => locale,
+    getDate: () => currentDate,
+    setDate: (date) => setDay(date),
+    refresh: () => {
+      void refresh();
+    },
+  });
   renderExportReminder();
 }
 

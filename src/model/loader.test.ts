@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fetchManifest, loadAsset, sha256Hex, verifySha256 } from './loader';
+import { z } from 'zod';
+import { fetchJson, fetchManifest, loadAsset, sha256Hex, verifySha256 } from './loader';
 import type { Fetcher } from './loader';
 
 const hash = 'a'.repeat(64);
@@ -57,6 +58,35 @@ describe('fetchManifest', () => {
         Promise.resolve(Response.json({ detector: manifest.detector })),
       ),
     ).rejects.toThrow();
+  });
+});
+
+describe('fetchJson', () => {
+  const schema = z.object({ name: z.string().min(1), bytes: z.number().int() }).strict();
+
+  it('descarga y valida contra el esquema dado', async () => {
+    const result = await fetchJson(
+      'https://example.com/data.json',
+      schema,
+      responder(JSON.stringify({ name: 'chat', bytes: 7 })),
+    );
+    expect(result).toEqual({ name: 'chat', bytes: 7 });
+  });
+
+  it('lanza si la respuesta no es valida', async () => {
+    await expect(
+      fetchJson('https://example.com/data.json', schema, responder(JSON.stringify({ name: '' }))),
+    ).rejects.toThrow();
+  });
+
+  it('lanza con el prefijo manifest si la respuesta no es ok', async () => {
+    await expect(
+      fetchJson(
+        'https://example.com/data.json',
+        schema,
+        responder('nope', { status: 404, statusText: 'Not Found' }),
+      ),
+    ).rejects.toThrow(/manifest 404/);
   });
 });
 

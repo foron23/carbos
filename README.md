@@ -15,6 +15,7 @@ de tu dispositivo.
 - Comparacion de modelos (writeup): [`docs/specs/11-comparacion-modelos.md`](docs/specs/11-comparacion-modelos.md)
 - Feedback de usuarios (diferido): [`docs/specs/12-feedback.md`](docs/specs/12-feedback.md)
 - Atajos de correccion y lectura del dia: [`docs/specs/13-atajos-y-dia.md`](docs/specs/13-atajos-y-dia.md)
+- Chat on-device (v1.1): [`docs/specs/14-chat.md`](docs/specs/14-chat.md)
 - Contrato de trabajo: [`docs/receta-de-codigo.md`](docs/receta-de-codigo.md)
 
 ## Estado
@@ -39,6 +40,13 @@ siguiente paso es **fine-tuning al catalogo** o **destilacion** (D32). Aviso: Nu
 cafeterias de California, asi que la cifra es **comparable**, no representativa de cocina espanola;
 el set propio pesado sigue como **deuda declarada** (D25). Detalle en
 [`docs/specs/11-comparacion-modelos.md`](docs/specs/11-comparacion-modelos.md).
+
+**v1.1 (Fase 3, chat on-device):** diseno en [`docs/specs/14-chat.md`](docs/specs/14-chat.md) e
+implementada la **fundacion**: esquema cerrado de intenciones con Zod validado antes de ejecutar,
+tarjeta de confirmacion (**propone, no ejecuta**), carga diferida con degradacion (iPhone incluido)
+y frontera regulatoria que impide que el chat entre en el camino del calculo. El chat es **opt-in**
+y sigue **oculto** hasta publicar los pesos y `public/chat-manifest.json`; la precision de
+intenciones queda como **gate con pesos** (D8/D12).
 
 Detalle por entregable: [`docs/specs/02-fase1.md`](docs/specs/02-fase1.md).
 

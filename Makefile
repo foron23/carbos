@@ -39,6 +39,8 @@ TRAIN_DATA ?= training/data
 TRAIN_OUT  ?= training/out
 TRAIN_ARGS ?=
 EXPORT_ARGS ?=
+# Destilacion Swin -> MobileNetV3 (ver training/distill.py). Requiere tools/shortlist/.venv.
+DISTILL_ARGS ?=
 
 # --- Pesos de produccion ----------------------------------------------------
 # Ver docs/specs/03-despliegue.md. Genera weights/ (en este repo) + el manifest.
@@ -52,7 +54,7 @@ WEIGHTS_ARGS    ?=
 EVAL_ARGS ?= --manifest public/model-manifest.json --root public --limit 25
 
 .PHONY: help setup install build test e2e lint format format-check check run dev clean \
-        build-stamp verify-bundle train-setup train train-smoke export-model catalog \
+        build-stamp verify-bundle train-setup train train-smoke export-model distill catalog \
         weights-manifest smoke-setup smoke-models smoke-clean eval
 
 ## help: Show this help
@@ -221,6 +223,10 @@ train-smoke:
 ## export-model: Exporta a ONNX int8 y escribe el manifest del clasificador
 export-model:
 	$(PYTHON) training/export_onnx.py --model $(TRAIN_OUT)/model.pt --out $(TRAIN_OUT) $(EXPORT_ARGS)
+
+## distill: Destila Swin Food-101 int8 -> MobileNetV3-Large (requiere tools/shortlist/.venv)
+distill:
+	tools/shortlist/.venv/bin/python training/distill.py --stage all --out $(TRAIN_OUT) $(DISTILL_ARGS)
 
 ## catalog: Regenera src/catalog/catalog.ts desde Ciqual 2020 (tools/catalog/build_catalog.py)
 catalog:

@@ -673,6 +673,47 @@ details[open] > summary::after {
   font-size: 1rem;
 }
 
+/* --- Chat (v1.1) -------------------------------------------------------- */
+
+.chat-panel {
+  margin-block-start: 0.6rem;
+}
+
+.chat-panel > legend {
+  font-weight: 600;
+}
+
+.chat-card {
+  margin-block-start: 0.6rem;
+  padding: 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.chat-card h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.chat-items {
+  margin: 0.4rem 0;
+  padding-inline-start: 1.1rem;
+  font-size: 0.9rem;
+}
+
+.chat-items li {
+  margin-block-end: 0.2rem;
+}
+
+.chat-card .muted {
+  font-size: 0.85rem;
+}
+
+#chat-status:empty {
+  display: none;
+}
+
 /* --- Movimiento --------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {

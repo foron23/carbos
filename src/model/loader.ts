@@ -1,3 +1,4 @@
+import type { ZodType } from 'zod';
 import { modelManifestSchema } from './manifest';
 import type { ModelEntry, ModelManifest } from './manifest';
 
@@ -19,10 +20,23 @@ export async function verifySha256(data: ArrayBuffer, expected: string): Promise
   return (await sha256Hex(data)) === expected.toLowerCase();
 }
 
-export async function fetchManifest(url: string, fetcher: Fetcher = fetch): Promise<ModelManifest> {
+/**
+ * Descarga un JSON y lo valida contra un esquema Zod. Aditivo: `fetchManifest` lo reutiliza y
+ * el chat lo usa con su propio esquema (`public/chat-manifest.json`), sin tocar el contrato de
+ * foto. El prefijo del error se mantiene para no cambiar el comportamiento existente.
+ */
+export async function fetchJson<T>(
+  url: string,
+  schema: ZodType<T>,
+  fetcher: Fetcher = fetch,
+): Promise<T> {
   const response = await fetcher(url, { cache: 'no-cache' });
   if (!response.ok) throw new Error(`manifest ${response.status}`);
-  return modelManifestSchema.parse(await response.json());
+  return schema.parse(await response.json());
+}
+
+export function fetchManifest(url: string, fetcher: Fetcher = fetch): Promise<ModelManifest> {
+  return fetchJson(url, modelManifestSchema, fetcher);
 }
 
 export async function fetchWithProgress(

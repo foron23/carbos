@@ -382,6 +382,49 @@ export const scenarios = [
     },
   },
   {
+    name: 'el chat propone una comida y no escribe hasta confirmar',
+    async run(page, ctx) {
+      await page.evaluateOnNewDocument(() => {
+        localStorage.setItem('carbos.chat.enabled', 'true');
+        window.__carbosChatStub = {
+          available: true,
+          client: {
+            ready: Promise.resolve(),
+            chat: () =>
+              Promise.resolve({
+                text: '{"action":"log_meal","items":[{"query":"pan blanco","grams":100}]}',
+                model: 'stub',
+              }),
+            dispose: () => {},
+          },
+        };
+      });
+      await openApp(page, ctx.base);
+      await page.$eval('#settings', (el) => {
+        el.open = true;
+      });
+      await waitFor(page, '#chat-input');
+      await setValue(page, '#chat-input', 'cien gramos de pan blanco');
+      await click(page, '#chat-send');
+      await waitFor(page, '#chat-confirm');
+      assertEqual(
+        await page.$eval('#chat-card', (el) => el.hidden),
+        false,
+        'la tarjeta de confirmacion aparece',
+      );
+      const beforeMeals = await readStore(page, 'meals');
+      const beforeInsulin = await readStore(page, 'insulin');
+      assertEqual(beforeMeals.length, 0, 'sin comidas antes de confirmar');
+      assertEqual(beforeInsulin.length, 0, 'sin insulina antes de confirmar');
+      await click(page, '#chat-confirm');
+      await waitForText(page, '#diary', 'Pan blanco');
+      const meals = await readStore(page, 'meals');
+      assertEqual(meals.length, 1, 'una comida escrita tras confirmar');
+      assertEqual(meals[0]?.origin, 'manual', 'origen manual confirmado');
+      await screenshot(page, 'chat-confirmacion');
+    },
+  },
+  {
     name: 'instala la PWA y sirve offline tras la primera carga',
     async run(page, ctx) {
       await page.evaluateOnNewDocument(() => localStorage.setItem('carbos.locale', 'es'));

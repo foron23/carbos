@@ -26,6 +26,25 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/chat/**/*.ts'],
+    rules: {
+      // Frontera regulatoria (D8/D10/D12): el chat nunca importa el modulo de insulina.
+      // Refuerza src/chat/boundary.test.ts a nivel de lint.
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/insulin', '**/insulin/**', 'insulin', 'insulin/**'],
+              message:
+                'La frontera regulatoria prohibe que el chat importe el modulo de insulina (D8/D10/D12).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['public/sw.js'],
     languageOptions: {
       globals: {
