@@ -8,8 +8,8 @@ binding = "CONTRIB"
 bucket_name = "carbos-contributions"
 
 [vars]
-# Origenes permitidos (la app). Separa por comas; vacio = cualquiera (NO recomendado).
-ALLOWED_ORIGINS = "https://carbos.foron.dev,https://foron23.github.io"
+# Origen permitido (la app). Vacio = cualquiera (NO recomendado).
+ALLOWED_ORIGINS = "https://carbos.foron.dev"
 # Tamano maximo del bundle en bytes (25 MB por defecto).
 MAX_BYTES = "26214400"
 # Tope duro de objetos en el bucket (proteccion de coste; ver README).
