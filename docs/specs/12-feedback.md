@@ -81,5 +81,6 @@ email) quedan como plan B.
 **Diferido en la app, pero con el receptor listo.** Decisiones cerradas el 2026-10-13 (D38):
 licencia **CC0-1.0**, recepcion **sin servidor** via bundle + `tools/data/import_contributions.py`,
 y **publicacion del dataset diferida** (de momento no se redistribuyen imagenes; solo se acumulan
-localmente en `data/contrib/`). Falta implementar el **export del bundle en la app** (opt-in), que
-se hara cuando la app este mas establecida.
+localmente en `data/contrib/`). El **export del bundle en la app** (opt-in) se especifica en
+[`15-subida-contribuciones.md`](15-subida-contribuciones.md) (D39) y se implementara cuando la app
+este mas establecida.

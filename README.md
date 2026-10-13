@@ -16,6 +16,7 @@ de tu dispositivo.
 - Feedback de usuarios (diferido): [`docs/specs/12-feedback.md`](docs/specs/12-feedback.md)
 - Atajos de correccion y lectura del dia: [`docs/specs/13-atajos-y-dia.md`](docs/specs/13-atajos-y-dia.md)
 - Chat on-device (v1.1): [`docs/specs/14-chat.md`](docs/specs/14-chat.md)
+- Subida de contribuciones desde la app: [`docs/specs/15-subida-contribuciones.md`](docs/specs/15-subida-contribuciones.md)
 - Contrato de trabajo: [`docs/receta-de-codigo.md`](docs/receta-de-codigo.md)
 
 ## Estado
