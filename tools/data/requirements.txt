@@ -1,0 +1,14 @@
+# Dependencias del pipeline de imagenes + etiquetado (tools/data/, D25/spec 12).
+#
+# fetch_images.py usa SOLO la libreria estandar de Python 3 (urllib, json, ...):
+#   python3 tools/data/fetch_images.py --all --per-class 20 --free-only
+#
+# review_labels.py usa CLIP (transformers) + torch + Pillow. Se ejecuta con el venv
+# de la shortlist (tools/shortlist/.venv), que ya trae estas dependencias:
+#   tools/shortlist/.venv/bin/python tools/data/review_labels.py --images data/images --synonyms
+#
+# Nota: en ese venv debe quedar huggingface_hub<1.0 (compatible con transformers 4.5x).
+# No instalar `datasets` ni `optimum` (no se usan y fuerzan huggingface_hub>=1.31).
+transformers>=4.40
+torch>=2.2
+Pillow>=10.0

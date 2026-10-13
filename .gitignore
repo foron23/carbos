@@ -11,6 +11,9 @@ e2e/tmp/
 # Entrenamiento (datos y pesos nunca al repo; ver docs/specs/08-linear-probe.md)
 training/data/
 training/out/
+# Imagenes descargadas (Wikimedia Commons) y etiquetas propuestas/revisadas (D25/spec 12)
+# Solo el directorio raiz data/ (no tools/data/, que es codigo)
+/data/
 __pycache__/
 *.pyc
 *.pt
