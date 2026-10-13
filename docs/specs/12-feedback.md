@@ -43,7 +43,30 @@ foto) contribuir esa imagen con su **etiqueta confirmada**. Se acumula un datase
 - **Herramientas de revision (mantenedor)**: `confirm_labels.py` (CLI interactiva) y
   `label_server.py` (**servidor local** en el navegador, `make data-label`) comparten la misma cola
   y escriben en `data/confirmed` con `reviewed:true`. Los modos automaticos escriben en
-  `data/proposed` con `reviewed:false`: **propuesto no es confirmado**.
+  `data/proposed` con `reviewed:false`: **propuesto no es confirmado**. El servidor agrupa por clase
+  y ofrece operaciones en volumen (aceptar la clase, solo las `agree`, o saltarla).
+
+## Formato del bundle (congelado v1)
+
+```
+contributions-<ts>.zip
+  consent.json   {"format":"carbos-contrib","version":1,"license":"CC0-1.0",
+                  "granted_at":"...","app_version":"...","images":N}
+  metadata.csv   cabecera `path,class_id`; una fila por imagen
+  images/<class_id>/<nombre>.<ext>
+```
+
+- `license` debe ser **CC0-1.0** (D38); cualquier otro valor **rechaza el bundle entero**.
+- Recortes sin EXIF/GPS; sin cuentas ni identificadores.
+- **Congelado**: cambios incompatibles suben `version`. El receptor
+  (`tools/data/import_contributions.py`) valida este contrato.
+
+## Recepcion en Cloudflare (R2)
+
+Endpoint **serverless** (Cloudflare Workers + R2) que recibe el bundle y lo guarda; pasos, codigo
+y pruebas en [`workers/contrib/README.md`](../../workers/contrib/README.md). Es la via **mas
+automatica con mantenimiento casi nulo** (plan gratuito); alternativas sin infra (formulario,
+email) quedan como plan B.
 
 ## Privacidad y riesgos
 
