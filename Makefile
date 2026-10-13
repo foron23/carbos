@@ -41,6 +41,13 @@ TRAIN_ARGS ?=
 EXPORT_ARGS ?=
 # Destilacion Swin -> MobileNetV3 (ver training/distill.py). Requiere tools/shortlist/.venv.
 DISTILL_ARGS ?=
+# Destilacion CLIP (zero-shot) -> catalogo (ver training/distill_clip.py).
+DISTILL_CLIP_ARGS ?=
+# Fuente de imagenes + etiquetado asistido (ver tools/data/, D25/spec 12).
+DATA_ARGS ?= --classes pan_blanco,tomate --per-class 4
+# Revision/confirmacion de etiquetas y empaquetado del dataset.
+CONFIRM_ARGS ?= --queue data/labels/review.queue.jsonl
+PACKAGE_ARGS ?= --images data/images --format targz --out dist/dataset --free-only
 
 # --- Pesos de produccion ----------------------------------------------------
 # Ver docs/specs/03-despliegue.md. Genera weights/ (en este repo) + el manifest.
@@ -54,7 +61,8 @@ WEIGHTS_ARGS    ?=
 EVAL_ARGS ?= --manifest public/model-manifest.json --root public --limit 25
 
 .PHONY: help setup install build test e2e lint format format-check check run dev clean \
-        build-stamp verify-bundle train-setup train train-smoke export-model distill catalog \
+        build-stamp verify-bundle train-setup train train-smoke export-model distill distill-clip \
+        data-images data-review data-confirm data-package catalog \
         weights-manifest smoke-setup smoke-models smoke-clean eval
 
 ## help: Show this help
@@ -227,6 +235,26 @@ export-model:
 ## distill: Destila Swin Food-101 int8 -> MobileNetV3-Large (requiere tools/shortlist/.venv)
 distill:
 	tools/shortlist/.venv/bin/python training/distill.py --stage all --out $(TRAIN_OUT) $(DISTILL_ARGS)
+
+## distill-clip: Destila CLIP (zero-shot) al catalogo -> MobileNetV3 (requiere tools/shortlist/.venv)
+distill-clip:
+	tools/shortlist/.venv/bin/python training/distill_clip.py --stage all --out $(TRAIN_OUT) $(DISTILL_CLIP_ARGS)
+
+## data-images: Descarga imagenes por clase del catalogo desde Wikimedia Commons
+data-images:
+	python3 tools/data/fetch_images.py $(DATA_ARGS)
+
+## data-review: CLIP propone la clase del catalogo y marca lo que hay que revisar
+data-review:
+	tools/shortlist/.venv/bin/python tools/data/review_labels.py $(DATA_ARGS)
+
+## data-confirm: Revisa la cola y materializa data/confirmed (etiquetas confirmadas)
+data-confirm:
+	python3 tools/data/confirm_labels.py $(CONFIRM_ARGS)
+
+## data-package: Empaqueta el dataset (imagenes + etiquetas + atribucion) para compartir
+data-package:
+	python3 tools/data/package_dataset.py $(PACKAGE_ARGS)
 
 ## catalog: Regenera src/catalog/catalog.ts desde Ciqual 2020 (tools/catalog/build_catalog.py)
 catalog:
