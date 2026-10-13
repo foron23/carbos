@@ -3,9 +3,10 @@ import { SCHEMA_VERSION, emptyVault } from './types';
 import { upgradeMeal } from './migrate';
 
 const DB_NAME = 'carbos';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_MEALS = 'meals';
 const STORE_INSULIN = 'insulin';
+const STORE_CONTRIBUTIONS = 'contributions';
 
 export function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -18,13 +19,16 @@ export function openDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE_INSULIN)) {
         db.createObjectStore(STORE_INSULIN, { keyPath: 'id' });
       }
+      if (!db.objectStoreNames.contains(STORE_CONTRIBUTIONS)) {
+        db.createObjectStore(STORE_CONTRIBUTIONS, { keyPath: 'id' });
+      }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
 }
 
-function tx<T>(
+export function tx<T>(
   storeName: string,
   mode: IDBTransactionMode,
   run: (store: IDBObjectStore) => IDBRequest<T>,
@@ -80,4 +84,4 @@ export function replaceVault(vault: Vault): Promise<void> {
   );
 }
 
-export { emptyVault };
+export { emptyVault, STORE_CONTRIBUTIONS };
