@@ -87,15 +87,64 @@ export const scenarios = [
     },
   },
   {
+    name: 'corrige la cantidad con atajos y porciones',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await addFood(page, 'manzana');
+      const grams = () => page.$eval('#draft-items input[type="number"]', (el) => Number(el.value));
+      const initial = await grams();
+      assert(initial > 1, 'la porcion por defecto es mayor que 1 g');
+
+      await click(page, '.draft-shortcuts button:nth-child(2)');
+      const doubled = await grams();
+      assert(doubled > initial && doubled >= 1, 'doble aumenta la cantidad');
+
+      await click(page, '.draft-shortcuts button:nth-child(1)');
+      const halved = await grams();
+      assert(halved >= 1 && halved < doubled, 'mitad reduce la cantidad');
+
+      await click(page, '.draft-portions button:nth-child(1)');
+      const small = await grams();
+      assert(small >= 1 && small < halved, 'pequeno queda por debajo de la cantidad');
+
+      await click(page, '.draft-portions button:nth-child(3)');
+      const large = await grams();
+      assert(large > small && large >= 1, 'grande supera a pequeno');
+
+      await click(page, '.draft-portions button:nth-child(2)');
+      const medium = await grams();
+      assert(medium >= 1, 'mediano conserva la cantidad');
+
+      if (await page.$('#detect-results select')) {
+        await waitFor(page, '#draft-items .detect-alt');
+      }
+
+      await screenshot(page, 'atajos-porciones');
+    },
+  },
+  {
     name: 'captura una foto sin salir del dispositivo',
     async run(page, ctx) {
       await openApp(page, ctx.base);
+
+      const manifest = await page.evaluate(async (base) => {
+        const res = await fetch(`${base}model-manifest.json`);
+        return res.json();
+      }, ctx.base);
+      const declared = new Set();
+      for (const entry of Object.values(manifest ?? {})) {
+        if (entry && typeof entry === 'object' && typeof entry.url === 'string') {
+          declared.add(entry.url);
+        }
+      }
+      assert(declared.size > 0, 'el manifest declara los pesos del modelo');
+
       const external = [];
       page.on('request', (request) => {
         const url = request.url();
-        if (!url.startsWith(ctx.base) && !url.startsWith('data:') && !url.startsWith('blob:')) {
-          external.push(url);
-        }
+        if (url.startsWith(ctx.base) || url.startsWith('data:') || url.startsWith('blob:')) return;
+        if (declared.has(url)) return;
+        external.push(url);
       });
       await uploadFile(page, '#file-input', ctx.fixturePng);
       await page.waitForFunction(
@@ -111,7 +160,7 @@ export const scenarios = [
       assertEqual(
         external.length,
         0,
-        `sin peticiones externas con la imagen (${external.join(', ')})`,
+        `sin peticiones externas fuera del manifest (${external.join(', ')})`,
       );
       await screenshot(page, 'foto');
     },
@@ -126,6 +175,14 @@ export const scenarios = [
       const day = parseFloat(await text(page, '#day-total'));
       const week = parseFloat(await text(page, '#week-total'));
       assert(day > 0 && week >= day, 'la semana cubre al menos el dia');
+      assert(Number.isFinite(week), 'el total semanal es numerico');
+      const bars = await page.$$eval('#week-bars .week-day', (nodes) => nodes.length);
+      assertEqual(bars, 7, 'siete barras de dia');
+      const active = await page.$$eval(
+        '#week-bars .week-day[data-active]',
+        (nodes) => nodes.length,
+      );
+      assertEqual(active, 1, 'un solo dia activo');
       await screenshot(page, 'semana');
     },
   },
@@ -160,11 +217,64 @@ export const scenarios = [
       await setValue(page, '#ins-time', '08:30');
       await setValue(page, '#ins-units', '4');
       await click(page, '#add-insulin');
-      await waitForText(page, '#insulin-list', '08:30');
+      await waitForText(page, '#diary', '08:30');
       const logs = await readStore(page, 'insulin');
       assertEqual(logs.length, 1, 'un registro de insulina');
       assertEqual(logs[0]?.units, 4, 'unidades tal cual');
       await screenshot(page, 'insulina');
+    },
+  },
+  {
+    name: 'edita la hora de una comida y la conserva al recargar',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await addFood(page, 'pan');
+      await register(page);
+      await waitForText(page, '#diary', 'Pan');
+      await page.$eval('#diary input[type="time"]', (el) => {
+        el.value = '07:15';
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      for (let i = 0; i < 60; i += 1) {
+        const meals = await readStore(page, 'meals');
+        if (meals[0]?.time === '07:15') break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      await reload(page);
+      await waitFor(page, '#app header h1');
+      await waitForText(page, '#diary', 'Pan');
+      const value = await page.$eval('#diary input[type="time"]', (el) => el.value);
+      assertEqual(value, '07:15', 'la hora editada persiste tras recargar');
+      const meals = await readStore(page, 'meals');
+      assertEqual(meals[0]?.time, '07:15', 'la hora guardada es la editada');
+      await screenshot(page, 'hora-editada');
+    },
+  },
+  {
+    name: 'ordena comidas e insulina en una sola linea de tiempo',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await addFood(page, 'pan');
+      await register(page);
+      await waitForText(page, '#diary', 'Pan');
+      await page.$eval('#diary input[type="time"]', (el) => {
+        el.value = '09:00';
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      for (let i = 0; i < 60; i += 1) {
+        const meals = await readStore(page, 'meals');
+        if (meals[0]?.time === '09:00') break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      await setValue(page, '#ins-time', '08:30');
+      await setValue(page, '#ins-units', '4');
+      await click(page, '#add-insulin');
+      await waitForText(page, '#diary', '08:30');
+      const kinds = await page.$$eval('#diary .timeline-row', (rows) =>
+        rows.map((row) => (row.querySelector('input[type="time"]') ? 'meal' : 'insulin')),
+      );
+      assertEqual(kinds.join(','), 'insulin,meal', 'la insulina anterior precede a la comida');
+      await screenshot(page, 'linea-tiempo');
     },
   },
   {
@@ -177,7 +287,7 @@ export const scenarios = [
       const download = await captureDownload(page, '#export');
       assert(download, 'se dispara la descarga');
       const parsed = JSON.parse(download.body);
-      assertEqual(parsed.version, 2, 'version de esquema en el export');
+      assertEqual(parsed.version, 3, 'version de esquema en el export');
       assertEqual(parsed.meals.length, 1, 'el export lleva la comida');
       const file = join(ctx.tmpDir, 'plain.json');
       await writeFile(file, download.body, 'utf8');
@@ -222,11 +332,11 @@ export const scenarios = [
       await setValue(page, '#locale', 'en');
       await waitForText(page, 'header p', 'Count carbs');
       assertEqual(await text(page, 'header h1'), 'Carbos', 'el nombre no se traduce');
-      const slot = await page.$eval(
-        '#draft-slot option[value="breakfast"]',
-        (el) => el.textContent,
+      assertEqual(
+        await page.$eval('#app [data-i18n="section.addFood"]', (el) => el.textContent),
+        'Add food',
+        'los textos se traducen',
       );
-      assertEqual(slot, 'Breakfast', 'las comidas se traducen');
       assertEqual(await page.title(), 'Carbos · carbs on your device', 'el titulo sigue al idioma');
       assertEqual(
         await page.$eval('link[rel="manifest"]', (el) => el.getAttribute('href')),

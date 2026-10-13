@@ -1,19 +1,25 @@
 import './style.css';
 import {
+  applyAlternative,
   dayCarbs,
+  dayTimeline,
   emptyVault,
   fromJson,
   itemCarbs,
   loadVault,
+  mealCarbs,
+  portionGrams,
+  PORTION_SIZES,
   putInsulin,
   putMeal,
   replaceVault,
   roundCarbs,
-  slotCarbs,
+  scaleGrams,
+  selectableTopk,
   toJson,
-  weekCarbs,
+  weekBreakdown,
 } from './core';
-import type { FoodItem, InsulinKind, Meal, MealSlot, Vault } from './core';
+import type { FoodItem, InsulinKind, InsulinLog, Meal, PortionSize, Vault, WeekDay } from './core';
 import { CATALOG, searchFoods } from './catalog';
 import type { Food } from './catalog';
 import { detectLocale, isLocale, isStringKey, storeLocale, t } from './i18n';
@@ -26,10 +32,7 @@ import { decryptVault, encryptVault, isEncrypted } from './export/crypto';
 import { setupInsulin } from './insulin';
 import type { InsulinHandle } from './insulin';
 
-const SLOTS: readonly MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
-
 interface Draft {
-  slot: MealSlot;
   origin: 'manual' | 'photo';
   items: FoodItem[];
 }
@@ -44,6 +47,7 @@ let locale: Locale = detectLocale();
  */
 const VIEW_DATE_KEY = 'carbos.viewDate';
 const VIEW_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_RE = /^\d{2}:\d{2}$/;
 
 function readViewDate(): string | null {
   try {
@@ -76,7 +80,7 @@ function setStatus(id: string, key: StringKey): void {
 function relocalizeStatuses(): void {
   for (const [id, key] of statusKeys) byId(id).textContent = tr(key);
 }
-let draft: Draft = { slot: 'breakfast', origin: 'manual', items: [] };
+let draft: Draft = { origin: 'manual', items: [] };
 let capture: CapturedImage | null = null;
 let vault: Vault = emptyVault();
 
@@ -122,16 +126,20 @@ function today(): string {
   return isoDay(new Date());
 }
 
+/** Hora local en HH:MM, con ceros a la izquierda. */
+function nowTime(): string {
+  const date = new Date();
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
 function uid(): string {
   return globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
 }
 
 function tr(key: StringKey): string {
   return t(locale, key);
-}
-
-function slotOptions(): string {
-  return SLOTS.map((slot) => `<option value="${slot}" data-i18n="slot.${slot}"></option>`).join('');
 }
 
 const app = byId('app');
@@ -172,6 +180,7 @@ app.innerHTML = `
       <output id="day-total" class="total" aria-live="polite"></output>
       <span class="chip"><span data-i18n="diary.week"></span>: <output id="week-total"></output></span>
     </p>
+    <ul id="week-bars" class="week-bars" aria-hidden="true"></ul>
     <label for="date" data-i18n="field.date"></label>
     <div class="row daynav">
       <button id="day-prev" type="button" data-i18n-aria="nav.prevDay">\u2039</button>
@@ -200,8 +209,6 @@ app.innerHTML = `
 
   <fieldset class="card">
     <legend data-i18n="section.addFood"></legend>
-    <label for="draft-slot" data-i18n="field.slot"></label>
-    <select id="draft-slot">${slotOptions()}</select>
     <label for="food-search" data-i18n="field.search"></label>
     <div class="row">
       <input id="food-search" type="search" autocomplete="off" />
@@ -234,7 +241,6 @@ app.innerHTML = `
       </label>
     </div>
     <p><button id="add-insulin" type="button" data-i18n="button.addInsulin"></button></p>
-    <ul id="insulin-list"></ul>
   </fieldset>
 
   <details class="card">
@@ -309,8 +315,22 @@ function addFoodToDraft(food: Food): void {
     name: food.name[locale],
     grams: food.defaultPortionGrams,
     carbsPer100g: food.carbsPer100g,
+    classId: food.id,
   });
   renderDraft();
+}
+
+function actionButton(key: StringKey, name: string, onClick: () => void): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = tr(key);
+  button.setAttribute('aria-label', `${tr(key)} ${name}`);
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+function portionKey(size: PortionSize): StringKey {
+  return `portion.${size}`;
 }
 
 function renderSearch(): void {
@@ -370,15 +390,63 @@ function renderDraft(): void {
       const carbs = document.createElement('span');
       carbs.className = 'muted';
       carbs.textContent = `${roundCarbs(itemCarbs(item))} ${tr('unit.grams')}`;
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.textContent = tr('button.remove');
-      remove.setAttribute('aria-label', `${tr('button.remove')} ${item.name}`);
-      remove.addEventListener('click', () => {
+      row.append(name, gramsLabel, carbs);
+
+      const food = foodById(item.classId);
+      if (food) {
+        const portions = document.createElement('div');
+        portions.className = 'draft-portions';
+        for (const size of PORTION_SIZES) {
+          portions.appendChild(
+            actionButton(portionKey(size), item.name, () => {
+              item.grams = portionGrams(food.defaultPortionGrams, size);
+              renderDraft();
+            }),
+          );
+        }
+        row.appendChild(portions);
+      }
+
+      const shortcuts = document.createElement('div');
+      shortcuts.className = 'draft-shortcuts';
+      shortcuts.append(
+        actionButton('button.half', item.name, () => {
+          item.grams = scaleGrams(item.grams, 0.5);
+          renderDraft();
+        }),
+        actionButton('button.double', item.name, () => {
+          item.grams = scaleGrams(item.grams, 2);
+          renderDraft();
+        }),
+      );
+      row.appendChild(shortcuts);
+
+      const detectionIndex = detectionDraftIds.indexOf(item.id);
+      const result = detectionIndex >= 0 ? detections[detectionIndex] : undefined;
+      const alternatives = result ? selectableTopk(result.topk) : [];
+      if (alternatives.length > 1) {
+        const select = document.createElement('select');
+        select.className = 'detect-alt';
+        select.setAttribute('aria-label', tr('button.change'));
+        alternatives.forEach((entry, altIndex) => {
+          const option = document.createElement('option');
+          option.value = String(altIndex);
+          option.textContent = `${topkLabel(entry)} ${Math.round(entry.p * 100)}%`;
+          select.appendChild(option);
+        });
+        select.addEventListener('change', () => {
+          const chosen = alternatives[Number(select.value)];
+          if (chosen) chooseDetection(detectionIndex, chosen);
+        });
+        row.appendChild(select);
+      }
+
+      const remove = actionButton('button.remove', item.name, () => {
         draft.items.splice(index, 1);
         renderDraft();
       });
-      row.append(name, gramsLabel, carbs, remove);
+      remove.className = 'remove';
+      row.appendChild(remove);
       list.appendChild(row);
     });
   }
@@ -406,7 +474,7 @@ function renderPhoto(): void {
   }
 }
 
-function foodById(id: string | null): Food | undefined {
+function foodById(id: string | null | undefined): Food | undefined {
   if (!id) return undefined;
   return CATALOG.foods.find((food) => food.id === id);
 }
@@ -436,13 +504,17 @@ function chooseDetection(index: number, entry: TopKEntry): void {
     ? draft.items.find((candidate) => candidate.id === existingId)
     : undefined;
   if (item) {
-    item.name = food.name[locale];
-    item.carbsPer100g = food.carbsPer100g;
-    item.classId = food.id;
+    const position = draft.items.indexOf(item);
+    draft.items[position] = applyAlternative(item, {
+      id: food.id,
+      name: food.name[locale],
+      carbsPer100g: food.carbsPer100g,
+    });
   } else {
     detectionDraftIds[index] = pushFood(food);
   }
   renderDraft();
+  renderDetect();
 }
 
 function applyDetections(results: DetectionResult[]): void {
@@ -480,19 +552,19 @@ function renderDetect(): void {
     name.className = 'draft-name';
     name.textContent = `${topkLabel(best)} · ${Math.round(best.p * 100)}%`;
     row.appendChild(name);
-    if (result.topk.length > 1) {
+    const alternatives = selectableTopk(result.topk);
+    if (alternatives.length > 1) {
       const select = document.createElement('select');
       select.className = 'detect-alt';
       select.setAttribute('aria-label', tr('detect.alternatives'));
-      result.topk.forEach((entry, altIndex) => {
+      alternatives.forEach((entry, altIndex) => {
         const option = document.createElement('option');
         option.value = String(altIndex);
         option.textContent = `${topkLabel(entry)} ${Math.round(entry.p * 100)}%`;
-        option.disabled = !entry.classId;
         select.appendChild(option);
       });
       select.addEventListener('change', () => {
-        const chosen = result.topk[Number(select.value)];
+        const chosen = alternatives[Number(select.value)];
         if (chosen) chooseDetection(index, chosen);
       });
       row.appendChild(select);
@@ -540,58 +612,106 @@ async function startDetection(image: CapturedImage): Promise<void> {
   }
 }
 
+function renderWeekBars(days: WeekDay[]): void {
+  const list = byId('week-bars');
+  const max = Math.max(0, ...days.map((day) => day.carbs));
+  const weekday = new Intl.DateTimeFormat(locale, { weekday: 'narrow', timeZone: 'UTC' });
+  list.innerHTML = '';
+  for (const day of days) {
+    const item = document.createElement('li');
+    item.className = 'week-day';
+    if (day.active) item.dataset.active = '';
+    const bar = document.createElement('span');
+    bar.className = 'week-bar';
+    const fill = document.createElement('span');
+    fill.className = 'week-fill';
+    fill.style.setProperty('--fill', String(max > 0 ? day.carbs / max : 0));
+    bar.appendChild(fill);
+    const label = document.createElement('span');
+    label.className = 'week-label';
+    label.textContent = weekday.format(new Date(`${day.date}T00:00:00Z`));
+    item.append(bar, label);
+    list.appendChild(item);
+  }
+}
+
 function renderToday(): void {
   byId('day-total').textContent =
     `${roundCarbs(dayCarbs(vault.meals, currentDate))} ${tr('unit.grams')}`;
-  const weekStart = currentDate;
-  byId('week-total').textContent =
-    `${roundCarbs(weekCarbs(vault.meals, weekStart))} ${tr('unit.grams')}`;
+  const days = weekBreakdown(vault.meals, currentDate);
+  const weekTotal = days.reduce((sum, day) => sum + day.carbs, 0);
+  byId('week-total').textContent = `${roundCarbs(weekTotal)} ${tr('unit.grams')}`;
+  renderWeekBars(days);
+}
+
+function timeInput(value: string, onCommit: (time: string) => void): HTMLInputElement {
+  const input = document.createElement('input');
+  input.type = 'time';
+  input.className = 'timeline-time';
+  input.value = value;
+  input.setAttribute('aria-label', tr('field.time'));
+  input.addEventListener('change', () => {
+    if (!TIME_RE.test(input.value)) {
+      input.value = value;
+      return;
+    }
+    onCommit(input.value);
+  });
+  return input;
+}
+
+function insulinBody(log: InsulinLog): string {
+  return `${log.units} ${tr('unit.units')} · ${tr(`kind.${log.kind}` as StringKey)}`;
 }
 
 function renderDiary(): void {
   const list = byId('diary');
-  const meals = vault.meals.filter((meal) => meal.date === currentDate);
-  if (meals.length === 0) {
+  const entries = dayTimeline(vault.meals, vault.insulin, currentDate);
+  if (entries.length === 0) {
     list.innerHTML = `<li class="muted">${tr('diary.empty')}</li>`;
     return;
   }
   list.innerHTML = '';
-  for (const meal of meals) {
-    const item = document.createElement('li');
-    const head = document.createElement('strong');
-    head.textContent = `${tr(`slot.${meal.slot}` as StringKey)} (${slotCarbs(vault.meals, currentDate, meal.slot)} ${tr('unit.grams')})`;
-    const detail = document.createElement('div');
-    detail.className = 'muted';
-    const items = meal.items
-      .map(
-        (food) =>
-          `${food.name} ${food.grams} ${tr('unit.grams')} (${roundCarbs(itemCarbs(food))} ${tr('unit.grams')})`,
-      )
-      .join(' · ');
-    detail.textContent = items;
-    item.append(head, detail);
-    if (meal.confidence !== null) {
-      const conf = document.createElement('span');
-      conf.className = 'muted';
-      conf.textContent = ` · ${tr('confidence.label')}: ${Math.round(meal.confidence * 100)}%`;
-      head.appendChild(conf);
+  for (const entry of entries) {
+    const row = document.createElement('li');
+    row.className = 'timeline-row';
+    if (entry.kind === 'meal') {
+      const meal = entry.meal;
+      row.appendChild(
+        timeInput(meal.time, (time) => {
+          void putMeal({ ...meal, time }).then(refresh);
+        }),
+      );
+      const body = document.createElement('div');
+      body.className = 'timeline-body';
+      const head = document.createElement('strong');
+      head.textContent = `${roundCarbs(mealCarbs(meal))} ${tr('unit.grams')}`;
+      if (meal.confidence !== null) {
+        const conf = document.createElement('span');
+        conf.className = 'muted';
+        conf.textContent = ` · ${tr('confidence.label')}: ${Math.round(meal.confidence * 100)}%`;
+        head.appendChild(conf);
+      }
+      const detail = document.createElement('div');
+      detail.className = 'muted';
+      detail.textContent = meal.items
+        .map(
+          (food) =>
+            `${food.name} ${food.grams} ${tr('unit.grams')} (${roundCarbs(itemCarbs(food))} ${tr('unit.grams')})`,
+        )
+        .join(' · ');
+      body.append(head, detail);
+      row.appendChild(body);
+    } else {
+      const time = document.createElement('span');
+      time.className = 'timeline-time';
+      time.textContent = entry.log.time;
+      const body = document.createElement('span');
+      body.className = 'timeline-body';
+      body.textContent = insulinBody(entry.log);
+      row.append(time, body);
     }
-    list.appendChild(item);
-  }
-}
-
-function renderInsulin(): void {
-  const list = byId('insulin-list');
-  const logs = vault.insulin.filter((log) => log.date === currentDate);
-  if (logs.length === 0) {
-    list.innerHTML = `<li class="muted">${tr('insulin.empty')}</li>`;
-    return;
-  }
-  list.innerHTML = '';
-  for (const log of logs) {
-    const item = document.createElement('li');
-    item.textContent = `${log.time} · ${log.units} ${tr('unit.units')} · ${tr(`kind.${log.kind}` as StringKey)}`;
-    list.appendChild(item);
+    list.appendChild(row);
   }
 }
 
@@ -604,7 +724,6 @@ function render(): void {
   renderDetect();
   renderSearch();
   renderDiary();
-  renderInsulin();
   relocalizeStatuses();
   insulin?.refresh();
 }
@@ -687,10 +806,6 @@ function wire(): void {
   byId<HTMLInputElement>('camera-input').addEventListener('change', onFile);
   byId<HTMLInputElement>('file-input').addEventListener('change', onFile);
 
-  byId<HTMLSelectElement>('draft-slot').addEventListener('change', () => {
-    draft.slot = byId<HTMLSelectElement>('draft-slot').value as MealSlot;
-  });
-
   let searchTimer: number | undefined;
   byId<HTMLInputElement>('food-search').addEventListener('input', () => {
     if (searchTimer !== undefined) window.clearTimeout(searchTimer);
@@ -715,7 +830,7 @@ function wire(): void {
     const meal: Meal = {
       id: uid(),
       date: currentDate,
-      slot: draft.slot,
+      time: nowTime(),
       items: draft.items.map((item) => ({ ...item })),
       confidence,
       origin: draft.origin,
@@ -725,7 +840,7 @@ function wire(): void {
           : undefined,
     };
     void putMeal(meal).then(() => {
-      draft = { slot: draft.slot, origin: 'manual', items: [] };
+      draft = { origin: 'manual', items: [] };
       capture = null;
       detections = [];
       detectionDraftIds = [];

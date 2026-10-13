@@ -37,7 +37,6 @@ const IGUALES_PERMITIDAS = new Set([
   'unit.grams',
   'unit.units',
   'label.total',
-  'slot.snack',
   'kind.basal',
   'diary.originManual',
 ]);
@@ -72,6 +71,32 @@ describe('cadenas de la interfaz', () => {
       (key) => !IGUALES_PERMITIDAS.has(key) && STRINGS.es[key] === STRINGS.en[key],
     );
     expect(sinTraducir).toEqual([]);
+  });
+
+  it('no queda ninguna clave de franja (slot) en ningun idioma', () => {
+    for (const locale of LOCALES) {
+      for (const key of Object.keys(STRINGS[locale])) {
+        expect(key.startsWith('slot.'), `${locale}.${key} es una clave de franja`).toBe(false);
+        expect(key, `${locale}.${key} no debe existir`).not.toBe('field.slot');
+      }
+    }
+  });
+
+  it('las claves nuevas de atajos y porciones existen en ambos idiomas', () => {
+    const nuevas = [
+      'button.half',
+      'button.double',
+      'button.change',
+      'portion.small',
+      'portion.medium',
+      'portion.large',
+    ] as const;
+    for (const key of nuevas) {
+      expect(isStringKey(key), `la clave ${key} debe existir`).toBe(true);
+      for (const locale of LOCALES) {
+        expect(t(locale, key), `${locale}.${key} falta`).not.toBe('');
+      }
+    }
   });
 
   it('reconoce las claves validas y rechaza el resto', () => {

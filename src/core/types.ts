@@ -1,5 +1,3 @@
-export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
-
 export type MealOrigin = 'manual' | 'photo';
 
 export interface TopK {
@@ -24,7 +22,7 @@ export interface FoodItem {
 export interface Meal {
   id: string;
   date: string;
-  slot: MealSlot;
+  time: string;
   items: FoodItem[];
   confidence: number | null;
   origin: MealOrigin;
@@ -41,7 +39,7 @@ export interface InsulinLog {
   kind: InsulinKind;
 }
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export interface Vault {
   version: number;

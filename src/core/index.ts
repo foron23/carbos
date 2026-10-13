@@ -2,5 +2,8 @@ export * from './types';
 export * from './schema';
 export * from './migrate';
 export * from './totals';
+export * from './portion';
+export * from './detection';
+export * from './timeline';
 export * from './export';
 export * from './db';

@@ -20,9 +20,12 @@ de tu dispositivo.
 ## Estado
 
 Fase 1 (nucleo) en marcha. Ya estan: **catalogo curado** (154 alimentos, generado desde Ciqual
-2020 con `make catalog`), diario con totales por dia/comida/semana, registro de insulina,
-**captura de foto on-device**, export JSON y **export cifrado** (Argon2id + AES-GCM), **ES/EN**,
-PWA offline e instalable y migracion de esquema. Ya esta el **runtime de inferencia** (ONNX en Web
+2020 con `make catalog`), diario con totales por dia/semana y **linea temporal del dia** que mezcla
+comidas e insulina, registro de insulina, **captura de foto on-device**, export JSON y **export
+cifrado** (Argon2id + AES-GCM), **ES/EN**, PWA offline e instalable y migracion de esquema. Ya estan
+los **atajos de correccion y la lectura del dia** (SPEC 13/D33-D37: mitad/doble/cambiar/quitar sin
+teclear, porciones tipicas, la comida gana **hora** y pierde la franja, y barras de la semana). Ya
+esta el **runtime de inferencia** (ONNX en Web
 Worker, WebGPU con fallback WASM, descarga diferida con sha256 y cache) y el **banco de medida**
 sobre Nutrition5k (`make eval`). El modelo elegido (D28) es **YOLO11n COCO + MobileNetV3-Large
 ImageNet int8**; los pesos viven en `weights/` (5.7 MB + 10.7 MB) y se publican desde este mismo

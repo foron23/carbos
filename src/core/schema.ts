@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { SCHEMA_VERSION } from './types';
 
 export const mealSlotSchema = z.enum(['breakfast', 'lunch', 'dinner', 'snack']);
+export const timeSchema = z.string().regex(/^\d{2}:\d{2}$/, 'hora esperada HH:MM');
 export const mealOriginSchema = z.enum(['manual', 'photo']);
 export const insulinKindSchema = z.enum(['bolus', 'basal']);
 
@@ -27,7 +28,7 @@ export const foodItemSchema = z.object({
 export const mealSchema = z.object({
   id: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'fecha esperada YYYY-MM-DD'),
-  slot: mealSlotSchema,
+  time: timeSchema,
   items: z.array(foodItemSchema),
   confidence: z.number().min(0).max(1).nullable(),
   origin: mealOriginSchema.default('manual'),

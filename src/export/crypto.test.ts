@@ -7,7 +7,7 @@ function vaultWithMeal() {
   vault.meals.push({
     id: 'm1',
     date: '2026-10-12',
-    slot: 'lunch',
+    time: '14:00',
     items: [{ id: 'f1', name: 'pan', grams: 60, carbsPer100g: 50 }],
     confidence: null,
     origin: 'manual',

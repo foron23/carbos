@@ -4,22 +4,53 @@ import { vaultSchema } from './schema';
 import { SCHEMA_VERSION, emptyVault } from './types';
 
 describe('exportacion JSON', () => {
-  it('toJson y fromJson hacen ida y vuelta', () => {
+  it('toJson y fromJson hacen ida y vuelta con time', () => {
     const vault = emptyVault();
     vault.meals.push({
       id: 'm1',
       date: '2026-10-12',
-      slot: 'lunch',
+      time: '14:00',
       items: [{ id: 'f1', name: 'tortilla', grams: 150, carbsPer100g: 4 }],
       confidence: 0.8,
       origin: 'manual',
     });
     const text = toJson(vault);
     expect(text).toContain(`"version": ${SCHEMA_VERSION}`);
+    const parsed = JSON.parse(text) as { meals: Record<string, unknown>[] };
+    expect(parsed.meals).toHaveLength(1);
+    for (const meal of parsed.meals) {
+      expect(meal).toHaveProperty('time');
+      expect(Object.prototype.hasOwnProperty.call(meal, 'slot')).toBe(false);
+    }
     expect(fromJson(text)).toEqual(vault);
   });
 
-  it('migra un export v1 anadiendo origin manual', () => {
+  it('un classId slot en el top-k no se confunde con la clave de franja', () => {
+    const vault = emptyVault();
+    vault.meals.push({
+      id: 'm1',
+      date: '2026-10-12',
+      time: '12:00',
+      items: [{ id: 'f1', name: 'slot', grams: 100, carbsPer100g: 10, classId: 'slot' }],
+      confidence: 0.5,
+      origin: 'photo',
+      model: {
+        detector: 'yolo',
+        classifier: 'mobilenet',
+        topk: [{ classId: 'slot', p: 0.9 }],
+      },
+    });
+    const parsed = JSON.parse(toJson(vault)) as {
+      meals: { time?: string; model?: { topk: { classId: string }[] } }[];
+    };
+    const meal = parsed.meals[0];
+    expect(meal).toHaveProperty('time');
+    expect(meal && Object.prototype.hasOwnProperty.call(meal, 'slot')).toBe(false);
+    expect(meal?.model?.topk[0]?.classId).toBe('slot');
+    expect(fromJson(toJson(vault))).toEqual(vault);
+  });
+
+  it('migra un export v1 con slot a time y version 3', () => {
     const legacy = {
       version: 1,
       meals: [
@@ -35,7 +66,29 @@ describe('exportacion JSON', () => {
     };
     const migrated = fromJson(JSON.stringify(legacy));
     expect(migrated.version).toBe(SCHEMA_VERSION);
+    expect(migrated.meals[0]?.time).toBe('14:00');
     expect(migrated.meals[0]?.origin).toBe('manual');
+  });
+
+  it('migra un export v2 con slot a time', () => {
+    const legacy = {
+      version: 2,
+      meals: [
+        {
+          id: 'm1',
+          date: '2026-10-12',
+          slot: 'dinner',
+          items: [],
+          confidence: null,
+          origin: 'photo',
+        },
+      ],
+      insulin: [],
+    };
+    const migrated = fromJson(JSON.stringify(legacy));
+    expect(migrated.version).toBe(SCHEMA_VERSION);
+    expect(migrated.meals[0]?.time).toBe('21:00');
+    expect(migrated.meals[0]?.origin).toBe('photo');
   });
 
   it('rechaza una version no soportada', () => {
@@ -56,7 +109,24 @@ describe('vaultSchema', () => {
         {
           id: 'm',
           date: '12/10/2026',
-          slot: 'lunch',
+          time: '14:00',
+          items: [],
+          confidence: null,
+          origin: 'manual',
+        },
+      ],
+      insulin: [],
+    };
+    expect(vaultSchema.safeParse(bad).success).toBe(false);
+  });
+
+  it('rechaza una comida sin time', () => {
+    const bad = {
+      version: SCHEMA_VERSION,
+      meals: [
+        {
+          id: 'm',
+          date: '2026-10-12',
           items: [],
           confidence: null,
           origin: 'manual',
@@ -76,7 +146,7 @@ describe('vaultSchema', () => {
     vault.meals.push({
       id: 'm1',
       date: '2026-10-12',
-      slot: 'lunch',
+      time: '13:30',
       items: [{ id: 'f1', name: 'manzana', grams: 180, carbsPer100g: 13.8, classId: 'apple' }],
       confidence: 0.7,
       origin: 'photo',

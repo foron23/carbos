@@ -207,6 +207,51 @@ fieldset {
   flex: 1 1 7rem;
 }
 
+/* --- Semana en barras (Lun-Dom) ----------------------------------------- */
+
+.week-bars {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.3rem;
+  align-items: end;
+  margin: 0 0 0.9rem;
+}
+
+.week-day {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: center;
+  min-inline-size: 0;
+}
+
+.week-bar {
+  display: flex;
+  align-items: flex-end;
+  inline-size: 100%;
+  block-size: 2.5rem;
+  padding: 0.15rem;
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+}
+
+.week-fill {
+  inline-size: 100%;
+  block-size: calc(var(--fill, 0) * 100%);
+  background: var(--accent);
+  border-radius: calc(var(--radius-sm) - 0.15rem);
+}
+
+.week-day[data-active] .week-bar {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.week-label {
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--muted);
+}
+
 /* --- Controles ----------------------------------------------------------- */
 
 label {
@@ -412,41 +457,69 @@ button.result {
   min-height: 2.25rem;
   padding: 0.35rem 0.6rem;
   font-size: 0.85rem;
+}
+
+.draft-row button.remove {
   color: var(--danger);
+}
+
+.draft-shortcuts,
+.draft-portions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.draft-shortcuts button,
+.draft-portions button {
+  color: var(--accent);
 }
 
 .detect-alt {
   flex: 1 1 10rem;
 }
 
-#diary li,
-#insulin-list li {
+.timeline-row {
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr);
+  align-items: start;
+  gap: 0.6rem;
+  min-inline-size: 0;
   padding-block: 0.55rem;
   border-block-end: 1px solid var(--line);
 }
 
-#diary li:last-child,
-#insulin-list li:last-child {
+.timeline-row:last-child {
   padding-block-end: 0;
   border-block-end: 0;
 }
 
-#diary li strong {
+.timeline-time {
+  min-inline-size: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+input.timeline-time {
+  inline-size: 100%;
+  padding-inline: 0.3rem;
+}
+
+.timeline-body {
+  min-inline-size: 0;
+}
+
+.timeline-body strong {
   display: block;
   font-size: 0.95rem;
 }
 
-#diary li .muted {
+.timeline-body .muted {
   font-size: 0.85rem;
-}
-
-#insulin-list li {
-  font-variant-numeric: tabular-nums;
 }
 
 /* Vacio: se anuncia, no se deja en blanco. */
 #diary li.muted:only-child,
-#insulin-list li.muted:only-child,
 #draft-items li.muted:only-child,
 #search-results li.muted:only-child,
 #detect-results li.muted:only-child {
