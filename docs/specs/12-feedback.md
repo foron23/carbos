@@ -24,12 +24,18 @@ foto) contribuir esa imagen con su **etiqueta confirmada**. Se acumula un datase
 - **Cola en el dispositivo** (IndexedDB) con estado; el usuario ve que se subira y puede borrarlo.
 - **Sin cuentas ni identificadores**: se sube solo la **imagen** (recortada) + el **id de clase**
   confirmado. Se **elimina EXIF** antes de subir. Nada de metadatos del usuario.
-- **Destino de subida (por definir)**:
-  - **A. Endpoint colector minimo** (un servicio pequeno que recibe y guarda). Implica backend,
-    aunque sea minimo.
-  - **B. Bundle manual**: la app exporta un `.zip` de contribuciones y el usuario lo sube a un
-    lugar (formulario, HF Dataset). Cero backend; menos comodo.
-  - **C. HF Dataset** con token de mantenedor (no apto para usuarios finales).
+- **Destino de subida (decidido 2026-10-13, D38)**: **bundle + receptor sin servidor**. La app
+  exporta un `.zip` de contribuciones (`consent.json` + `metadata.csv` + recortes sin EXIF) y el
+  mantenedor lo importa con `tools/data/import_contributions.py` (valida consentimiento, licencia,
+  quita EXIF, deduplica por sha256). Es la via **mas automatica sin backend**; un endpoint propio
+  (Cloudflare Worker) queda para mas adelante, cuando haya volumen.
+  - **Licencia de la contribucion: CC0-1.0** (la mas compatible con el proyecto AGPL-3.0; sin
+    obligaciones para quien reutilice el dataset). Un bundle sin `consent.json` o con otra licencia
+    se **rechaza entero**.
+  - ⚠️ **Tension declarada**: "0 friccion / automatico" choca con la promesa del producto ("la foto
+    nunca sale del dispositivo", D11) y con la regla de consentimiento por foto. Maximo honesto: un
+    **consentimiento explicito** (por foto o un toggle global claro) y luego cola en dispositivo +
+    envio en segundo plano; **nunca subida silenciosa**.
 - **Generacion del dataset**: agregar, revisar y deduplicar las contribuciones en
   `dataset/<clase>/` para el pipeline de `training/` (fine-tuning al catalogo).
 
@@ -43,5 +49,8 @@ foto) contribuir esa imagen con su **etiqueta confirmada**. Se acumula un datase
 
 ## Estado
 
-**Diferido.** No se implementa en Fase 1. Se implementa despues del fine-tuning/destilacion
-inicial, cuando el valor de un dataset propio este claro.
+**Diferido en la app, pero con el receptor listo.** Decisiones cerradas el 2026-10-13 (D38):
+licencia **CC0-1.0**, recepcion **sin servidor** via bundle + `tools/data/import_contributions.py`,
+y **publicacion del dataset diferida** (de momento no se redistribuyen imagenes; solo se acumulan
+localmente en `data/contrib/`). Falta implementar el **export del bundle en la app** (opt-in), que
+se hara cuando la app este mas establecida.
