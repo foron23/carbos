@@ -130,8 +130,8 @@ p {
   inset-block-start: env(safe-area-inset-top);
   z-index: 10;
   display: grid;
-  gap: 0.08rem;
-  padding-block: 0.22rem 0.28rem;
+  gap: 0.5rem;
+  padding-block: 0.55rem 0.5rem;
   padding-inline: 0.9rem;
   min-inline-size: 0;
   background: var(--surface);
@@ -160,7 +160,7 @@ p {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem 0.6rem;
+  gap: 0.4rem 0.7rem;
 }
 
 .day-summary .total {
@@ -177,7 +177,7 @@ p {
 }
 
 .day-summary .week-bar {
-  block-size: 0.75rem;
+  block-size: 0.9rem;
 }
 
 .header-disclaimer {
@@ -271,7 +271,7 @@ fieldset {
 }
 
 .daynav {
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 
 .daynav button {
