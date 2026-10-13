@@ -29,6 +29,7 @@ async function openApp(page, base) {
 }
 
 async function addFood(page, query, resultIndex = 0) {
+  await switchEntryMode(page, '#entry-mode-search');
   await setValue(page, '#food-search', query);
   await page.waitForSelector('#search-results button.result', { timeout: 8000 });
   await page.evaluate((index) => {
@@ -36,6 +37,34 @@ async function addFood(page, query, resultIndex = 0) {
     buttons[index]?.click();
   }, resultIndex);
   await page.waitForSelector('#draft-items .draft-row', { timeout: 8000 });
+}
+
+/** Conmuta la superficie unica Foto | Buscar (A2) y espera el cambio de panel. */
+async function switchEntryMode(page, selector) {
+  await page.$eval(selector, (el) => {
+    el.checked = true;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.waitForFunction(
+    (photoMode) => document.querySelector('#photo-panel').hidden !== photoMode,
+    { timeout: 8000 },
+    selector === '#entry-mode-photo',
+  );
+}
+
+/**
+ * El borrador (`#draft-items`), su total y el boton Registrar viven dentro de la
+ * tarjeta `#entry` y son visibles con independencia del modo conmutado (A3).
+ */
+async function assertUnifiedEntry(page) {
+  const inside = await page.$$eval('#draft-items, #register, #draft-total', (nodes) =>
+    nodes.every((node) => Boolean(node.closest('#entry'))),
+  );
+  assert(inside, 'el borrador, su total y Registrar viven en #entry');
+  const visible = await page.$$eval('#draft-items, #register, #draft-total', (nodes) =>
+    nodes.every((node) => !node.hidden && node.getClientRects().length > 0),
+  );
+  assert(visible, 'el borrador, su total y Registrar son visibles');
 }
 
 async function register(page) {
@@ -708,6 +737,192 @@ export const scenarios = [
       assertEqual(gramsMedium, 60, 'mediano coincide con la porcion por defecto del catalogo');
       assert(gramsLarge > gramsMedium, 'una caja grande sugiere mas porcion que mediano');
       await screenshot(page, 'deteccion-dedupe-porcion');
+    },
+  },
+  {
+    name: 'la primera apertura es un dialogo con fondo inert',
+    async run(page, ctx) {
+      await page.goto(ctx.base, { waitUntil: 'domcontentloaded' });
+      await page.evaluate(() => {
+        localStorage.removeItem('carbos.onboarded');
+        localStorage.setItem('carbos.locale', 'es');
+      });
+      await reload(page);
+      await waitFor(page, '#onboarding:not([hidden])');
+      await page.waitForFunction(() => document.activeElement?.id === 'onboarding-start', {
+        timeout: 8000,
+      });
+      assertEqual(
+        await page.$eval('#onboarding', (el) => el.getAttribute('role')),
+        'dialog',
+        'el onboarding es un dialogo',
+      );
+      const inertBackground = await page.$$eval(
+        '#app > header, #app > main, #app > footer',
+        (nodes) => nodes.length === 3 && nodes.every((node) => node.hasAttribute('inert')),
+      );
+      assert(inertBackground, 'el fondo (header/main/footer) queda inert');
+
+      await click(page, '#onboarding-start');
+      await waitFor(page, '#onboarding[hidden]');
+      await page.waitForFunction(() => document.activeElement?.id === 'date', { timeout: 8000 });
+
+      await reload(page);
+      await waitFor(page, '#app header h1');
+      assertEqual(
+        await page.$eval('#onboarding', (el) => el.hidden),
+        true,
+        'el onboarding no vuelve a mostrarse',
+      );
+      await screenshot(page, 'onboarding-dialogo');
+    },
+  },
+  {
+    name: 'registra desde la busqueda y desde la foto sin cambiar de tarjeta',
+    async run(page, ctx) {
+      await installDetectionStub(page);
+      await openApp(page, ctx.base);
+
+      await switchEntryMode(page, '#entry-mode-search');
+      assertEqual(
+        await page.$eval('#search-panel', (el) => el.hidden),
+        false,
+        'panel de busqueda visible',
+      );
+      await assertUnifiedEntry(page);
+
+      await addFood(page, 'manzana');
+      await assertUnifiedEntry(page);
+      await register(page);
+      await waitForText(page, '#diary', 'Manzana');
+
+      await switchEntryMode(page, '#entry-mode-photo');
+      assertEqual(
+        await page.$eval('#photo-panel', (el) => el.hidden),
+        false,
+        'panel de foto visible',
+      );
+      await assertUnifiedEntry(page);
+
+      await uploadAndDetect(page, ctx.fixturePng);
+      await register(page);
+      await waitForText(page, '#diary', 'Pan blanco');
+      await assertUnifiedEntry(page);
+
+      const meals = await readStore(page, 'meals');
+      assertEqual(meals.length, 2, 'dos comidas registradas (busqueda y foto)');
+      await screenshot(page, 'ciclo-unificado');
+    },
+  },
+  {
+    name: 'el doble toque no duplica comidas ni insulina',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await addFood(page, 'manzana');
+      await page.$eval('#register', (el) => {
+        el.click();
+        el.click();
+      });
+      await waitForText(page, '#diary', 'Manzana');
+
+      await setValue(page, '#ins-time', '08:30');
+      await setValue(page, '#ins-units', '4');
+      await page.$eval('#add-insulin', (el) => {
+        el.click();
+        el.click();
+      });
+      await waitForText(page, '#diary', '08:30');
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      const meals = await readStore(page, 'meals');
+      const logs = await readStore(page, 'insulin');
+      assertEqual(meals.length, 1, 'exactamente una comida');
+      assertEqual(logs.length, 1, 'exactamente un registro de insulina');
+      await screenshot(page, 'doble-toque');
+    },
+  },
+  {
+    name: 'una imagen ilegible muestra un error visible',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      const bad = join(ctx.tmpDir, 'ilegible.png');
+      await writeFile(bad, 'esto no es una imagen', 'utf8');
+      await uploadFile(page, '#file-input', bad);
+      await waitForText(page, '#photo-status', 'No se pudo procesar');
+      assert(
+        await page.$eval('#photo-status', (el) => el.getClientRects().length > 0),
+        'el estado de error es visible',
+      );
+      assertEqual(
+        await page.$eval('#file-input', (el) => el.value),
+        '',
+        'la entrada de fichero se rearma para reintentar',
+      );
+      await screenshot(page, 'imagen-ilegible');
+    },
+  },
+  {
+    name: 'el recordatorio de copia es visible sin abrir Copia',
+    async run(page, ctx) {
+      await page.goto(ctx.base, { waitUntil: 'domcontentloaded' });
+      await page.evaluate(() => {
+        localStorage.removeItem('carbos.lastExport');
+        localStorage.setItem('carbos.locale', 'es');
+      });
+      await reload(page);
+      await waitFor(page, '#app header h1');
+      await waitFor(page, '#export-reminder:not([hidden])');
+      assertEqual(
+        await page.$eval('#export-reminder', (el) => Boolean(el.closest('details'))),
+        false,
+        'el aviso no vive dentro de un details plegable',
+      );
+      assertEqual(
+        await page.$eval('#export-reminder', (el) => el.getAttribute('role')),
+        'status',
+        'el aviso se anuncia',
+      );
+      assert(
+        await page.$eval('#export-reminder', (el) => !el.hidden && el.getClientRects().length > 0),
+        'el recordatorio es visible sin abrir Copia',
+      );
+      await screenshot(page, 'recordatorio-copia');
+    },
+  },
+  {
+    name: 'las barras de la semana llevan dia y gramos y el total es numerico',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await addFood(page, 'pan');
+      await register(page);
+      await waitForText(page, '#diary', 'Pan');
+
+      const week = parseFloat(await text(page, '#week-total'));
+      assert(Number.isFinite(week) && week > 0, 'el total semanal es numerico y positivo');
+      assertEqual(
+        await page.$eval('#week-bars', (el) => el.hasAttribute('aria-hidden')),
+        false,
+        'la lista de barras no es aria-hidden',
+      );
+      const listLabel = await page.$eval('#week-bars', (el) => el.getAttribute('aria-label') ?? '');
+      assert(listLabel.trim().length > 0, 'la lista tiene nombre accesible');
+
+      const labels = await page.$$eval('#week-bars .week-day .sr-only', (nodes) =>
+        nodes.map((node) => (node.textContent ?? '').trim()),
+      );
+      assertEqual(labels.length, 7, 'siete dias etiquetados');
+      assert(
+        labels.every((label) => label.length > 0 && /\d/.test(label)),
+        `cada dia expone dia + gramos: ${labels.join(' | ')}`,
+      );
+      const active = await page.$eval('#week-bars .week-day[data-active] .sr-only', (el) =>
+        (el.textContent ?? '').trim(),
+      );
+      assert(
+        active.includes('\u00b7') && /\d/.test(active),
+        `el dia activo lleva dia y gramos: ${active}`,
+      );
+      await screenshot(page, 'semana-etiquetada');
     },
   },
 ];
