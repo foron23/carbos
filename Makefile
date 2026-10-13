@@ -50,6 +50,9 @@ CONFIRM_ARGS ?= --queue data/labels/review.queue.jsonl
 LABEL_ARGS ?= --open
 IMPORT_ARGS ?= --bundle contributions.zip
 PACKAGE_ARGS ?= --images data/images --format targz --out dist/dataset --free-only
+# Endpoint del receptor (Cloudflare) para el smoke end-to-end; vacio = se salta.
+DATA_ENDPOINT ?=
+DATA_E2E_ARGS ?= $(if $(DATA_ENDPOINT),--endpoint $(DATA_ENDPOINT))
 
 # --- Pesos de produccion ----------------------------------------------------
 # Ver docs/specs/03-despliegue.md. Genera weights/ (en este repo) + el manifest.
@@ -64,7 +67,8 @@ EVAL_ARGS ?= --manifest public/model-manifest.json --root public --limit 25
 
 .PHONY: help setup install build test e2e lint format format-check check run dev clean \
         build-stamp verify-bundle train-setup train train-smoke export-model distill distill-clip \
-        data-images data-review data-confirm data-label data-import data-package catalog \
+        data-images data-review data-confirm data-label data-import data-package \
+        data-distill data-e2e data-pipeline catalog \
         weights-manifest smoke-setup smoke-models smoke-clean eval
 
 ## help: Show this help
@@ -265,6 +269,21 @@ data-import:
 ## data-package: Empaqueta el dataset (imagenes + etiquetas + atribucion) para compartir
 data-package:
 	python3 tools/data/package_dataset.py $(PACKAGE_ARGS)
+
+## data-distill: Destila CLIP->catalogo con las etiquetas confirmadas (data/confirmed)
+data-distill:
+	tools/shortlist/.venv/bin/python training/distill_clip.py --stage all --data data/confirmed --out $(TRAIN_OUT) $(DISTILL_CLIP_ARGS)
+
+## data-e2e: Smoke del pipeline de datos (bundle -> import -> [endpoint])
+data-e2e:
+	python3 tools/data/selfcheck.py $(DATA_E2E_ARGS)
+
+## data-pipeline: Harness del pipeline (fetch -> review); luego revisar y destilar
+data-pipeline: data-images data-review
+	@echo ""
+	@echo ">> Revisa con 'make data-label' (navegador) o 'make data-confirm' (CLI)."
+	@echo ">> Despues: 'make data-distill' para entrenar con data/confirmed."
+	@echo ">> Y 'make data-e2e DATA_ENDPOINT=<url>' para probar el receptor."
 
 ## catalog: Regenera src/catalog/catalog.ts desde Ciqual 2020 (tools/catalog/build_catalog.py)
 catalog:
