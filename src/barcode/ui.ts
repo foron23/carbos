@@ -244,10 +244,18 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
       if (stopButton) stopButton.hidden = false;
       let fallback = false;
       let detected = false;
+      // Si a los 8 s no ha leido nada, sugerir acercar la camara o usar la foto.
+      const aimTimer = window.setTimeout(() => {
+        if (!detected && live) {
+          statusKey = 'barcode.aim';
+          paint();
+        }
+      }, 8000);
       void startLiveScan({
         video: video as HTMLVideoElement,
         onCode: (code) => {
           detected = true;
+          window.clearTimeout(aimTimer);
           stopScan();
           void useCode(code);
         },
