@@ -7,6 +7,8 @@ import { isBarcodeOnlineEnabled, setBarcodeOnlineEnabled } from './flag';
 import type { BarcodeFetcher } from './lookup/client';
 import { importPack, parseManifest } from './pack';
 import { resolveBarcode } from './resolve';
+import { startLiveScan } from './scanner';
+import type { LiveScanHandle } from './scanner';
 
 /**
  * Panel del modulo de codigo de barras (Fase A offline + Fase B opt-in).
@@ -55,6 +57,7 @@ function testFetcher(): BarcodeFetcher | undefined {
 export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandle {
   let root: HTMLElement | null = null;
   let statusKey: StringKey | null = null;
+  let live: LiveScanHandle | null = null;
 
   const paintStatus = (): void => {
     const status = root?.querySelector<HTMLElement>('#barcode-status');
@@ -192,25 +195,84 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
     host.innerHTML = `
       <fieldset class="card inset">
         <legend data-i18n="section.barcode"></legend>
-        <p class="muted" data-i18n="barcode.hint"></p>
-        <div class="row">
-          <label class="btn"><input id="barcode-input" class="sr-only" type="file" accept="image/*" capture="environment" data-i18n-aria="button.scanBarcode" /><span data-i18n="button.scanBarcode"></span></label>
-          <label for="barcode-manual" data-i18n="barcode.manualLabel"></label>
-          <input id="barcode-manual" type="text" inputmode="numeric" autocomplete="off" />
-          <button id="barcode-manual-go" type="button" data-i18n="button.search"></button>
-        </div>
-        <div class="row">
-          <button id="barcode-download" type="button" data-i18n="barcode.downloadPack"></button>
-          <label class="btn"><input id="barcode-pack" class="sr-only" type="file" accept=".gz,.json,application/gzip,application/json" multiple data-i18n-aria="barcode.importPack" /><span data-i18n="barcode.importPack"></span></label>
-        </div>
-        <label class="check"><input id="barcode-online" type="checkbox" /> <span data-i18n="barcode.onlineLabel"></span></label>
-        <p class="muted" data-i18n="barcode.onlineWarning"></p>
-        <p class="muted" data-i18n="barcode.onlineNote"></p>
+        <p><button id="barcode-scan" type="button" class="primary" data-i18n="button.scanBarcode"></button></p>
+        <video id="barcode-video" class="barcode-video" hidden playsinline muted></video>
+        <p><button id="barcode-stop" type="button" data-i18n="button.cancel" hidden></button></p>
         <p id="barcode-status" class="muted" aria-live="polite"></p>
+        <details>
+          <summary data-i18n="barcode.moreOptions"></summary>
+          <p class="muted" data-i18n="barcode.hint"></p>
+          <div class="row">
+            <label for="barcode-manual" data-i18n="barcode.manualLabel"></label>
+            <input id="barcode-manual" type="text" inputmode="numeric" autocomplete="off" />
+            <button id="barcode-manual-go" type="button" data-i18n="button.search"></button>
+          </div>
+          <div class="row">
+            <label class="btn"><input id="barcode-input" class="sr-only" type="file" accept="image/*" capture="environment" data-i18n-aria="barcode.scanPhoto" /><span data-i18n="barcode.scanPhoto"></span></label>
+            <button id="barcode-download" type="button" data-i18n="barcode.downloadPack"></button>
+            <label class="btn"><input id="barcode-pack" class="sr-only" type="file" accept=".gz,.json,application/gzip,application/json" multiple data-i18n-aria="barcode.importPack" /><span data-i18n="barcode.importPack"></span></label>
+          </div>
+          <label class="check"><input id="barcode-online" type="checkbox" /> <span data-i18n="barcode.onlineLabel"></span></label>
+          <p class="muted" data-i18n="barcode.onlineWarning"></p>
+          <p class="muted" data-i18n="barcode.onlineNote"></p>
+        </details>
         <p class="muted" data-i18n="barcode.attribution"></p>
       </fieldset>
     `;
     root = host.querySelector('fieldset');
+    const video = host.querySelector<HTMLVideoElement>('#barcode-video');
+    const stopButton = host.querySelector<HTMLButtonElement>('#barcode-stop');
+
+    const stopScan = (): void => {
+      live?.stop();
+      live = null;
+      if (video) {
+        video.hidden = true;
+        video.srcObject = null;
+      }
+      if (stopButton) stopButton.hidden = true;
+    };
+
+    // Boton principal: escaneo en vivo; si el navegador no puede, cae a la foto.
+    const beginScan = (): void => {
+      statusKey = 'barcode.detecting';
+      paint();
+      let fallback = false;
+      let detected = false;
+      void startLiveScan({
+        video: video as HTMLVideoElement,
+        onCode: (code) => {
+          detected = true;
+          stopScan();
+          void useCode(code);
+        },
+        onError: (reason) => {
+          statusKey = reason === 'denied' ? 'barcode.cameraDenied' : 'barcode.unsupported';
+          if (reason === 'unsupported') fallback = true;
+          paint();
+        },
+      }).then((handle) => {
+        if (detected) {
+          handle?.stop();
+          return;
+        }
+        if (handle) {
+          live = handle;
+          if (video) video.hidden = false;
+          if (stopButton) stopButton.hidden = false;
+        } else if (fallback) {
+          host.querySelector<HTMLInputElement>('#barcode-input')?.click();
+        }
+      });
+    };
+
+    host.querySelector('#barcode-scan')?.addEventListener('click', beginScan);
+    stopButton?.addEventListener('click', () => {
+      stopScan();
+      statusKey = null;
+      paint();
+    });
+
     const manual = host.querySelector<HTMLInputElement>('#barcode-manual');
     const runManual = (): void => {
       const value = manual?.value.trim() ?? '';

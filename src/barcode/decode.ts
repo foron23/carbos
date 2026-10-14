@@ -7,26 +7,39 @@
  * Nunca lanza.
  */
 
-interface BarcodeDetectorResult {
+export interface BarcodeDetectorResult {
   rawValue: string;
   format: string;
 }
 
-interface BarcodeDetectorLike {
+export interface BarcodeDetectorLike {
   detect(source: ImageBitmapSource): Promise<BarcodeDetectorResult[]>;
   getSupportedFormats?(): Promise<string[]>;
 }
 
-interface BarcodeDetectorConstructor {
+export interface BarcodeDetectorConstructor {
   new (options?: { formats?: string[] }): BarcodeDetectorLike;
   getSupportedFormats?(): Promise<string[]>;
 }
 
-interface BarcodeStub {
-  decode(file: Blob): Promise<string | null>;
+/** Hook E2E: decodificador sintetico que devuelve un EAN fijo. */
+export interface BarcodeStub {
+  decode(file?: Blob): Promise<string | null>;
 }
 
-const FORMATS = ['ean_13', 'upc_a'];
+export const BARCODE_FORMATS = ['ean_13', 'upc_a'];
+
+/** El stub del arnes E2E, si esta instalado. */
+export function barcodeStub(): BarcodeStub | undefined {
+  const stub = (globalThis as { __carbosBarcodeStub?: BarcodeStub }).__carbosBarcodeStub;
+  return stub && typeof stub.decode === 'function' ? stub : undefined;
+}
+
+/** El constructor nativo `BarcodeDetector`, si el navegador lo trae. */
+export function barcodeDetectorCtor(): BarcodeDetectorConstructor | undefined {
+  const ctor = (globalThis as { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector;
+  return typeof ctor === 'function' ? ctor : undefined;
+}
 
 async function supportedFormats(ctor: BarcodeDetectorConstructor): Promise<string[] | null> {
   try {
@@ -48,16 +61,17 @@ async function toSource(file: Blob): Promise<ImageBitmapSource> {
 
 export async function decodeBarcodeFromFile(file: Blob): Promise<string | null> {
   try {
-    const stub = (globalThis as { __carbosBarcodeStub?: BarcodeStub }).__carbosBarcodeStub;
-    if (stub && typeof stub.decode === 'function') {
+    const stub = barcodeStub();
+    if (stub) {
       return (await stub.decode(file)) ?? null;
     }
 
-    const ctor = (globalThis as { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector;
-    if (typeof ctor !== 'function') return null;
+    const ctor = barcodeDetectorCtor();
+    if (!ctor) return null;
 
+    const all = [...BARCODE_FORMATS];
     const supported = await supportedFormats(ctor);
-    const formats = supported ? FORMATS.filter((format) => supported.includes(format)) : FORMATS;
+    const formats = supported ? all.filter((format) => supported.includes(format)) : all;
     if (formats.length === 0) return null;
 
     const detector = new ctor({ formats });

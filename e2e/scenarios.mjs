@@ -795,17 +795,20 @@ export const scenarios = [
         el.checked = true;
         el.dispatchEvent(new Event('change', { bubbles: true }));
       });
-      await waitFor(page, '#barcode-panel:not([hidden]) #barcode-manual');
+      await waitFor(page, '#barcode-panel:not([hidden]) #barcode-scan');
 
-      // Camino de camara via stub: la imagen se decodifica al EAN del stub.
-      await uploadFile(page, '#barcode-input', ctx.fixturePng);
+      // Boton principal "Escanear" (escaneo en vivo via stub): prellena el EAN.
+      await click(page, '#barcode-scan');
       await waitForText(page, '#draft-items', ean);
       assert(
         (await text(page, '#draft-items')).includes(ean),
         'el escaneo con el stub prellena el EAN',
       );
 
-      // Camino manual: escribir el EAN y resolverlo prellena otro item.
+      // Camino manual (en "Mas opciones"): escribir el EAN prellena otro item.
+      await page.$eval('#barcode-panel details', (el) => {
+        el.open = true;
+      });
       await setValue(page, '#barcode-manual', ean);
       await click(page, '#barcode-manual-go');
       await page.waitForFunction(
@@ -876,7 +879,11 @@ export const scenarios = [
         el.checked = true;
         el.dispatchEvent(new Event('change', { bubbles: true }));
       });
-      await waitFor(page, '#barcode-panel:not([hidden]) #barcode-download');
+      await waitFor(page, '#barcode-panel:not([hidden]) #barcode-scan');
+      // El pack/manual/online viven en "Mas opciones" (details): abrirlo.
+      await page.$eval('#barcode-panel details', (el) => {
+        el.open = true;
+      });
 
       // 1) Descarga automatizada (manifest -> sha256 -> IndexedDB), sigue offline.
       await click(page, '#barcode-download');
