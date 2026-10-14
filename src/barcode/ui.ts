@@ -44,6 +44,12 @@ export interface BarcodeHandle {
   prepare(): void;
 }
 
+/** Resultado de usar un codigo: para el popup de confirmacion del visor. */
+interface UseCodeResult {
+  kind: 'hit' | 'miss' | 'invalid';
+  name?: string;
+}
+
 /** Racion por defecto cuando el pack no trae `defaultPortionGrams`. */
 const DEFAULT_GRAMS = 100;
 
@@ -96,7 +102,7 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
     paintStatus();
   };
 
-  async function useCode(code: string): Promise<void> {
+  async function useCode(code: string): Promise<UseCodeResult> {
     setStatus('barcode.detecting');
     paint();
     const online = isBarcodeOnlineEnabled();
@@ -121,14 +127,14 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
       setStatus(hasCarbs ? 'barcode.ready' : 'barcode.identified');
       // Confirmacion con el nombre resuelto: se ve de un vistazo que se anadio.
       statusText = `${t(deps.getLocale(), 'barcode.added')} ${name}`;
-    } else if (result.kind === 'miss') {
-      // No se inventa una fila: solo se avisa. El usuario decide (pack, en linea
-      // o anadir a mano). Antes se anadia una fila con el EAN y 0 g, que era enganoso.
-      setStatus('barcode.notFound');
-    } else {
-      setStatus('barcode.notFound');
+      paint();
+      return { kind: 'hit', name };
     }
+    // No se inventa una fila: solo se avisa. El usuario decide (pack, en linea
+    // o anadir a mano). Antes se anadia una fila con el EAN y 0 g, que era enganoso.
+    setStatus('barcode.notFound');
     paint();
+    return { kind: result.kind === 'miss' ? 'miss' : 'invalid' };
   }
 
   async function decodeFile(file: File): Promise<void> {
@@ -241,6 +247,7 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
           <video id="barcode-video" class="barcode-video" autoplay playsinline muted></video>
           <div class="barcode-reticle" aria-hidden="true"></div>
           <p class="barcode-reticle-hint" data-i18n="barcode.aimHint"></p>
+          <div id="barcode-flash" class="barcode-flash" aria-hidden="true" hidden></div>
         </div>
         <p><button id="barcode-stop" type="button" data-i18n="button.cancel" hidden></button></p>
         <p id="barcode-status" class="muted" aria-live="polite"></p>
@@ -268,8 +275,22 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
     root = host.querySelector('fieldset');
     const video = host.querySelector<HTMLVideoElement>('#barcode-video');
     const viewer = host.querySelector<HTMLElement>('#barcode-viewer');
+    const flash = host.querySelector<HTMLElement>('#barcode-flash');
     const status = host.querySelector<HTMLElement>('#barcode-status');
     const stopButton = host.querySelector<HTMLButtonElement>('#barcode-stop');
+
+    // Popup sobre el retículo: verde si se encontro y anadio el producto (con su
+    // nombre), rojo si no. Se pinta un instante antes de cerrar el visor.
+    const showFlash = (result: UseCodeResult): void => {
+      if (!flash) return;
+      const success = result.kind === 'hit';
+      flash.classList.toggle('is-success', success);
+      flash.classList.toggle('is-error', !success);
+      flash.textContent = success
+        ? `${t(deps.getLocale(), 'barcode.added')} ${result.name ?? ''}`.trim()
+        : t(deps.getLocale(), 'barcode.missShort');
+      flash.hidden = false;
+    };
 
     // Estado visual del visor: `scanning` (animacion de barrido) o `locked`
     // (codigo ya leido, congelado). Ambas clases viven en src/style.css.
@@ -287,6 +308,10 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
     const hideViewer = (): void => {
       setViewerState(null);
       setBusy(false);
+      if (flash) {
+        flash.hidden = true;
+        flash.classList.remove('is-success', 'is-error');
+      }
       if (viewer) viewer.hidden = true;
       if (video) video.srcObject = null;
       if (stopButton) stopButton.hidden = true;
@@ -331,7 +356,15 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
           setBusy(false);
           setStatus('barcode.codeDetected');
           paint();
-          void useCode(code).finally(() => hideViewer());
+          void (async () => {
+            const result = await useCode(code);
+            showFlash(result);
+            // Deja ver la confirmacion (verde) o el aviso (rojo) antes de cerrar.
+            await new Promise((resolve) =>
+              window.setTimeout(resolve, result.kind === 'hit' ? 1600 : 2400),
+            );
+            hideViewer();
+          })();
         },
         onError: (reason) => {
           setStatus(reason === 'denied' ? 'barcode.cameraDenied' : 'barcode.unsupported');

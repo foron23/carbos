@@ -1128,6 +1128,53 @@ details[open] > summary::after {
   box-shadow: 0 0 0 100vmax rgb(0 0 0 / 40%);
 }
 
+/* Popup de resultado sobre el reticulo: verde si se anadio, rojo si no. */
+.barcode-flash {
+  position: absolute;
+  inset-inline: 10%;
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--accent-fg);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 35%);
+  animation: barcode-flash-pop var(--dur-base) var(--ease-emphasis);
+}
+
+.barcode-flash.is-success {
+  background: var(--accent);
+}
+
+.barcode-flash.is-success::before {
+  content: '\2713\00a0';
+  font-weight: 700;
+}
+
+.barcode-flash.is-error {
+  background: var(--danger);
+}
+
+@keyframes barcode-flash-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barcode-flash {
+    animation: none !important;
+  }
+}
+
 /* Actividad del escaneo en el propio texto de estado (giro indeterminado). */
 #barcode-status.busy::after {
   content: '';

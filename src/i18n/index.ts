@@ -169,6 +169,7 @@ export const STRINGS = {
     'barcode.ready': 'Código leído.',
     'barcode.identified': 'Código identificado. Añade los carbohidratos y los gramos.',
     'barcode.notFound': 'No se encontró. Descarga el pack o activa la consulta en línea.',
+    'barcode.missShort': 'No encontrado',
     'barcode.emptyHint':
       'Para reconocer productos necesitas los datos: descarga el pack o activa la consulta en línea.',
     'barcode.unsupported': 'No se pudo leer el código. Escríbelo a mano.',
@@ -363,6 +364,7 @@ export const STRINGS = {
     'barcode.ready': 'Code read.',
     'barcode.identified': 'Code identified. Add the carbs and grams.',
     'barcode.notFound': 'Not found. Download the pack or turn on the online lookup.',
+    'barcode.missShort': 'Not found',
     'barcode.emptyHint':
       'To recognize products you need the data: download the pack or turn on the online lookup.',
     'barcode.unsupported': 'Could not read the code. Type it by hand.',
