@@ -1,2 +1,5 @@
 src/catalog/catalog.ts
 *.tmp.mjs
+# Caches generadas (no versionadas); evitan que `prettier --check .` falle en local
+.pytest_cache/
+__pycache__/

@@ -12,6 +12,8 @@ export default tseslint.config(
       'tools/smoke/.venv',
       'tools/catalog/.cache',
       '**/*.tmp.mjs',
+      // Prototipos de UI desechables (gitignored): no forman parte del build.
+      'prototypes',
     ],
   },
   js.configs.recommended,

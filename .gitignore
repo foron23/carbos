@@ -11,13 +11,16 @@ e2e/tmp/
 # Prototipos desechables de UI (comparativas de diseno; no forman parte del build)
 prototypes/
 
-# Entrenamiento (datos y pesos nunca al repo; ver docs/specs/08-linear-probe.md)
+# Entrenamiento (datos y pesos nunca al repo; ver docs/specs/08-linear-probe.md).
+# `out*/` cubre el directorio por defecto (training/out/) y las corridas alternativas
+# que aterrizan artefactos intermedios (p.ej. training/out_noleak/ de SPEC 18).
 training/data/
-training/out/
+training/out*/
 # Imagenes descargadas (Wikimedia Commons) y etiquetas propuestas/revisadas (D25/spec 12)
 # Solo el directorio raiz data/ (no tools/data/, que es codigo)
 /data/
 __pycache__/
+.pytest_cache/
 *.pyc
 *.pt
 *.onnx
