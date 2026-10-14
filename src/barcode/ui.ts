@@ -196,7 +196,7 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
       <fieldset class="card inset">
         <legend data-i18n="section.barcode"></legend>
         <p><button id="barcode-scan" type="button" class="primary" data-i18n="button.scanBarcode"></button></p>
-        <video id="barcode-video" class="barcode-video" hidden playsinline muted></video>
+        <video id="barcode-video" class="barcode-video" hidden autoplay playsinline muted></video>
         <p><button id="barcode-stop" type="button" data-i18n="button.cancel" hidden></button></p>
         <p id="barcode-status" class="muted" aria-live="polite"></p>
         <details>
@@ -238,6 +238,10 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
     const beginScan = (): void => {
       statusKey = 'barcode.detecting';
       paint();
+      // Mostrar el visor ANTES de arrancar: un video `display:none` no dibuja
+      // fotogramas y la decodificacion no ve nada.
+      if (video) video.hidden = false;
+      if (stopButton) stopButton.hidden = false;
       let fallback = false;
       let detected = false;
       void startLiveScan({
@@ -253,17 +257,14 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
           paint();
         },
       }).then((handle) => {
-        if (detected) {
-          handle?.stop();
-          return;
-        }
         if (handle) {
           live = handle;
-          if (video) video.hidden = false;
-          if (stopButton) stopButton.hidden = false;
-        } else if (fallback) {
-          host.querySelector<HTMLInputElement>('#barcode-input')?.click();
+          return;
         }
+        // Sin camara: ocultar el visor y, si procede, caer a la foto.
+        if (video) video.hidden = true;
+        if (stopButton) stopButton.hidden = true;
+        if (!detected && fallback) host.querySelector<HTMLInputElement>('#barcode-input')?.click();
       });
     };
 
