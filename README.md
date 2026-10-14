@@ -23,6 +23,7 @@ de tu dispositivo.
 - Platos cocinados / guisos: [`docs/specs/20-platos-cocinados.md`](docs/specs/20-platos-cocinados.md)
 - Expansion del catalogo (platos): [`docs/specs/21-expansion-catalogo.md`](docs/specs/21-expansion-catalogo.md)
 - Navegacion persistente y Diario como linea de tiempo (UI/UX v3): [`docs/specs/22-uiux-v3.md`](docs/specs/22-uiux-v3.md)
+- Calidad de vida: quick-add, objetivo diario y repetir: [`docs/specs/23-calidad-de-vida.md`](docs/specs/23-calidad-de-vida.md)
 - Contrato de trabajo: [`docs/receta-de-codigo.md`](docs/receta-de-codigo.md)
 
 ## Estado
