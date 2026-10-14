@@ -168,8 +168,9 @@ export const STRINGS = {
     'barcode.detecting': 'Leyendo el código...',
     'barcode.ready': 'Código leído.',
     'barcode.identified': 'Código identificado. Añade los carbohidratos y los gramos.',
-    'barcode.notFound':
-      'No está en tu pack local. Añádelo con el código y ajusta gramos y carbohidratos.',
+    'barcode.notFound': 'No se encontró. Descarga el pack o activa la consulta en línea.',
+    'barcode.emptyHint':
+      'Para reconocer productos necesitas los datos: descarga el pack o activa la consulta en línea.',
     'barcode.unsupported': 'No se pudo leer el código. Escríbelo a mano.',
     'barcode.manualLabel': 'Código EAN-13 o UPC-A',
     'barcode.importPack': 'Importar pack',
@@ -358,7 +359,9 @@ export const STRINGS = {
     'barcode.detecting': 'Reading the code...',
     'barcode.ready': 'Code read.',
     'barcode.identified': 'Code identified. Add the carbs and grams.',
-    'barcode.notFound': 'Not in your local pack. Add it with the code and set grams and carbs.',
+    'barcode.notFound': 'Not found. Download the pack or turn on the online lookup.',
+    'barcode.emptyHint':
+      'To recognize products you need the data: download the pack or turn on the online lookup.',
     'barcode.unsupported': 'Could not read the code. Type it by hand.',
     'barcode.manualLabel': 'EAN-13 or UPC-A code',
     'barcode.importPack': 'Import pack',

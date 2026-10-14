@@ -2,13 +2,13 @@ import { isStringKey, t } from '../i18n';
 import type { Locale, StringKey } from '../i18n';
 import { decodeBarcodeFromFile } from './decode';
 import { downloadPack, fetchPacksManifest } from './download';
-import { normalizeEan } from './ean';
 import { isBarcodeOnlineEnabled, setBarcodeOnlineEnabled } from './flag';
 import type { BarcodeFetcher } from './lookup/client';
 import { importPack, parseManifest } from './pack';
 import { resolveBarcode } from './resolve';
 import { startLiveScan } from './scanner';
 import type { LiveScanHandle } from './scanner';
+import { countProducts } from './store';
 
 /**
  * Panel del modulo de codigo de barras (Fase A offline + Fase B opt-in).
@@ -106,16 +106,8 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
       // Sin carbohidratos conocidos: identificado, pero el usuario los ajusta.
       statusKey = hasCarbs ? 'barcode.ready' : 'barcode.identified';
     } else if (result.kind === 'miss') {
-      // Miss offline: prellenar con el propio codigo y pedir los gramos a mano.
-      const normalized = normalizeEan(code);
-      if (normalized) {
-        deps.onAdd({
-          name: normalized,
-          grams: DEFAULT_GRAMS,
-          carbsPer100g: 0,
-          barcode: normalized,
-        });
-      }
+      // No se inventa una fila: solo se avisa. El usuario decide (pack, en linea
+      // o anadir a mano). Antes se anadia una fila con el EAN y 0 g, que era enganoso.
       statusKey = 'barcode.notFound';
     } else {
       statusKey = 'barcode.notFound';
@@ -172,6 +164,18 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
       statusKey = 'barcode.downloadFailed';
     }
     paint();
+    void updatePackHint();
+  }
+
+  /** Muestra el aviso de "sin datos" mientras el store local este vacio. */
+  async function updatePackHint(): Promise<void> {
+    const hint = root?.querySelector<HTMLElement>('#barcode-empty-hint');
+    if (!hint) return;
+    try {
+      hint.hidden = (await countProducts()) > 0;
+    } catch {
+      hint.hidden = true;
+    }
   }
 
   async function importFiles(files: File[]): Promise<void> {
@@ -199,6 +203,13 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
         <video id="barcode-video" class="barcode-video" hidden autoplay playsinline muted></video>
         <p><button id="barcode-stop" type="button" data-i18n="button.cancel" hidden></button></p>
         <p id="barcode-status" class="muted" aria-live="polite"></p>
+        <p id="barcode-empty-hint" class="muted" data-i18n="barcode.emptyHint" hidden></p>
+        <div class="row">
+          <button id="barcode-download" type="button" data-i18n="barcode.downloadPack"></button>
+          <label class="btn"><input id="barcode-pack" class="sr-only" type="file" accept=".gz,.json,application/gzip,application/json" multiple data-i18n-aria="barcode.importPack" /><span data-i18n="barcode.importPack"></span></label>
+        </div>
+        <label class="check"><input id="barcode-online" type="checkbox" /> <span data-i18n="barcode.onlineLabel"></span></label>
+        <p class="muted" data-i18n="barcode.onlineWarning"></p>
         <details>
           <summary data-i18n="barcode.moreOptions"></summary>
           <p class="muted" data-i18n="barcode.hint"></p>
@@ -207,13 +218,7 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
             <input id="barcode-manual" type="text" inputmode="numeric" autocomplete="off" />
             <button id="barcode-manual-go" type="button" data-i18n="button.search"></button>
           </div>
-          <div class="row">
-            <label class="btn"><input id="barcode-input" class="sr-only" type="file" accept="image/*" capture="environment" data-i18n-aria="barcode.scanPhoto" /><span data-i18n="barcode.scanPhoto"></span></label>
-            <button id="barcode-download" type="button" data-i18n="barcode.downloadPack"></button>
-            <label class="btn"><input id="barcode-pack" class="sr-only" type="file" accept=".gz,.json,application/gzip,application/json" multiple data-i18n-aria="barcode.importPack" /><span data-i18n="barcode.importPack"></span></label>
-          </div>
-          <label class="check"><input id="barcode-online" type="checkbox" /> <span data-i18n="barcode.onlineLabel"></span></label>
-          <p class="muted" data-i18n="barcode.onlineWarning"></p>
+          <label class="btn"><input id="barcode-input" class="sr-only" type="file" accept="image/*" capture="environment" data-i18n-aria="barcode.scanPhoto" /><span data-i18n="barcode.scanPhoto"></span></label>
           <p class="muted" data-i18n="barcode.onlineNote"></p>
         </details>
         <p class="muted" data-i18n="barcode.attribution"></p>
@@ -313,6 +318,7 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
       online.addEventListener('change', () => setBarcodeOnlineEnabled(online.checked));
     }
     paint();
+    void updatePackHint();
   };
 
   const refresh = (): void => {

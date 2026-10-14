@@ -52,6 +52,18 @@ describe('lookupOnline', () => {
     });
   });
 
+  it('acepta success_with_warnings (status real de la v3 de OFF)', async () => {
+    const fetcher = fetcherFor({
+      status: 'success_with_warnings',
+      product: { product_name_es: 'Salsa de mostaza', nutriments: { carbohydrates_100g: 7.5 } },
+    });
+
+    const result = await lookupOnline(EAN, { fetcher });
+
+    expect(result?.name).toEqual({ es: 'Salsa de mostaza', en: 'Salsa de mostaza' });
+    expect(result?.carbsPer100g).toBe(7.5);
+  });
+
   it('cae a product_name como nombre si no hay traducciones', async () => {
     const fetcher = fetcherFor({
       status: 'success',

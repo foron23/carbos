@@ -50,7 +50,11 @@ function pickName(product: OffProduct): { es: string; en: string } | string | nu
 }
 
 function mapProduct(ean: string, response: OffResponse): ScannedProduct | null {
-  if (response.status !== 'success') return null;
+  // OFF v3 usa `status` = "success", "success_with_warnings" o "failure"; exigir
+  // solo "success" rechazaba productos validos con avisos. El fallo real es
+  // `failure` (o la ausencia de `product`).
+  const status = response.status ?? '';
+  if (typeof status === 'string' && status.startsWith('failure')) return null;
   const product = response.product;
   if (!product) return null;
   // Los liquidos vienen por 100 ml: no se mapean a gramos a ciegas.
