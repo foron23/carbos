@@ -52,6 +52,18 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="base de los pesos; por defecto jsDelivr sobre <repo>@weights-<version>/weights",
     )
+    parser.add_argument(
+        "--detector-base",
+        default=None,
+        help="base propia del detector (por defecto, la comun). Util para reutilizar un "
+        "asset sin cambios desde un tag anterior (p.ej. weights-0.2.0) si el CDN del tag "
+        "nuevo no lo sirve.",
+    )
+    parser.add_argument(
+        "--classifier-base",
+        default=None,
+        help="base propia del clasificador (por defecto, la comun).",
+    )
     parser.add_argument("--stage", type=Path, default=DEFAULT_STAGE)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--detector-name", default="detector.onnx")
@@ -66,6 +78,8 @@ def main() -> None:
     base = args.base_url or (
         f"https://cdn.jsdelivr.net/gh/{args.repo}@weights-{args.version}/weights"
     ).rstrip("/")
+    detector_base = (args.detector_base or base).rstrip("/")
+    classifier_base = (args.classifier_base or base).rstrip("/")
 
     for path in (args.detector, args.classifier, args.classes):
         if not path.is_file():
@@ -82,13 +96,13 @@ def main() -> None:
     manifest = {
         "detector": {
             "version": args.detector_version,
-            "url": f"{base}/{args.detector_name}",
+            "url": f"{detector_base}/{args.detector_name}",
             "sha256": sha256_of(detector_staged),
             "bytes": detector_staged.stat().st_size,
         },
         "classifier": {
             "version": args.classifier_version,
-            "url": f"{base}/{args.classifier_name}",
+            "url": f"{classifier_base}/{args.classifier_name}",
             "sha256": sha256_of(classifier_staged),
             "bytes": classifier_staged.stat().st_size,
             "classes": classes,

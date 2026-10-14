@@ -1,7 +1,7 @@
 {
   "detector": {
     "version": "yolo11n-coco",
-    "url": "https://cdn.jsdelivr.net/gh/foron23/carbos@weights-0.3.0/weights/detector.onnx",
+    "url": "https://cdn.jsdelivr.net/gh/foron23/carbos@weights-0.2.0/weights/detector.onnx",
     "sha256": "4358e2dd982c58ad2246858aadb3a6a44edbe1654e6f0fc884290bd9a78d4201",
     "bytes": 10701974
   },
