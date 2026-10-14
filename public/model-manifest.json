@@ -1,14 +1,14 @@
 {
   "detector": {
     "version": "yolo11n-coco",
-    "url": "https://cdn.jsdelivr.net/gh/foron23/carbos@weights-0.2.0/weights/detector.onnx",
+    "url": "https://cdn.jsdelivr.net/gh/foron23/carbos@weights-0.3.0/weights/detector.onnx",
     "sha256": "4358e2dd982c58ad2246858aadb3a6a44edbe1654e6f0fc884290bd9a78d4201",
     "bytes": 10701974
   },
   "classifier": {
-    "version": "distill-clip-clip-vit-base-patch32-v1",
-    "url": "https://cdn.jsdelivr.net/gh/foron23/carbos@weights-0.2.0/weights/classifier.int8.onnx",
-    "sha256": "8c86059fdd241346221e909fb5a3fe899bb0c2916497e01fe107efc46753c50f",
+    "version": "distill-clip-clip-vit-large-patch14-v1",
+    "url": "https://cdn.jsdelivr.net/gh/foron23/carbos@weights-0.3.0/weights/classifier.int8.onnx",
+    "sha256": "4a4ef6420bb0725ca10c2d89947b71b88d31fbd15ed5613bd4531252e7ad629e",
     "bytes": 4619132,
     "classes": [
       "pan_blanco",
