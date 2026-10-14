@@ -8,6 +8,7 @@ import {
   startOfWeek,
   weekBreakdown,
   weekCarbs,
+  targetProgress,
 } from './totals';
 
 function food(grams: number, carbsPer100g: number): FoodItem {
@@ -77,5 +78,33 @@ describe('totals', () => {
   it('roundCarbs redondea a una decimal', () => {
     expect(roundCarbs(12.34)).toBe(12.3);
     expect(roundCarbs(12.35)).toBe(12.4);
+  });
+
+  it('targetProgress calcula restante y ratio por debajo del objetivo', () => {
+    const info = targetProgress(120, 180);
+    expect(info.remaining).toBeCloseTo(60);
+    expect(info.ratio).toBeCloseTo(120 / 180);
+    expect(info.over).toBe(false);
+  });
+
+  it('targetProgress acota el ratio a 1 y no deja restante negativo al pasarse', () => {
+    const info = targetProgress(200, 180);
+    expect(info.remaining).toBe(0);
+    expect(info.ratio).toBe(1);
+    expect(info.over).toBe(true);
+  });
+
+  it('targetProgress trata un objetivo no positivo como sin objetivo', () => {
+    const info = targetProgress(50, 0);
+    expect(info.target).toBe(0);
+    expect(info.ratio).toBe(0);
+    expect(info.over).toBe(false);
+  });
+
+  it('targetProgress a la altura exacta del objetivo no marca over', () => {
+    const info = targetProgress(180, 180);
+    expect(info.remaining).toBe(0);
+    expect(info.ratio).toBe(1);
+    expect(info.over).toBe(false);
   });
 });

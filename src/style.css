@@ -181,6 +181,37 @@ p {
   block-size: 0.9rem;
 }
 
+/* Objetivo diario (D60): barra fina + texto informativo; oculto sin objetivo. */
+.target-progress {
+  flex: 1 1 100%;
+  display: grid;
+  grid-template-columns: minmax(4rem, 1fr) auto;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.target-bar {
+  display: block;
+  block-size: 0.4rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+
+.target-fill {
+  display: block;
+  block-size: 100%;
+  inline-size: 0;
+  background: var(--accent);
+  border-radius: inherit;
+}
+
+.target-text {
+  font-variant-numeric: tabular-nums;
+}
+
 .header-disclaimer {
   font-size: 0.7rem;
   line-height: 1.25;
@@ -1060,6 +1091,18 @@ main {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--fg);
+}
+
+.daily-target-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-block: 0.5rem 0.75rem;
+  font-size: var(--text-sm);
+}
+
+.daily-target-field input {
+  inline-size: 6rem;
 }
 
 .moment-breakdown {

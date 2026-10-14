@@ -23,6 +23,7 @@ import {
   roundCarbs,
   scaleGrams,
   selectableTopk,
+  targetProgress,
   toJson,
   weekBreakdown,
 } from './core';
@@ -142,6 +143,31 @@ function toggleFavorite(id: string): void {
   if (index >= 0) ids.splice(index, 1);
   else ids.push(id);
   writeFavorites(ids);
+}
+
+/**
+ * Objetivo diario de carbohidratos (D60): un ajuste de UI con **el numero de la
+ * persona**. Vacio, no numerico o `<= 0` significa "sin objetivo".
+ */
+const DAILY_TARGET_KEY = 'carbos.dailyTarget';
+
+function readDailyTarget(): number {
+  try {
+    const raw = localStorage.getItem(DAILY_TARGET_KEY);
+    const value = raw === null ? Number.NaN : Number.parseFloat(raw);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeDailyTarget(value: number): void {
+  try {
+    if (value > 0) localStorage.setItem(DAILY_TARGET_KEY, String(value));
+    else localStorage.removeItem(DAILY_TARGET_KEY);
+  } catch {
+    /* almacenamiento no disponible */
+  }
 }
 
 function readViewDate(): string | null {
@@ -290,6 +316,19 @@ app.innerHTML = `
     <p class="tagline muted" data-i18n="app.tagline"></p>
     <div class="day-summary">
       <output id="day-total" class="total" aria-live="polite"></output>
+      <div
+        id="target-progress"
+        class="target-progress"
+        hidden
+        role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax="0"
+        aria-valuenow="0"
+        data-i18n-aria="target.progress"
+      >
+        <span class="target-bar" aria-hidden="true"><span id="target-fill" class="target-fill"></span></span>
+        <output id="target-text" class="target-text"></output>
+      </div>
       <span class="chip"><span data-i18n="diary.week"></span>: <output id="week-total"></output></span>
       <ul id="week-bars" class="week-bars"></ul>
     </div>
@@ -374,6 +413,7 @@ app.innerHTML = `
     <h2 class="sr-only" data-i18n="section.diary"></h2>
     <div id="diary-summary" class="diary-summary">
       <p class="summary-row summary-total"><span data-i18n="summary.total"></span><strong class="summary-carbs"><output id="summary-carbs"></output></strong></p>
+      <p class="summary-row summary-target" id="summary-target-row" hidden><span data-i18n="summary.target"></span><output id="summary-target" class="summary-count"></output></p>
       <p class="summary-row"><output id="summary-meals" class="summary-count"></output><span data-i18n="summary.meals"></span></p>
       <p class="summary-row"><output id="summary-insulin" class="summary-count"></output><span data-i18n="summary.insulin"></span></p>
       <ul class="moment-breakdown">
@@ -423,6 +463,7 @@ app.innerHTML = `
   <details class="card" id="settings">
     <summary data-i18n="section.settings"></summary>
     <h2 class="sr-only" data-i18n="section.settings"></h2>
+    <label class="field daily-target-field"><span data-i18n="settings.dailyTarget"></span><input id="daily-target" type="number" min="0" step="1" inputmode="numeric" /></label>
     <p><button id="persist" type="button" data-i18n="button.persist"></button></p>
     <p id="persist-status" class="muted" aria-live="polite"></p>
     <label class="check"><input id="insulin-toggle" type="checkbox" /> <span data-i18n="settings.insulinModule"></span></label>
@@ -1147,12 +1188,41 @@ function renderWeekBars(days: WeekDay[]): void {
 }
 
 function renderToday(): void {
-  byId('day-total').textContent =
-    `${roundCarbs(dayCarbs(vault.meals, currentDate))} ${tr('unit.grams')}`;
+  const consumed = roundCarbs(dayCarbs(vault.meals, currentDate));
+  byId('day-total').textContent = `${consumed} ${tr('unit.grams')}`;
   const days = weekBreakdown(vault.meals, currentDate);
   const weekTotal = days.reduce((sum, day) => sum + day.carbs, 0);
   byId('week-total').textContent = `${roundCarbs(weekTotal)} ${tr('unit.grams')}`;
   renderWeekBars(days);
+  renderTarget(consumed);
+}
+
+/**
+ * Progreso del objetivo (D60) en el topbar y en el resumen del Diario. Sin
+ * objetivo, ambos quedan ocultos: la UI es la de SPEC 22. El texto es
+ * informativo ("Restante"), nunca valorativo, y el numero es el del usuario.
+ */
+function renderTarget(consumed: number): void {
+  const progress = byId('target-progress');
+  const summaryRow = byId('summary-target-row');
+  const target = readDailyTarget();
+  if (target <= 0) {
+    progress.hidden = true;
+    summaryRow.hidden = true;
+    return;
+  }
+  const info = targetProgress(consumed, target);
+  const delta = info.over ? consumed - target : info.remaining;
+  const deltaLabel = `${info.over ? tr('target.over') : tr('target.remaining')} ${roundCarbs(delta)} ${tr('unit.grams')}`;
+  const amount = `${roundCarbs(consumed)} / ${target} ${tr('unit.grams')}`;
+  progress.hidden = false;
+  progress.setAttribute('aria-valuemax', String(target));
+  progress.setAttribute('aria-valuenow', String(roundCarbs(consumed)));
+  progress.setAttribute('aria-valuetext', `${amount} · ${deltaLabel}`);
+  byId('target-fill').style.inlineSize = `${Math.round(info.ratio * 100)}%`;
+  byId('target-text').textContent = `${amount} · ${deltaLabel}`;
+  summaryRow.hidden = false;
+  byId('summary-target').textContent = `${target} ${tr('unit.grams')} · ${deltaLabel}`;
 }
 
 /**
@@ -1623,6 +1693,15 @@ function wire(): void {
 
   byId<HTMLInputElement>('date').value = currentDate;
   localeSelect.value = locale;
+
+  const dailyTargetInput = byId<HTMLInputElement>('daily-target');
+  const initialTarget = readDailyTarget();
+  dailyTargetInput.value = initialTarget > 0 ? String(initialTarget) : '';
+  dailyTargetInput.addEventListener('change', () => {
+    const value = Number.parseFloat(dailyTargetInput.value);
+    writeDailyTarget(Number.isFinite(value) && value > 0 ? value : 0);
+    render();
+  });
 
   localeSelect.addEventListener('change', () => {
     const value = localeSelect.value;

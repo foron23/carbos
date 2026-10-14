@@ -1699,4 +1699,39 @@ export const scenarios = [
       await screenshot(page, 'quickadd');
     },
   },
+  {
+    name: 'objetivo diario muestra progreso en el topbar y el resumen',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await page.evaluate(() => localStorage.removeItem('carbos.dailyTarget'));
+      await reload(page);
+      await waitFor(page, '#app header h1');
+      assert(await page.$eval('#target-progress', (el) => el.hidden), 'sin objetivo no hay barra');
+
+      // El objetivo es el numero de la persona (D60).
+      await setValue(page, '#daily-target', '180');
+      assertEqual(
+        await page.$eval('#target-progress', (el) => el.getAttribute('aria-valuemax')),
+        '180',
+        'el objetivo se refleja en la barra',
+      );
+
+      await addFood(page, 'manzana');
+      await register(page);
+      await waitForText(page, '#diary', 'Manzana');
+      const now = Number(
+        await page.$eval('#target-progress', (el) => el.getAttribute('aria-valuenow')),
+      );
+      assert(now > 0, `el progreso avanza (${now})`);
+      assert(
+        !(await page.$eval('#summary-target-row', (el) => el.hidden)),
+        'el resumen muestra el objetivo',
+      );
+      assert(
+        (await text(page, '#summary-target')).includes('180'),
+        'el resumen incluye el objetivo',
+      );
+      await screenshot(page, 'objetivo-diario');
+    },
+  },
 ];

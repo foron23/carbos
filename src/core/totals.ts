@@ -56,3 +56,29 @@ export function weekBreakdown(meals: readonly Meal[], activeDate: string): WeekD
 export function roundCarbs(value: number): number {
   return Math.round(value * 10) / 10;
 }
+
+export interface TargetProgress {
+  target: number;
+  consumed: number;
+  remaining: number;
+  ratio: number;
+  over: boolean;
+}
+
+/**
+ * Progreso del objetivo diario (D60). Presentacional y sin juicio: `remaining`
+ * nunca es negativo (lo que "queda") y `ratio` se acota a `[0, 1]` para la barra.
+ * Un `target` no positivo equivale a "sin objetivo".
+ */
+export function targetProgress(consumed: number, target: number): TargetProgress {
+  const safeTarget = target > 0 ? target : 0;
+  const remaining = Math.max(0, safeTarget - consumed);
+  const ratio = safeTarget > 0 ? Math.min(1, Math.max(0, consumed / safeTarget)) : 0;
+  return {
+    target: safeTarget,
+    consumed,
+    remaining,
+    ratio,
+    over: safeTarget > 0 && consumed > safeTarget,
+  };
+}
