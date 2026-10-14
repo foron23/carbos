@@ -32,14 +32,18 @@ from confirm_labels import (  # noqa: E402
     REJECT_LABEL,
     append_log,
     build_catalog_index,
+    crop_materialize,
     dest_name,
+    dest_name_box,
     load_decided,
     load_queue,
     materialize,
     now_iso,
     record,
+    record_boxes,
     resolve_src,
     search_catalog,
+    validate_box,
 )
 from fetch_images import load_foods  # noqa: E402
 
@@ -60,14 +64,21 @@ PAGE = """<!doctype html>
  header{padding:.5rem 1rem;display:flex;gap:1rem;align-items:center;border-bottom:1px solid #8884}
  #bar{height:6px;background:#2a7;width:0}
  main{flex:1;display:flex;gap:1rem;padding:1rem;min-height:0}
- #pic{flex:2;display:flex;align-items:center;justify-content:center;background:#8881;border-radius:8px;overflow:hidden}
+ #pic{flex:2;display:flex;align-items:center;justify-content:center;background:#8881;border-radius:8px;overflow:hidden;position:relative}
  #pic img{max-width:100%;max-height:100%;object-fit:contain}
+ #cv{position:absolute;touch-action:none;cursor:crosshair}
  aside{flex:1;display:flex;flex-direction:column;gap:.5rem;min-width:280px}
  button{font-size:1rem;padding:.6rem;border-radius:8px;border:1px solid #8886;background:#8881;cursor:pointer;text-align:left}
  button:hover{background:#8883}
  .k{opacity:.6;margin-right:.4rem}
  #topk button b{color:#2a7}
+ #topk button.active,#results button.active{outline:2px solid #2a7}
  #meta{font-size:.9rem;opacity:.75}
+ #activeinfo{font-size:.85rem;opacity:.8}
+ #boxlist{max-height:20vh;overflow:auto;display:flex;flex-direction:column;gap:.3rem;font-size:.9rem}
+ .boxrow{display:flex;gap:.4rem;align-items:center}
+ .boxrow span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .boxrow button{padding:.2rem .5rem}
  #searchrow{display:flex;gap:.4rem}
  input{flex:1;padding:.5rem;border-radius:8px;border:1px solid #8886;background:transparent;color:inherit}
  #results{max-height:30vh;overflow:auto;display:flex;flex-direction:column;gap:.3rem}
@@ -80,12 +91,15 @@ PAGE = """<!doctype html>
   <strong>Etiquetado local</strong>
   <span id="meta">cargando...</span>
   <span style="flex:1"></span>
-  <span class="k">teclas: 1-5 propuesta · a aceptar · r rechazar · n saltar · ←/→</span>
+  <span class="k">1-5 propuesta · a aceptar · r rechazar · n saltar · ←/→ · arrastra para dibujar cajas</span>
 </header>
 <main>
-  <div id="pic"><img id="img" alt=""></div>
+  <div id="pic"><img id="img" alt=""><canvas id="cv"></canvas></div>
   <aside>
     <div id="topk"></div>
+    <div id="activeinfo"></div>
+    <div id="boxlist"></div>
+    <button id="confirm-boxes">✓ confirmar cajas</button>
     <button id="accept">a · aceptar la carpeta</button>
     <div id="searchrow"><input id="q" placeholder="buscar en el catalogo..."><button id="find">buscar</button></div>
     <div id="results"></div>
@@ -102,37 +116,124 @@ PAGE = """<!doctype html>
 </main>
 <footer id="foot"></footer>
 <script>
-let items=[], i=0, counts={};
+let items=[], i=0, counts={}, boxes=[], activeClass=null, drag=null;
 const $=id=>document.getElementById(id);
+const cv=$('cv'), ctx=cv.getContext('2d');
+function colorFor(id){
+  let h=0; for(let k=0;k<id.length;k++) h=(h*31+id.charCodeAt(k))>>>0;
+  return `hsl(${h%360} 70% 45%)`;
+}
 async function load(){
   const r=await fetch('/api/queue'); const d=await r.json();
   items=d.items; counts=d.counts; i=0; render();
 }
+function resizeCanvas(){
+  const img=$('img');
+  if(!img.naturalWidth||!img.naturalHeight){ cv.width=0; cv.height=0; return; }
+  const pr=$('pic').getBoundingClientRect(), r=img.getBoundingClientRect();
+  const scale=Math.min(r.width/img.naturalWidth, r.height/img.naturalHeight);
+  const w=img.naturalWidth*scale, h=img.naturalHeight*scale;
+  cv.style.left=(r.left-pr.left+(r.width-w)/2)+'px';
+  cv.style.top=(r.top-pr.top+(r.height-h)/2)+'px';
+  cv.style.width=w+'px'; cv.style.height=h+'px';
+  cv.width=Math.max(1,Math.round(w)); cv.height=Math.max(1,Math.round(h));
+  draw();
+}
+function draw(){
+  const w=cv.width, h=cv.height;
+  ctx.clearRect(0,0,w,h);
+  for(const b of boxes){
+    const [x,y,bw,bh]=b.box;
+    ctx.strokeStyle=colorFor(b.label); ctx.lineWidth=2;
+    ctx.strokeRect(x*w,y*h,bw*w,bh*h);
+    ctx.fillStyle=colorFor(b.label); ctx.font='12px system-ui,sans-serif';
+    ctx.fillText(b.label,x*w+2,y*h+12);
+  }
+  if(drag){
+    const [x,y,bw,bh]=drag.box;
+    ctx.strokeStyle='#2a7'; ctx.lineWidth=2; ctx.setLineDash([5,4]);
+    ctx.strokeRect(x*w,y*h,bw*w,bh*h); ctx.setLineDash([]);
+  }
+}
+function norm(e){
+  const r=cv.getBoundingClientRect();
+  const nx=(e.clientX-r.left)/r.width, ny=(e.clientY-r.top)/r.height;
+  return [Math.min(1,Math.max(0,nx)),Math.min(1,Math.max(0,ny))];
+}
+function rectFrom(a,b){
+  return [Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.abs(a[0]-b[0]),Math.abs(a[1]-b[1])];
+}
+function setActive(id){
+  if(!id) return;
+  activeClass=id;
+  document.querySelectorAll('#topk button,#results button').forEach(b=>b.classList.toggle('active',b.dataset.id===id));
+  $('activeinfo').textContent='clase activa: '+id;
+}
+function renderBoxes(){
+  const el=$('boxlist');
+  if(!boxes.length){ el.innerHTML='<em>sin cajas · elige clase y arrastra sobre la imagen</em>'; return; }
+  el.innerHTML=boxes.map((b,n)=>`<div class="boxrow"><span style="color:${colorFor(b.label)}">${b.label}</span><button data-n="${n}">✕</button></div>`).join('');
+  el.querySelectorAll('button').forEach(btn=>btn.onclick=()=>{boxes.splice(+btn.dataset.n,1);draw();renderBoxes();});
+}
+function resetBoxes(){ boxes=[]; drag=null; activeClass=null; }
 function render(){
   const it=items[i];
+  resetBoxes();
   $('bar').style.width = (100*(i/items.length)).toFixed(1)+'%';
-  if(!it){ $('img').removeAttribute('src'); $('topk').innerHTML='<em>Cola terminada.</em>'; return; }
+  if(!it){ $('img').removeAttribute('src'); $('topk').innerHTML='<em>Cola terminada.</em>'; $('boxlist').innerHTML=''; $('activeinfo').textContent=''; ctx.clearRect(0,0,cv.width,cv.height); return; }
   $('img').src='/img?p='+encodeURIComponent(it.path);
   const cls=it.folderClass||'(ninguna)';
   const rem=items.filter(x=>(x.folderClass||'(ninguna)')===cls).length;
   $('meta').textContent=`${i+1}/${items.length} · carpeta: ${cls} (${rem} restantes) · ${it.agree===true?'agree':it.agree===false?'disagree':'n/a'}`;
   $('foot').textContent=`confirmadas=${counts.accepted} rechazadas=${counts.rejected} saltadas=${counts.skipped} pendientes=${items.length-i}`;
   const tk=it.topk||[];
-  $('topk').innerHTML=tk.map((p,n)=>`<button data-n="${n}" data-id="${p.id}"><span class="k">${n+1}</span>${p.id} <b>${(p.p*100).toFixed(1)}%</b></button>`).join('')
-     + `<button data-n="0" data-id="${it.folderClass||''}"><span class="k">a</span>${it.folderClass||'(carpeta)'} <b>carpeta</b></button>`;
-  $('topk').querySelectorAll('button').forEach(b=>b.onclick=()=>decide(b.dataset.n==='0'?'accept':'topk',b.dataset.id));
+  $('topk').innerHTML=tk.map((p,n)=>`<button data-id="${p.id}"><span class="k">${n+1}</span>${p.id} <b>${(p.p*100).toFixed(1)}%</b></button>`).join('')
+     + `<button data-id="${it.folderClass||''}"><span class="k">a</span>${it.folderClass||'(carpeta)'} <b>carpeta</b></button>`;
+  $('topk').querySelectorAll('button').forEach(b=>b.onclick=()=>setActive(b.dataset.id));
+  $('results').innerHTML='';
+  const def=it.folderClass||(tk[0]&&tk[0].id)||'';
+  if(def) setActive(def); else $('activeinfo').textContent='';
+  renderBoxes();
+  draw();
 }
+cv.addEventListener('pointerdown',e=>{
+  if(!$('img').naturalWidth) return;
+  if(!activeClass){ $('activeinfo').textContent='elige una clase activa antes de dibujar'; return; }
+  cv.setPointerCapture(e.pointerId);
+  const p=norm(e); drag={start:p,box:[p[0],p[1],0,0]}; draw();
+});
+cv.addEventListener('pointermove',e=>{
+  if(!drag) return;
+  drag.box=rectFrom(drag.start,norm(e)); draw();
+});
+function endDrag(){
+  if(!drag) return;
+  const b=drag.box; drag=null;
+  if(b[2]>0.005&&b[3]>0.005){ boxes.push({label:activeClass,box:b.map(v=>+v.toFixed(4))}); }
+  draw(); renderBoxes();
+}
+cv.addEventListener('pointerup',endDrag);
+cv.addEventListener('pointercancel',endDrag);
+$('img').addEventListener('load',resizeCanvas);
+window.addEventListener('resize',resizeCanvas);
 async function decide(action,label){
   const it=items[i]; if(!it) return;
   await fetch('/api/decide',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:it.path,action,label})});
   counts.accepted+=(action==='reject'?0:1); counts.rejected+=(action==='reject'?1:0); counts.skipped+=(action==='skip'?1:0);
   i++; render();
 }
+async function confirmBoxes(){
+  const it=items[i]; if(!it||!boxes.length) return;
+  const r=await fetch('/api/decide',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:it.path,boxes})});
+  const d=await r.json();
+  if(d.ok){ counts.accepted+=1; i++; render(); }
+  else { $('activeinfo').textContent=(d.error||'error al confirmar'); }
+}
 async function find(){
   const q=$('q').value.trim(); if(!q) return;
   const r=await fetch('/api/search?q='+encodeURIComponent(q)); const d=await r.json();
   $('results').innerHTML=d.matches.map(id=>`<button data-id="${id}">${id}</button>`).join('');
-  $('results').querySelectorAll('button').forEach(b=>b.onclick=()=>decide('label',b.dataset.id));
+  $('results').querySelectorAll('button').forEach(b=>b.onclick=()=>setActive(b.dataset.id));
 }
 async function bulk(mode){
   const it=items[i]; if(!it||!it.folderClass) return;
@@ -140,6 +241,7 @@ async function bulk(mode){
   const d=await r.json();
   if(d.ok){ items=d.items||[]; counts=d.counts||counts; i=0; render(); }
 }
+$('confirm-boxes').onclick=confirmBoxes;
 $('accept').onclick=()=>{const it=items[i]; if(it&&it.folderClass) decide('accept',it.folderClass);};
 $('reject').onclick=()=>decide('reject');
 $('skip').onclick=()=>{i++;render();};
@@ -150,12 +252,13 @@ $('find').onclick=find;
 $('q').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();find();}});
 document.addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT') return;
-  if(e.key==='a'){const it=items[i]; if(it&&it.folderClass) decide('accept',it.folderClass);}
+  const it=items[i];
+  if(e.key==='a'){if(it&&it.folderClass) decide('accept',it.folderClass);}
   else if(e.key==='r') decide('reject');
   else if(e.key==='n'){i++;render();}
   else if(e.key==='ArrowRight'){i=Math.min(i+1,items.length);render();}
   else if(e.key==='ArrowLeft'){i=Math.max(i-1,0);render();}
-  else if(/^[1-9]$/.test(e.key)){const b=$('topk').querySelector(`button[data-n="${e.key}"]`); if(b)b.click();}
+  else if(/^[1-9]$/.test(e.key)){const tk=(it&&it.topk)||[]; const n=+e.key-1; if(tk[n]) decide('topk',tk[n].id);}
 });
 load();
 </script></body></html>"""
@@ -182,10 +285,67 @@ class State:
     def queue_payload(self) -> dict:
         return {"items": self.items, "counts": self.counts}
 
-    def decide(self, path: str, action: str, label: str | None) -> dict:
+    def decide(
+        self,
+        path: str,
+        action: str,
+        label: str | None = None,
+        boxes: list[dict] | None = None,
+    ) -> dict:
         row = next((r for r in self.items if r["path"] == path), None)
         if row is None:
             return {"ok": False, "error": "fila no encontrada"}
+        if boxes is not None:
+            if not isinstance(boxes, list):
+                with self.lock:
+                    self.counts["errors"] += 1
+                return {"ok": False, "error": "'boxes' debe ser una lista"}
+            valid_boxes: list[dict] = []
+            for b in boxes:
+                if not isinstance(b, dict):
+                    with self.lock:
+                        self.counts["errors"] += 1
+                    return {"ok": False, "error": f"cada caja debe ser un objeto: {b!r}"}
+                bid = b.get("label")
+                if bid not in self.valid_ids:
+                    with self.lock:
+                        self.counts["errors"] += 1
+                    return {"ok": False, "error": f"'{bid}' no es id del catalogo"}
+                try:
+                    box = validate_box(b.get("box"))
+                except ValueError as exc:
+                    with self.lock:
+                        self.counts["errors"] += 1
+                    return {"ok": False, "error": f"caja invalida: {exc}"}
+                valid_boxes.append({"label": bid, "box": [box[0], box[1], box[2], box[3]]})
+            if not valid_boxes:
+                with self.lock:
+                    self.counts["errors"] += 1
+                return {"ok": False, "error": "'boxes' vacio; se omite"}
+            src = resolve_src(path)
+            if not src.exists():
+                with self.lock:
+                    self.counts["errors"] += 1
+                return {"ok": False, "error": "imagen origen ausente"}
+            with self.lock:
+                written: list[Path] = []
+                try:
+                    for b in valid_boxes:
+                        dest = self.args.out_dir / dest_name_box(path, b["label"], b["box"])
+                        if crop_materialize(src, dest, b["box"]) == "crop":
+                            written.append(dest)
+                except ValueError as exc:
+                    for dest in written:  # rollback: sin recortes huerfanos
+                        try:
+                            dest.unlink()
+                        except OSError:
+                            pass
+                    self.counts["errors"] += 1
+                    return {"ok": False, "error": f"error al recortar: {exc}"}
+                append_log(self.args.log, record_boxes(row, valid_boxes, "boxes", True, "server"))
+                self.counts["accepted"] += 1
+                self.items = [r for r in self.items if r["path"] != path]
+            return {"ok": True, "counts": self.counts}
         if action == "reject":
             label = REJECT_LABEL
         elif action == "skip":
@@ -291,7 +451,10 @@ def make_handler(state: State):
                 result = state.bulk(payload.get("class", ""), payload.get("mode", "accept"))
             else:
                 result = state.decide(
-                    payload.get("path", ""), payload.get("action", ""), payload.get("label")
+                    payload.get("path", ""),
+                    payload.get("action", ""),
+                    payload.get("label"),
+                    payload.get("boxes"),
                 )
             return self._json(result, 200 if result.get("ok") else 400)
 

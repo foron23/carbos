@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import shutil
 import sys
@@ -61,6 +62,7 @@ AUTO_SOURCES = {"accept-agree", "accept-folder"}
 REJECT_LABEL = "__reject__"
 IGNORED_EXTS = {".jpeg", ".webp"}
 ALLOWED_ACTIONS = {"accept", "topk", "label", "reject", "skip"}
+_BOX_EPS = 1e-6  # tolerancia para x+w<=1 / y+h<=1 (redondeos de la UI)
 
 
 # ---------------------------------------------------------------------------
@@ -152,13 +154,80 @@ def resolve_decision(
     raise ValueError(f"accion desconocida: {action!r}")
 
 
+def _sha8(path: str) -> str:
+    """Hash corto y estable de un path relativo (evita colisiones de nombre)."""
+    return hashlib.sha256(path.encode("utf-8")).hexdigest()[:8]
+
+
 def dest_name(path: str, class_id: str) -> Path:
     """data/confirmed/<class_id>/<stem>__<sha8(path)>.<ext> (evita colisiones)."""
     src = Path(path)
     stem = src.stem or "image"
     ext = src.suffix.lower() or ".jpg"
-    digest = hashlib.sha256(path.encode("utf-8")).hexdigest()[:8]
-    return Path(class_id) / f"{stem}__{digest}{ext}"
+    return Path(class_id) / f"{stem}__{_sha8(path)}{ext}"
+
+
+def validate_box(box) -> tuple[float, float, float, float]:
+    """Valida una caja normalizada [x, y, w, h] en 0..1 (w>0, h>0).
+
+    Acepta cualquier secuencia de 4 numeros; ValueError con mensaje claro en
+    caso contrario. Relativa a la imagen ORIGINAL.
+    """
+    if isinstance(box, (str, bytes)) or not isinstance(box, (list, tuple)) or len(box) != 4:
+        raise ValueError(f"box debe ser secuencia de 4 numeros: {box!r}")
+    values: list[float] = []
+    for value in box:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"box debe contener numeros (0..1): {box!r}")
+        fv = float(value)
+        if not math.isfinite(fv) or fv < 0.0 or fv > 1.0:
+            raise ValueError(f"box fuera de [0,1]: {box!r}")
+        values.append(fv)
+    x, y, w, h = values
+    if w <= 0.0 or h <= 0.0:
+        raise ValueError(f"box requiere w>0 y h>0: {box!r}")
+    if x + w > 1.0 + _BOX_EPS or y + h > 1.0 + _BOX_EPS:
+        raise ValueError(f"box desborda la imagen (x+w o y+h > 1): {box!r}")
+    return (x, y, w, h)
+
+
+def dest_name_box(path: str, class_id: str, box, suffix: str = ".png") -> Path:
+    """Nombre de recorte para etiquetado por regiones (PNG por defecto).
+
+    Misma base que dest_name; la caja se resume en un hash corto para que dos
+    cajas distintas de la misma imagen no colisionen.
+    """
+    x, y, w, h = validate_box(box)
+    box_key = hashlib.sha1((",".join(f"{v:.4f}" for v in (x, y, w, h))).encode()).hexdigest()[:8]
+    stem = Path(path).stem or "image"
+    return Path(class_id) / f"{stem}__{_sha8(path)}__b{box_key}{suffix}"
+
+
+def crop_materialize(src: Path, dest: Path, box, min_px: int = 16) -> str:
+    """Recorta `box` (normalizada) de `src` y lo guarda como PNG en `dest`.
+
+    Usa Pillow (import perezoso: solo el etiquetado por regiones lo necesita).
+    Aplica exif_transpose, convierte a RGB y hace clamp de la caja a los limites.
+    Nunca mueve/borra el origen. Devuelve "exists" o "crop".
+    """
+    from PIL import Image, ImageOps  # noqa: PLC0415 (dependencia opcional)
+
+    x, y, w, h = validate_box(box)
+    if dest.exists():
+        return "exists"
+    with Image.open(src) as opened:
+        image = ImageOps.exif_transpose(opened).convert("RGB")
+        width, height = image.size
+        left = max(0, min(int(round(x * width)), width))
+        top = max(0, min(int(round(y * height)), height))
+        right = max(0, min(int(round((x + w) * width)), width))
+        bottom = max(0, min(int(round((y + h) * height)), height))
+        if right - left < min_px or bottom - top < min_px:
+            raise ValueError("caja demasiado pequena")
+        crop = image.crop((left, top, right, bottom))
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        crop.save(dest, "PNG")
+    return "crop"
 
 
 def load_queue(path: Path) -> list[dict]:
@@ -200,6 +269,12 @@ def load_decided(log_path: Path) -> dict[str, dict]:
 
 def is_materialized(rec: dict, out_dir: Path) -> bool:
     """Reconciliacion log<->disco: reject siempre decidido; aceptado requiere archivo."""
+    boxes = rec.get("boxes")
+    if boxes:
+        return all(
+            (out_dir / dest_name_box(rec["path"], b["label"], b["box"])).exists()
+            for b in boxes
+        )
     label = rec.get("label")
     if label == REJECT_LABEL:
         return True
@@ -331,6 +406,22 @@ def record(row: dict, label: str, source: str, reviewed: bool, via: str) -> dict
     }
 
 
+def record_boxes(row: dict, boxes: list[dict], source: str, reviewed: bool, via: str) -> dict:
+    """Fila de log para etiquetado por regiones (varios alimentos por imagen)."""
+    return {
+        "path": row["path"],
+        "labels": [b["label"] for b in boxes],
+        "boxes": boxes,
+        "source": source,
+        "reviewed": bool(reviewed),
+        "via": via,
+        "ts": now_iso(),
+        "folderClass": row.get("folderClass"),
+        "top1": (row.get("topk") or [{}])[0].get("id"),
+        "agree": row.get("agree"),
+    }
+
+
 def apply_decision(row: dict, dec: dict, args: argparse.Namespace, counters: dict) -> None:
     path = row["path"]
     label = dec["label"]
@@ -383,6 +474,74 @@ def apply_decision(row: dict, dec: dict, args: argparse.Namespace, counters: dic
     else:
         suffix = paint(" (dry-run)", "90")
     print(paint(f"ACCEPT {label:<16}", "32") + f"{path} -> {dest_rel}{suffix}")
+
+
+def apply_boxes_decision(row: dict, dec: dict, args: argparse.Namespace, counters: dict) -> None:
+    """Decision multi-region: valida y materializa cada recorte, luego loguea.
+
+    Misma semantica que el servidor (`label_server.State.decide`): valida TODAS
+    las cajas antes de escribir; si algo falla no cuenta como aceptada y hace
+    rollback de los recortes ya escritos para no dejar huerfanos sin log.
+    """
+    path = row["path"]
+    try:
+        boxes: list[dict] = []
+        for item in dec.get("boxes") or []:
+            if not isinstance(item, dict):
+                raise ValueError(f"cada caja debe ser un objeto: {item!r}")
+            label = item.get("label")
+            if label not in counters["valid_ids"]:
+                raise ValueError(f"label '{label}' no es id del catalogo")
+            box = validate_box(item.get("box"))
+            boxes.append({"label": label, "box": [box[0], box[1], box[2], box[3]]})
+    except ValueError as exc:
+        counters["errors"] += 1
+        print(f"WARN   {path}: {exc}", file=sys.stderr)
+        return
+    if not boxes:
+        counters["errors"] += 1
+        print(f"WARN   {path}: 'boxes' vacio; se omite", file=sys.stderr)
+        return
+
+    src = resolve_src(path)
+    if not src.exists():
+        counters["errors"] += 1
+        counters["handled"].add(path)
+        print(f"WARN   {path}: imagen origen ausente; se omite", file=sys.stderr)
+        return
+
+    source = dec.get("source", "manual")
+    reviewed = source not in AUTO_SOURCES
+    via = "machine" if args.decisions else "interactive"
+
+    if args.dry_run:
+        counters["accepted"] += 1
+        counters["handled"].add(path)
+        for b in boxes:
+            dest_rel = dest_name_box(path, b["label"], b["box"])
+            print(paint(f"CROP   {b['label']:<16}", "32") + f"{path} -> {dest_rel}")
+            print(paint(" (dry-run)", "90"))
+        return
+
+    written: list[Path] = []
+    try:
+        for b in boxes:
+            dest_abs = args.out_dir / dest_name_box(path, b["label"], b["box"])
+            if crop_materialize(src, dest_abs, b["box"]) == "crop":
+                written.append(dest_abs)
+    except ValueError as exc:
+        for dest in written:  # rollback: no dejar recortes sin entrada de log
+            try:
+                dest.unlink()
+            except OSError:
+                pass
+        counters["errors"] += 1
+        print(f"WARN   {path}: {exc}", file=sys.stderr)
+        return
+    counters["accepted"] += 1
+    counters["handled"].add(path)
+    append_log(args.log, record_boxes(row, boxes, source, reviewed, via))
+    print(paint(f"CROP x{len(boxes):<3}", "32") + path)
 
 
 def show_row(idx: int, total: int, row: dict, topk: list[dict]) -> None:
@@ -554,6 +713,9 @@ def main() -> int:
                 counters["already"] += 1
                 counters["handled"].add(row["path"])
                 print(paint(f"ALREADY {row['path']}", "90"))
+                continue
+            if dec.get("boxes") is not None:
+                apply_boxes_decision(row, dec, args, counters)
                 continue
             try:
                 action = dec.get("action", "accept")

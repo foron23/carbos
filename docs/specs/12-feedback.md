@@ -46,6 +46,25 @@ foto) contribuir esa imagen con su **etiqueta confirmada**. Se acumula un datase
   `data/proposed` con `reviewed:false`: **propuesto no es confirmado**. El servidor agrupa por clase
   y ofrece operaciones en volumen (aceptar la clase, solo las `agree`, o saltarla).
 
+### Etiquetado por regiones (varios alimentos por imagen)
+
+`tools/data/label_server.py` (`make data-label`) tambien permite marcar **varias regiones** en una
+misma foto: se **dibujan cajas** sobre la imagen, cada caja tiene una **clase activa** (la propuesta
+del teacher o una elegida en el catalogo) y se **confirma** caja a caja; cada region se materializa
+como un recorte con su etiqueta.
+
+- **Caja**: `box=[x, y, w, h]` **normalizado** (0-1, relativo al ancho/alto de la imagen; debe
+  caber dentro de la imagen: `x+w<=1` y `y+h<=1`).
+- **Salida**: `data/confirmed/<clase>/<img>__<sha8>__b<boxhash>.png`, donde `<sha8>` es el hash de
+  la imagen origen y `<boxhash>` el de la caja → **sin colision** entre regiones de la misma foto,
+  y el origen queda **recuperable** por el `<sha8>`.
+- Es la via **multi-alimento "sin modelos nuevos"** (idea afin a SPEC 20 **C2**, multi-etiqueta
+  "barata"): recortes anotados a mano, sin segmentacion ni cabezas nuevas.
+- **Nota**: el nombre conserva de que foto venia cada recorte, pero el entrenamiento actual usa
+  `ImageFolder`, que **ignora esa agrupacion**: cada recorte entra como muestra independiente de
+  una sola clase, asi que **no se modela la composicion del plato** (limitacion del loader, no del
+  nombre). Ver [`20-platos-cocinados.md`](20-platos-cocinados.md).
+
 ## Formato del bundle (congelado v1)
 
 ```
