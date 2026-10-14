@@ -212,6 +212,8 @@ function clearStatus(id: string): void {
 let draft: Draft = { origin: 'manual', items: [] };
 /** Comida registrada que se esta editando (null = se crea una nueva). */
 let editingMeal: Meal | null = null;
+/** Hay una repeticion (D61) en el borrador: cancelable, pero es una comida nueva. */
+let repeatPending = false;
 let capture: CapturedImage | null = null;
 let vault: Vault = emptyVault();
 
@@ -235,6 +237,14 @@ let detectAbort: AbortController | null = null;
 let detectionClient: DetectionClient | null = null;
 /** La entrada escalonada de las cajas corre solo al resolver la deteccion (B2). */
 let animateDetectBoxes = false;
+
+/** Resetea el estado de deteccion (un solo dueno; evita el shotgun surgery). */
+function clearDetections(): void {
+  detections = [];
+  detectionDraftIds = [];
+  detectionMeta = null;
+  detectionEngine = '';
+}
 
 /**
  * Hook estrecho para el arnes E2E (mismo patron que `__carbosChatStub`): si
@@ -551,10 +561,7 @@ function pushBarcodeItem(product: BarcodeAdd): void {
     brand: product.brand,
   });
   draft.origin = 'manual';
-  detections = [];
-  detectionDraftIds = [];
-  detectionMeta = null;
-  detectionEngine = '';
+  clearDetections();
   renderDraft();
 }
 
@@ -781,7 +788,7 @@ function renderDraft(): void {
   byId('draft-total').textContent = `${roundCarbs(total)} ${tr('unit.grams')}`;
   const editing = editingMeal !== null;
   byId<HTMLButtonElement>('register').textContent = tr(editing ? 'button.save' : 'button.register');
-  byId<HTMLButtonElement>('register-cancel').hidden = !editing;
+  byId<HTMLButtonElement>('register-cancel').hidden = !(editing || repeatPending);
   byId('draft-editing').hidden = !editing;
   renderOverlay();
 }
@@ -1082,10 +1089,7 @@ async function startDetection(image: CapturedImage): Promise<void> {
   detectAbort = controller;
   const previous = new Set(detectionDraftIds.filter(Boolean));
   if (previous.size > 0) draft.items = draft.items.filter((item) => !previous.has(item.id));
-  detections = [];
-  detectionDraftIds = [];
-  detectionEngine = '';
-  detectionMeta = null;
+  clearDetections();
   renderDraft();
   renderDetect();
   setPhotoStatus('photo.detecting');
@@ -1222,7 +1226,7 @@ function renderTarget(consumed: number): void {
   byId('target-fill').style.inlineSize = `${Math.round(info.ratio * 100)}%`;
   byId('target-text').textContent = `${amount} · ${deltaLabel}`;
   summaryRow.hidden = false;
-  byId('summary-target').textContent = `${target} ${tr('unit.grams')} · ${deltaLabel}`;
+  byId('summary-target').textContent = `${amount} · ${deltaLabel}`;
 }
 
 /**
@@ -1319,15 +1323,17 @@ function entryActions(
   return wrap;
 }
 
-/** Deja de editar y vacia el borrador. */
+/** Deja de editar o de repetir y vacia el borrador. */
 function resetEdit(): void {
   editingMeal = null;
+  repeatPending = false;
   draft = { origin: 'manual', items: [] };
 }
 
 /** Carga una comida registrada en el borrador para ajustarla y guardarla. */
 function startEditMeal(meal: Meal): void {
   editingMeal = meal;
+  repeatPending = false;
   draft = { origin: meal.origin, items: meal.items.map((item) => ({ ...item })) };
   clearStatus('register-status');
   renderDraft();
@@ -1349,12 +1355,10 @@ function cancelEdit(): void {
  */
 function repeatMeal(meal: Meal): void {
   editingMeal = null;
+  repeatPending = true;
   draft = { origin: meal.origin, items: meal.items.map((item) => ({ ...item, id: uid() })) };
   // Una repeticion no hereda detecciones de foto: no hay modelo que rellenar.
-  detections = [];
-  detectionDraftIds = [];
-  detectionMeta = null;
-  detectionEngine = '';
+  clearDetections();
   clearStatus('register-status');
   renderDraft();
   renderDiary();
@@ -1865,10 +1869,7 @@ function wire(): void {
       .then(() => {
         resetEdit();
         capture = null;
-        detections = [];
-        detectionDraftIds = [];
-        detectionMeta = null;
-        detectionEngine = '';
+        clearDetections();
         photoStatusKey = null;
         setStatus('register-status', 'register.done');
         return refresh();

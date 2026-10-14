@@ -122,11 +122,11 @@ confirmacion previa al guardado. Sin esquema ni red.
 
 ## Decisiones nuevas (D59-D61)
 
-| #   | Decision                                          | Detalle                                                                                                                                                                                                                                                          | Estado    |
-| --- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| D59 | **Quick-add de recientes y favoritos**            | Atajos de un toque bajo la busqueda: **favoritos** (ids en `localStorage`) y **recientes** (ids derivados del diario, patron D57). Anaden a la **porcion por defecto del catalogo**; **no** aprenden correcciones ni guardan porcion por alimento (respeta D33). | propuesta |
-| D60 | **Objetivo diario de carbohidratos, del usuario** | Objetivo opt-in en gramos, **puesto por la persona**, en `localStorage`; el topbar y el resumen del Diario muestran progreso y restante. Presentacional, sin dosis ni consejo (linea regulatoria).                                                               | propuesta |
-| D61 | **Repetir comida**                                | Accion que **clona los items de una comida registrada al borrador** (ids nuevos, mismo dia en vista); nada se registra sin confirmar. Aditivo, sin esquema.                                                                                                      | propuesta |
+| #   | Decision                                          | Detalle                                                                                                                                                                                                                                                          | Estado  |
+| --- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| D59 | **Quick-add de recientes y favoritos**            | Atajos de un toque bajo la busqueda: **favoritos** (ids en `localStorage`) y **recientes** (ids derivados del diario, patron D57). Anaden a la **porcion por defecto del catalogo**; **no** aprenden correcciones ni guardan porcion por alimento (respeta D33). | cerrada |
+| D60 | **Objetivo diario de carbohidratos, del usuario** | Objetivo opt-in en gramos, **puesto por la persona**, en `localStorage`; el topbar y el resumen del Diario muestran progreso y restante. Presentacional, sin dosis ni consejo (linea regulatoria).                                                               | cerrada |
+| D61 | **Repetir comida**                                | Accion que **clona los items de una comida registrada al borrador** (ids nuevos, mismo dia en vista); nada se registra sin confirmar. Aditivo, sin esquema.                                                                                                      | cerrada |
 
 Estas decisiones quedan **cerradas** con la implementacion de SPEC 23.
 
@@ -188,18 +188,18 @@ consumed)` y `ratio` acotado a `[0, 1]` para la barra; `over` indica si se paso.
 
 Claves nuevas en **es** y **en** (el tipo `StringKey` y la guarda de paridad lo imponen):
 
-| Clave                        | ES                                   | EN                    |
-| ---------------------------- | ------------------------------------ | --------------------- |
-| `quickadd.favorites`         | Favoritos                            | Favorites             |
-| `quickadd.recents`           | Recientes                            | Recents               |
-| `quickadd.favorite` (aria)   | Marcar como favorito                 | Mark as favorite      |
-| `quickadd.unfavorite` (aria) | Quitar de favoritos                  | Remove from favorites |
-| `settings.dailyTarget`       | Objetivo diario de carbohidratos (g) | Daily carb target (g) |
-| `summary.target`             | Objetivo                             | Target                |
-| `target.remaining`           | Restante                             | Remaining             |
-| `target.over`                | Por encima                           | Over                  |
-| `target.progress` (aria)     | Progreso del objetivo                | Target progress       |
-| `button.repeat`              | Repetir                              | Repeat                |
+| Clave                        | ES                                      | EN                         |
+| ---------------------------- | --------------------------------------- | -------------------------- |
+| `quickadd.favorites`         | Favoritos                               | Favorites                  |
+| `quickadd.recents`           | Recientes                               | Recents                    |
+| `quickadd.favorite` (aria)   | Marcar como favorito                    | Mark as favorite           |
+| `quickadd.unfavorite` (aria) | Quitar de favoritos                     | Remove from favorites      |
+| `settings.dailyTarget`       | Tu objetivo diario de carbohidratos (g) | Your daily carb target (g) |
+| `summary.target`             | Tu objetivo                             | Your target                |
+| `target.remaining`           | Restante                                | Remaining                  |
+| `target.over`                | Por encima                              | Over                       |
+| `target.progress` (aria)     | Progreso del objetivo                   | Target progress            |
+| `button.repeat`              | Repetir                                 | Repeat                     |
 
 ## Criterios de aceptacion
 

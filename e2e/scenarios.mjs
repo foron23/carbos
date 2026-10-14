@@ -1654,6 +1654,10 @@ export const scenarios = [
     async run(page, ctx) {
       await openApp(page, ctx.base);
       await page.evaluate(() => localStorage.removeItem('carbos.favorites'));
+      await reload(page);
+      await waitFor(page, '#app header h1');
+      // C3: sin favoritos ni recientes el bloque no se renderiza.
+      assert(await page.$eval('#quickadd', (el) => el.hidden), 'sin atajos no hay bloque');
       // Registra una comida: su alimento pasa a "Recientes".
       await addFood(page, 'manzana');
       await register(page);
@@ -1673,7 +1677,7 @@ export const scenarios = [
         return { h: rect.height };
       });
       assert(chip, 'hay un chip de Recientes con Manzana');
-      assert(chip.h >= 43, `el chip mide al menos 44 px (${chip.h})`);
+      assert(chip.h >= 44, `el chip mide al menos 44 px (${chip.h})`);
       await page.waitForSelector('#draft-items .draft-row', { timeout: 8000 });
 
       // Favorito: la estrella del resultado de busqueda.
@@ -1683,7 +1687,7 @@ export const scenarios = [
         '#search-results .fav-toggle',
         (el) => el.getBoundingClientRect().height,
       );
-      assert(starH >= 43, `la estrella mide al menos 44 px (${starH})`);
+      assert(starH >= 44, `la estrella mide al menos 44 px (${starH})`);
       await click(page, '#search-results .fav-toggle');
       assertEqual(
         await page.$eval('#search-results .fav-toggle', (el) => el.getAttribute('aria-pressed')),
@@ -1691,11 +1695,32 @@ export const scenarios = [
         'la estrella queda marcada',
       );
       await waitForText(page, '#quickadd', 'Favoritos');
+      assert((await text(page, '#quickadd')).includes('Manzana'), 'el favorito aparece como atajo');
 
-      // Persiste tras recargar.
+      // Desmarcar lo quita (C2).
+      await click(page, '#search-results .fav-toggle');
+      assertEqual(
+        await page.$eval('#search-results .fav-toggle', (el) => el.getAttribute('aria-pressed')),
+        'false',
+        'la estrella se desmarca',
+      );
+      assert(
+        !(await text(page, '#quickadd')).includes('Favoritos'),
+        'sin favoritos desaparece el grupo Favoritos',
+      );
+
+      // Vuelve a marcarlo y comprueba que persiste tras recargar.
+      await click(page, '#search-results .fav-toggle');
       await reload(page);
       await switchEntryMode(page, '#entry-mode-search');
       await waitForText(page, '#quickadd', 'Favoritos');
+      await setValue(page, '#food-search', 'manzana');
+      await page.waitForSelector('#search-results .fav-toggle', { timeout: 8000 });
+      assertEqual(
+        await page.$eval('#search-results .fav-toggle', (el) => el.getAttribute('aria-pressed')),
+        'true',
+        'el favorito persiste tras recargar',
+      );
       await screenshot(page, 'quickadd');
     },
   },
@@ -1707,6 +1732,10 @@ export const scenarios = [
       await reload(page);
       await waitFor(page, '#app header h1');
       assert(await page.$eval('#target-progress', (el) => el.hidden), 'sin objetivo no hay barra');
+      assert(
+        await page.$eval('#summary-target-row', (el) => el.hidden),
+        'sin objetivo no hay fila en el resumen',
+      );
 
       // El objetivo es el numero de la persona (D60).
       await setValue(page, '#daily-target', '180');
@@ -1719,18 +1748,33 @@ export const scenarios = [
       await addFood(page, 'manzana');
       await register(page);
       await waitForText(page, '#diary', 'Manzana');
-      const now = Number(
-        await page.$eval('#target-progress', (el) => el.getAttribute('aria-valuenow')),
-      );
-      assert(now > 0, `el progreso avanza (${now})`);
+
+      // C6: la barra y el resumen cuadran (mismos numeros) y muestran el restante.
+      const metrics = await page.evaluate(() => ({
+        now: document.querySelector('#target-progress').getAttribute('aria-valuenow'),
+        valuetext: document.querySelector('#target-progress').getAttribute('aria-valuetext'),
+        bar: document.querySelector('#target-text').textContent,
+        summary: document.querySelector('#summary-target').textContent,
+        total: document.querySelector('#day-total').textContent,
+      }));
+      const consumed = Number.parseFloat(metrics.total);
+      assert(consumed > 0, `el progreso avanza (${consumed})`);
+      assertEqual(Number(metrics.now), consumed, 'aria-valuenow sigue al consumido');
       assert(
-        !(await page.$eval('#summary-target-row', (el) => el.hidden)),
-        'el resumen muestra el objetivo',
+        metrics.bar.includes('/ 180'),
+        `el topbar muestra consumido/objetivo (${metrics.bar})`,
       );
+      assert(metrics.bar.includes('Restante'), `el topbar muestra el restante (${metrics.bar})`);
+      assert(metrics.valuetext.includes('Restante'), 'aria-valuetext describe el restante');
       assert(
-        (await text(page, '#summary-target')).includes('180'),
-        'el resumen incluye el objetivo',
+        metrics.summary.includes('/ 180') && metrics.summary.includes('Restante'),
+        `el resumen cuadra con el topbar (${metrics.summary})`,
       );
+
+      // C8: el objetivo 0 equivale a "sin objetivo".
+      await setValue(page, '#daily-target', '0');
+      assert(await page.$eval('#target-progress', (el) => el.hidden), 'objetivo 0 = sin barra');
+      assert(await page.$eval('#summary-target-row', (el) => el.hidden), 'objetivo 0 = sin fila');
       await screenshot(page, 'objetivo-diario');
     },
   },
@@ -1741,6 +1785,7 @@ export const scenarios = [
       await addFood(page, 'manzana');
       await register(page);
       await waitForText(page, '#diary', 'Manzana');
+      const before = (await readStore(page, 'meals'))[0];
 
       // Expande la comida y pulsa Repetir (D56/B5: la accion vive en el detalle).
       await page.evaluate(() => {
@@ -1750,6 +1795,13 @@ export const scenarios = [
       await page.waitForSelector('#diary .repeat-entry', { timeout: 8000 });
       await page.evaluate(() => document.querySelector('#diary .repeat-entry')?.click());
       await page.waitForSelector('#draft-items .draft-row', { timeout: 8000 });
+
+      // C10: el borrador de la repeticion conserva atajos y Cancelar.
+      assert(await page.$('.draft-shortcuts button'), 'el borrador conserva los atajos');
+      assert(
+        !(await page.$eval('#register-cancel', (el) => el.hidden)),
+        'el borrador de repeticion ofrece Cancelar',
+      );
 
       // Repetir no registra nada por si sola.
       assertEqual((await readStore(page, 'meals')).length, 1, 'repetir no registra por si sola');
@@ -1762,11 +1814,17 @@ export const scenarios = [
       }
       const meals = await readStore(page, 'meals');
       assertEqual(meals.length, 2, 'registrar la repeticion crea la segunda comida');
+      const original = meals.find((meal) => meal.id === before?.id);
+      const repeated = meals.find((meal) => meal.id !== before?.id);
+      assert(original && repeated, 'la segunda comida es distinta de la primera');
+      assert(repeated.id !== original.id, 'la repeticion usa ids nuevos');
+      assertEqual(repeated.items[0]?.grams, original.items[0]?.grams, 'mismos gramos');
       assertEqual(
-        meals[0]?.items?.[0]?.classId,
-        meals[1]?.items?.[0]?.classId,
-        'la repeticion conserva el alimento',
+        repeated.items[0]?.carbsPer100g,
+        original.items[0]?.carbsPer100g,
+        'mismos carbohidratos',
       );
+      assertEqual(repeated.items[0]?.classId, original.items[0]?.classId, 'mismo alimento');
       await screenshot(page, 'repetir-comida');
     },
   },
