@@ -11,13 +11,18 @@ producto. Escribe:
 
   <out>.jsonl.gz        JSONL gzip, un producto por linea, ordenado por barcode
   <out>.manifest.json   {format, version, locale, url, bytes, sha256,
-                         product_count, generated_at}
+                         raw_bytes, sha256_raw, product_count, generated_at}
 
 Con `--packs-manifest` genera ademas el **manifest hospedado** que la app
 consulta para descubrir y descargar los packs (mismo patron que el manifest de
-pesos): `{format, version, packs:[{id, locale, url, sha256, bytes,
-product_count, generated_at}]}`. Sin `--input` emite una lista `packs` vacia
-(util para bootstrap/ejemplo).
+pesos): `{format, version, packs:[{id, locale, url, sha256, bytes, raw_bytes,
+sha256_raw, product_count, generated_at}]}`. Sin `--input` emite una lista
+`packs` vacia (util para bootstrap/ejemplo).
+
+`sha256`/`bytes` firman el `.jsonl.gz` publicado; `sha256_raw`/`raw_bytes`
+firman los bytes del JSONL **descomprimido** (lo que la app parsea e importa),
+necesario porque un transporte con `Content-Encoding: gzip` deja al navegador
+los bytes crudos ya descomprimidos.
 
 Fuentes:
     --from-api   API de busqueda de OFF (search-a-licious): pack sin bajar el dump.
@@ -243,17 +248,19 @@ def project_record(product: dict, saved_at: int) -> dict | None:
     if barcode is None:
         return None
 
+    brand = first_brand(product.get("brands"))
     fallback = clean_text(product.get("product_name"))
     name_es = clean_text(product.get("product_name_es")) or fallback
     name_en = clean_text(product.get("product_name_en")) or fallback
-    if not (name_es or name_en):
-        return None
+    # Nunca emitir un idioma vacio: si falta, cae al otro idioma, luego a la
+    # marca y, en ultimo termino, al propio barcode.
+    name_es = name_es or name_en or brand or barcode
+    name_en = name_en or name_es or brand or barcode
 
     record = {
         "barcode": barcode,
         "name": {"es": name_es, "en": name_en},
     }
-    brand = first_brand(product.get("brands"))
     if brand:
         record["brand"] = brand
     # Los carbohidratos son opcionales: sin ellos el producto sirve para
@@ -479,11 +486,16 @@ def write_pack(
     pack_path = out_base.with_name(out_base.name + ".jsonl.gz")
     manifest_path = out_base.with_name(out_base.name + ".manifest.json")
 
+    # Los bytes RAW (JSONL sin comprimir) son la fuente de verdad: de ellos se
+    # derivan raw_bytes/sha256_raw y se comprime gzip ese MISMO contenido, de modo
+    # que sha256_raw siempre coincide con el JSONL que la app parsea e importa.
+    raw = b"".join(
+        (json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
+        for record in records
+    )
     buffer = io.BytesIO()
     with gzip.GzipFile(fileobj=buffer, mode="wb", mtime=0) as gz:
-        for record in records:
-            line = json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n"
-            gz.write(line.encode("utf-8"))
+        gz.write(raw)
     data = buffer.getvalue()
     pack_path.write_bytes(data)
 
@@ -494,6 +506,8 @@ def write_pack(
         "url": url or pack_path.name,
         "bytes": len(data),
         "sha256": hashlib.sha256(data).hexdigest(),
+        "raw_bytes": len(raw),
+        "sha256_raw": hashlib.sha256(raw).hexdigest(),
         "product_count": len(records),
         "generated_at": generated_at,
     }
@@ -513,15 +527,22 @@ def pack_entry(
     app necesita para descargar y verificar (url, sha256, bytes).
     """
     url = f"{base_url.rstrip('/')}/{pack_file}" if base_url else pack_file
-    return {
+    entry = {
         "id": pack_id,
         "locale": manifest["locale"],
         "url": url,
         "sha256": manifest["sha256"],
         "bytes": manifest["bytes"],
-        "product_count": manifest["product_count"],
-        "generated_at": manifest["generated_at"],
     }
+    # Campos opcionales del contrato: sha256/bytes siguen firmando el .gz
+    # publicado; sha256_raw/raw_bytes firman el JSONL ya descomprimido.
+    if "sha256_raw" in manifest:
+        entry["sha256_raw"] = manifest["sha256_raw"]
+    if "raw_bytes" in manifest:
+        entry["raw_bytes"] = manifest["raw_bytes"]
+    entry["product_count"] = manifest["product_count"]
+    entry["generated_at"] = manifest["generated_at"]
+    return entry
 
 
 def write_packs_manifest(path: Path, packs: list[dict]) -> dict:

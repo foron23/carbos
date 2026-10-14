@@ -8,6 +8,8 @@
       "url": "./barcode/es.jsonl.gz",
       "sha256": "1bb9a025efa3f077c0bdf18ed525c969b415d1ffecea65d1939ec711706c7d44",
       "bytes": 4685584,
+      "raw_bytes": 47649091,
+      "sha256_raw": "252f7441d14b23be5077a9547568443ced928ad93d6985c11f14d7da17167abf",
       "product_count": 223774,
       "generated_at": "2026-10-13T19:41:18Z"
     },
@@ -17,6 +19,8 @@
       "url": "./barcode/es-rest.jsonl.gz",
       "sha256": "83afd343db3e7be493aca82ca670d9caac10e57bf1ef391e48d8d8428ebd78c3",
       "bytes": 1225841,
+      "raw_bytes": 10868692,
+      "sha256_raw": "04fb409e6e4eb023a1ca386419c8da1cadd667331141ba72ecd52922d0b6364f",
       "product_count": 58611,
       "generated_at": "2026-10-13T19:41:23Z"
     },
@@ -26,6 +30,8 @@
       "url": "./barcode/fr.jsonl.gz",
       "sha256": "e09681f619ac96fe08d264c0486127730f4f03ff12bf57c8ae78ca1b3a4a6856",
       "bytes": 17407363,
+      "raw_bytes": 167728409,
+      "sha256_raw": "13a805aac8f628ea881490506febdc55c2fa111ba212477da0f6082d30d4235d",
       "product_count": 762177,
       "generated_at": "2026-10-13T19:58:35Z"
     },
@@ -35,6 +41,8 @@
       "url": "./barcode/fr-rest.jsonl.gz",
       "sha256": "e5932ab372ed13f7f1adc7b8013dcad35341b581bce0c8aa08214485c96d1d6c",
       "bytes": 4594387,
+      "raw_bytes": 40316795,
+      "sha256_raw": "b06fe9b4f24ef34d2c7956d1662a82ab32f658e901f4bfe398dc224b50f14651",
       "product_count": 213417,
       "generated_at": "2026-10-13T19:58:47Z"
     },
@@ -44,6 +52,8 @@
       "url": "./barcode/pt.jsonl.gz",
       "sha256": "bba89e7d95532885aae3c287b76f0288c97018b46f634a45d0cf996d58d07771",
       "bytes": 234656,
+      "raw_bytes": 2130507,
+      "sha256_raw": "014d5b19d27ae06ed1cfd0760ec97aa6069d49198c4d6b06902e0ac5a97a1d90",
       "product_count": 9651,
       "generated_at": "2026-10-13T19:59:22Z"
     },
@@ -53,6 +63,8 @@
       "url": "./barcode/pt-rest.jsonl.gz",
       "sha256": "9ada6348befa9987e0e35af11d4cb9a37d3ffb7bfdb693eb8842fcfeb15b6392",
       "bytes": 77859,
+      "raw_bytes": 623502,
+      "sha256_raw": "a1c6fdbb6a702c421e3344d52bc95980cddc9d214bd992a8b9d396f1b5f8e66b",
       "product_count": 3242,
       "generated_at": "2026-10-13T19:59:22Z"
     },
@@ -62,6 +74,8 @@
       "url": "./barcode/it.jsonl.gz",
       "sha256": "178eecfcfcbfc31e4e0faa52a460435571f22fbb8b4ef7421d0110881cc3a029",
       "bytes": 4148254,
+      "raw_bytes": 41592189,
+      "sha256_raw": "d374140fc33bbcebaf21a134fbadf6e7f587d70123d84210c40592e1372c24cf",
       "product_count": 195115,
       "generated_at": "2026-10-13T20:02:57Z"
     },
@@ -71,6 +85,8 @@
       "url": "./barcode/it-rest.jsonl.gz",
       "sha256": "3bf18cdc71073906ad50fab11acb2dbee30fcca91d6f9ca2963cf84ba087b40b",
       "bytes": 728252,
+      "raw_bytes": 6625909,
+      "sha256_raw": "2a9a7212b7f9f9d1f0a79040c064063a3046f1ae9d760629c379cfbd90d1fbb6",
       "product_count": 36277,
       "generated_at": "2026-10-13T20:03:00Z"
     }

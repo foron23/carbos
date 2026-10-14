@@ -19,7 +19,11 @@ function jsonl(products: unknown[]): string {
   return products.map((product) => JSON.stringify(product)).join('\n');
 }
 
-async function manifestFor(bytes: ArrayBuffer, productCount: number): Promise<BarcodePackManifest> {
+async function manifestFor(
+  bytes: ArrayBuffer,
+  productCount: number,
+  extra: Partial<BarcodePackManifest> = {},
+): Promise<BarcodePackManifest> {
   return {
     format: 'carbos-barcode-pack',
     version: 1,
@@ -28,7 +32,12 @@ async function manifestFor(bytes: ArrayBuffer, productCount: number): Promise<Ba
     sha256: await sha256Hex(bytes),
     product_count: productCount,
     generated_at: '2026-01-01T00:00:00.000Z',
+    ...extra,
   };
+}
+
+async function plainBytes(products: unknown[]): Promise<ArrayBuffer> {
+  return new Blob([jsonl(products)]).arrayBuffer();
 }
 
 const SAMPLE = [
@@ -93,11 +102,49 @@ describe('importPack', () => {
     expect(inserted[1]?.savedAt).toEqual(expect.any(Number));
   });
 
-  it('acepta JSONL sin comprimir', async () => {
-    const bytes = await new Blob([jsonl(SAMPLE)]).arrayBuffer();
-    const manifest = await manifestFor(bytes, SAMPLE.length);
+  it('importa JSONL ya descomprimido cuando el manifest trae sha256_raw', async () => {
+    // Simula Content-Encoding: gzip: el transporte ya descomprimio, asi que el
+    // blob recibido es el JSONL crudo aunque el manifest describe el .gz.
+    const plain = await plainBytes(SAMPLE);
+    const compressed = await gzipText(jsonl(SAMPLE));
+    const manifest = await manifestFor(compressed, SAMPLE.length, {
+      sha256_raw: await sha256Hex(plain),
+      raw_bytes: plain.byteLength,
+    });
 
-    expect(await importPack({ manifest, blob: new Blob([bytes]) })).toEqual({ imported: 2 });
+    expect(await importPack({ manifest, blob: new Blob([plain]) })).toEqual({ imported: 2 });
+  });
+
+  it('rechaza JSONL descomprimido manipulado contra sha256_raw', async () => {
+    const plain = await plainBytes(SAMPLE);
+    const compressed = await gzipText(jsonl(SAMPLE));
+    const manifest = await manifestFor(compressed, SAMPLE.length, {
+      sha256_raw: await sha256Hex(plain),
+      raw_bytes: plain.byteLength,
+    });
+    const tampered = await plainBytes([...SAMPLE, { barcode: '4006381333931', name: 'Extra' }]);
+
+    await expect(importPack({ manifest, blob: new Blob([tampered]) })).rejects.toThrow(/sha256/);
+    expect(mocks.putProducts).not.toHaveBeenCalled();
+  });
+
+  it('verifica sha256 comprimido y sha256_raw de un gzip valido', async () => {
+    const plain = await plainBytes(SAMPLE);
+    const compressed = await gzipText(jsonl(SAMPLE));
+    const manifest = await manifestFor(compressed, SAMPLE.length, {
+      sha256_raw: await sha256Hex(plain),
+      raw_bytes: plain.byteLength,
+    });
+
+    expect(await importPack({ manifest, blob: new Blob([compressed]) })).toEqual({ imported: 2 });
+  });
+
+  it('rechaza bytes sin gzip y sin sha256_raw (no se puede verificar)', async () => {
+    const plain = await plainBytes(SAMPLE);
+    const manifest = await manifestFor(plain, SAMPLE.length);
+
+    await expect(importPack({ manifest, blob: new Blob([plain]) })).rejects.toThrow(/sha256_raw/);
+    expect(mocks.putProducts).not.toHaveBeenCalled();
   });
 
   it('rechaza un sha256 que no coincide', async () => {
@@ -108,18 +155,53 @@ describe('importPack', () => {
     expect(mocks.putProducts).not.toHaveBeenCalled();
   });
 
-  it('falla con JSONL malformado', async () => {
-    const bytes = await gzipText('{ no-es-json');
-    const manifest = await manifestFor(bytes, 1);
+  it('ignora lineas malformadas y no aborta el pack', async () => {
+    const text = `${jsonl([SAMPLE[1]])}\n{ no-es-json`;
+    const bytes = await gzipText(text);
+    const manifest = await manifestFor(bytes, 2);
 
-    await expect(importPack({ manifest, blob: new Blob([bytes]) })).rejects.toThrow();
+    expect(await importPack({ manifest, blob: new Blob([bytes]) })).toEqual({ imported: 1 });
   });
 
-  it('rechaza un barcode invalido dentro del pack', async () => {
-    const bytes = await gzipText(jsonl([{ barcode: '123', name: 'x', carbsPer100g: 1 }]));
-    const manifest = await manifestFor(bytes, 1);
+  it('salta un barcode invalido y conserva el valido', async () => {
+    const products = [
+      { barcode: '123', name: 'x', carbsPer100g: 1 },
+      { barcode: '4006381333931', name: 'Crema', carbsPer100g: 57.5 },
+    ];
+    const bytes = await gzipText(jsonl(products));
+    const manifest = await manifestFor(bytes, products.length);
 
-    await expect(importPack({ manifest, blob: new Blob([bytes]) })).rejects.toThrow(/barcode/);
+    expect(await importPack({ manifest, blob: new Blob([bytes]) })).toEqual({ imported: 1 });
+    const inserted = mocks.putProducts.mock.calls[0]?.[0] ?? [];
+    expect(inserted[0]).toMatchObject({ barcode: '4006381333931' });
+  });
+
+  it('importa solo la valida cuando otra linea tiene el nombre vacio en ambos idiomas', async () => {
+    const products = [
+      { barcode: '4006381333931', name: { es: '', en: '' } },
+      { barcode: '8412345678905', name: 'Valida', carbsPer100g: 10 },
+    ];
+    const bytes = await gzipText(jsonl(products));
+    const manifest = await manifestFor(bytes, products.length);
+
+    expect(await importPack({ manifest, blob: new Blob([bytes]) })).toEqual({ imported: 1 });
+    const inserted = mocks.putProducts.mock.calls[0]?.[0] ?? [];
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]).toMatchObject({ barcode: '8412345678905' });
+  });
+
+  it('normaliza un nombre con un idioma vacio al otro (simetrico)', async () => {
+    const products = [
+      { barcode: '4006381333931', name: { es: '', en: 'Leche' } },
+      { barcode: '8412345678905', name: { es: 'Leche', en: '' } },
+    ];
+    const bytes = await gzipText(jsonl(products));
+    const manifest = await manifestFor(bytes, products.length);
+
+    expect(await importPack({ manifest, blob: new Blob([bytes]) })).toEqual({ imported: 2 });
+    const inserted = mocks.putProducts.mock.calls[0]?.[0] ?? [];
+    expect(inserted[0]?.name).toEqual({ es: 'Leche', en: 'Leche' });
+    expect(inserted[1]?.name).toEqual({ es: 'Leche', en: 'Leche' });
   });
 
   it('falla con un gzip corrupto', async () => {

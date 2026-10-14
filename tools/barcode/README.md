@@ -65,6 +65,8 @@ El mismo builder escribe el manifest que la app consulta para **descubrir** el p
       "url": "https://cdn.example/barcode/es.jsonl.gz",
       "sha256": "<hex de los bytes del jsonl.gz>",
       "bytes": 12345,
+      "sha256_raw": "<hex de los bytes del jsonl descomprimido>",
+      "raw_bytes": 45678,
       "product_count": 42,
       "generated_at": "2026-10-13T00:00:00Z"
     }
@@ -77,7 +79,11 @@ rellenan al publicar). El flujo en la app es **una sola vez**: al pulsar "descar
 descarga el `.jsonl.gz`, **verifica el sha256**, importa los productos en IndexedDB
 (store `products`) y a partir de ahi resuelve el EAN en local **sin red**. La URL de cada
 pack se compone como `<base-url>/<fichero>`; el sha256 y `bytes` firman los bytes exactos
-del pack. La importacion manual (fichero local) queda como respaldo.
+del `.jsonl.gz` publicado. `sha256_raw`/`raw_bytes` (opcionales) firman los bytes del JSONL
+**descomprimido** (lo que la app parsea e importa): si el transporte responde con
+`Content-Encoding: gzip`, el navegador ya descomprime y `response.arrayBuffer()` devuelve
+el JSONL crudo, asi que la app valida contra `sha256_raw`. La importacion manual (fichero
+local) queda como respaldo.
 
 Dentro de la app, la descarga ocurre **solo** al pulsar el boton: la app no descarga el
 pack en segundo plano ni consulta el manifest sin accion del usuario.
@@ -126,6 +132,8 @@ atribucion ODbL-1.0 se muestra en la UI.
   "url": "es.jsonl.gz",
   "bytes": 12345,
   "sha256": "<hex de los bytes del jsonl.gz>",
+  "raw_bytes": 45678,
+  "sha256_raw": "<hex de los bytes del jsonl descomprimido>",
   "product_count": 42,
   "generated_at": "2026-10-13T00:00:00Z"
 }

@@ -164,6 +164,27 @@ describe('downloadPack', () => {
     expect(inserted[0]).toMatchObject({ barcode: '0036000291452' });
   });
 
+  it('importa cuando el transporte ya descomprimio (Content-Encoding) usando sha256_raw', async () => {
+    const plain = await new Blob([jsonl(SAMPLE)]).arrayBuffer();
+    const compressed = await gzipText(jsonl(SAMPLE));
+    const entry = entryWith({
+      sha256: await sha256Hex(compressed),
+      sha256_raw: await sha256Hex(plain),
+      raw_bytes: plain.byteLength,
+      bytes: compressed.byteLength,
+      product_count: 2,
+    });
+    // El servidor responde con el JSONL ya descomprimido por el transporte.
+    const fetcher = vi.fn(async () => new Response(plain));
+
+    const result = await downloadPack(entry, { fetcher });
+
+    expect(result).toEqual({ imported: 2 });
+    expect(mocks.putAll).toHaveBeenCalledTimes(1);
+    const inserted = mocks.putAll.mock.calls[0]?.[1] ?? [];
+    expect(inserted[0]).toMatchObject({ barcode: '0036000291452' });
+  });
+
   it('falla si el sha256 no coincide y no importa nada', async () => {
     const bytes = await gzipText(jsonl(SAMPLE));
     const entry = entryWith({ sha256: '0'.repeat(64), bytes: bytes.byteLength, product_count: 2 });

@@ -48,8 +48,19 @@ async function cacheFirst(request) {
   const cached = await cache.match(request);
   if (cached) return cached;
   const response = await fetch(request);
-  if (response && response.ok) await cache.put(request, response.clone());
+  if (response && response.ok) {
+    try {
+      await cache.put(request, response.clone());
+    } catch {
+      // La escritura en Cache puede rechazar (p.ej. respuestas gzip grandes).
+      // Un fallo de cache nunca debe tumbar la respuesta: degradamos a red.
+    }
+  }
   return response;
+}
+
+function isBarcodeAsset(url) {
+  return url.pathname.includes('/barcode/') || url.pathname.endsWith('barcode-manifest.json');
 }
 
 self.addEventListener('fetch', (event) => {
@@ -57,6 +68,11 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  if (isBarcodeAsset(url)) {
+    // Los packs ya viven en IndexedDB y son grandes: network-only, sin Cache.
+    event.respondWith(fetch(request));
+    return;
+  }
   if (request.mode === 'navigate') {
     event.respondWith(networkFirst(request));
     return;

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { BarcodeFetcher } from './lookup/client';
-import { importPack, verifySha256 } from './pack';
+import { importPack } from './pack';
 import type { BarcodePackManifest } from './types';
 
 /**
@@ -16,6 +16,8 @@ export interface PackEntry {
   locale: string;
   url: string;
   sha256: string;
+  sha256_raw?: string;
+  raw_bytes?: number;
   bytes: number;
   product_count: number;
   generated_at: string;
@@ -32,6 +34,11 @@ const packEntrySchema = z.object({
   locale: z.string().min(1),
   url: z.string().min(1),
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  sha256_raw: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
+  raw_bytes: z.number().int().nonnegative().optional(),
   bytes: z.number().int().nonnegative(),
   product_count: z.number().int().nonnegative(),
   generated_at: z.string().min(1),
@@ -89,8 +96,10 @@ async function fetchPackBytes(
 }
 
 /**
- * Descarga un pack con progreso, verifica su sha256 y lo importa en el store
- * local. Lanza si la descarga falla o si el sha256 no coincide (pack alterado).
+ * Descarga un pack con progreso y lo importa en el store local. La verificacion
+ * de integridad vive solo en `importPack` (unica puerta), que decide segun el
+ * contenido recibido (gzip o JSONL ya descomprimido por el transporte). Lanza si
+ * la descarga falla o si la firma no coincide (pack alterado).
  */
 export async function downloadPack(
   entry: PackEntry,
@@ -106,9 +115,6 @@ export async function downloadPack(
     opts.onProgress ?? (() => {}),
     entry.bytes,
   );
-  if (!(await verifySha256(bytes, entry.sha256))) {
-    throw new Error('sha256 no coincide con el manifest');
-  }
   const manifest: BarcodePackManifest = {
     format: 'carbos-barcode-pack',
     version: 1,
@@ -119,5 +125,7 @@ export async function downloadPack(
     product_count: entry.product_count,
     generated_at: entry.generated_at,
   };
+  if (entry.sha256_raw !== undefined) manifest.sha256_raw = entry.sha256_raw;
+  if (entry.raw_bytes !== undefined) manifest.raw_bytes = entry.raw_bytes;
   return importPack({ manifest, blob: new Blob([bytes]) });
 }

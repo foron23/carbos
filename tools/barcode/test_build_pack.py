@@ -102,7 +102,7 @@ def test_filter_roundtrip_and_manifest() -> None:
         assert isinstance(record["savedAt"], int)
         assert "Open Food Facts" in record["source"]
 
-        # El manifest firma los bytes exactos.
+        # El manifest firma los bytes exactos del .gz.
         data = pack.read_bytes()
         assert manifest["format"] == "carbos-barcode-pack"
         assert manifest["version"] == 1
@@ -111,6 +111,15 @@ def test_filter_roundtrip_and_manifest() -> None:
         assert manifest["sha256"] == hashlib.sha256(data).hexdigest()
         assert manifest["product_count"] == 1
         assert manifest["url"] == "es.jsonl.gz"
+
+        # sha256_raw/raw_bytes firman el JSONL descomprimido (lo que se importa).
+        raw = gzip.decompress(data)
+        assert manifest["raw_bytes"] == len(raw)
+        assert manifest["sha256_raw"] == hashlib.sha256(raw).hexdigest()
+        assert raw == "".join(
+            json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n"
+            for record in main
+        ).encode("utf-8")
         assert manifest_path.read_text(encoding="utf-8")
 
 
@@ -196,6 +205,13 @@ def test_packs_manifest_entry_matches_pack() -> None:
         assert entry["sha256"] == manifest["sha256"]
         assert entry["bytes"] == manifest["bytes"]
 
+        # sha256_raw/raw_bytes se propagan y firman el JSONL descomprimido.
+        raw = gzip.decompress(data)
+        assert entry["sha256_raw"] == hashlib.sha256(raw).hexdigest()
+        assert entry["raw_bytes"] == len(raw)
+        assert entry["sha256_raw"] == manifest["sha256_raw"]
+        assert entry["raw_bytes"] == manifest["raw_bytes"]
+
         path = tmp / "packs.json"
         document = build_pack.write_packs_manifest(path, [entry])
         assert document["format"] == "carbos-barcode-packs"
@@ -213,6 +229,9 @@ def test_pack_entry_without_base_url_is_bare_filename() -> None:
     }
     entry = build_pack.pack_entry(manifest, "es.jsonl.gz", "es", base_url=None)
     assert entry["url"] == "es.jsonl.gz"
+    # Un manifest antiguo sin sha256_raw/raw_bytes sigue siendo valido.
+    assert "sha256_raw" not in entry
+    assert "raw_bytes" not in entry
 
 
 def test_first_brand_accepts_list_and_string() -> None:
@@ -220,6 +239,32 @@ def test_first_brand_accepts_list_and_string() -> None:
     assert build_pack.first_brand("Marca X, Otra") == "Marca X"
     assert build_pack.first_brand([]) == ""
     assert build_pack.first_brand(None) == ""
+
+
+def test_missing_name_falls_back_and_is_never_empty() -> None:
+    # Falta el nombre en es: cae al otro idioma.
+    one_lang = build_pack.project_record(
+        {"code": "4006381333931", "product_name_en": "Milk"}, 0
+    )
+    assert one_lang is not None
+    assert one_lang["name"] == {"es": "Milk", "en": "Milk"}
+
+    # Falta el nombre en en: simetrico.
+    other_lang = build_pack.project_record(
+        {"code": "4006381333931", "product_name_es": "Leche"}, 0
+    )
+    assert other_lang is not None
+    assert other_lang["name"] == {"es": "Leche", "en": "Leche"}
+
+    # Sin nombre en ningun idioma: cae a la marca.
+    with_brand = build_pack.project_record({"code": "4006381333931", "brands": "Marca X"}, 0)
+    assert with_brand is not None
+    assert with_brand["name"] == {"es": "Marca X", "en": "Marca X"}
+
+    # Sin nombre ni marca: cae al propio barcode.
+    bare = build_pack.project_record({"code": "4006381333931"}, 0)
+    assert bare is not None
+    assert bare["name"] == {"es": "4006381333931", "en": "4006381333931"}
 
 
 def test_build_records_api_pages_and_filters() -> None:

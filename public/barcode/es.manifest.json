@@ -5,6 +5,8 @@
   "url": "es.jsonl.gz",
   "bytes": 4685584,
   "sha256": "1bb9a025efa3f077c0bdf18ed525c969b415d1ffecea65d1939ec711706c7d44",
+  "raw_bytes": 47649091,
+  "sha256_raw": "252f7441d14b23be5077a9547568443ced928ad93d6985c11f14d7da17167abf",
   "product_count": 223774,
   "generated_at": "2026-10-13T19:41:18Z"
 }

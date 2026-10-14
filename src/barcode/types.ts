@@ -23,6 +23,10 @@ export interface BarcodePackManifest {
   url?: string;
   bytes: number;
   sha256: string;
+  /** sha256 de los bytes del JSONL ya decodificado (lo que se parsea e importa). */
+  sha256_raw?: string;
+  /** Longitud en bytes del JSONL decodificado. */
+  raw_bytes?: number;
   product_count: number;
   generated_at: string;
 }
