@@ -355,3 +355,29 @@ a la guarda de acentos del test. No renderizar `origin` si no se pinta en el dia
   y, en un hit sin carbohidratos, prellena nombre/marca y deja los gramos editables
   (clave `barcode.identified`). Pendiente: guardar-en-local tras un miss y streaming del
   JSONL grande.
+- **Feedback del escaneo en vivo**: sobre el visor de camara, un marco/reticle con guia
+  ("Apunta al codigo de barras") y estado en vivo (indicador de actividad → "Codigo leido.
+  Buscando el producto..." → **"Anadido: <nombre>"** o fallo accionable). Sin camara, el
+  fallback a foto/entrada manual no cambia.
+- **Arreglo critico de la descarga de packs** (el pack **nunca** se importaba, asi que
+  _todo_ escaneo era un miss, Lidl/Mercadona incluidos). Eran **tres** fallos encadenados:
+  1. **Integridad/transporte**: el servidor sirve `*.jsonl.gz` con `Content-Encoding: gzip`
+     y el navegador entrega el JSONL **ya descomprimido**; el sha256 calculado sobre esos
+     bytes no coincidia con el del `.gz` del manifest → `downloadPack` fallaba. Los
+     manifests ganan `sha256_raw`/`raw_bytes` (hash del JSONL decodificado) y la app
+     verifica el contenido decodificado (y, si los bytes llegan comprimidos, tambien el
+     `.gz`). `tools/barcode/build_pack.py` los emite.
+  2. **Parseo tolerante**: `importPack` abortaba el pack entero en la primera linea
+     invalida (p.ej. un `name.es` vacio; hay cientos en los packs reales). Ahora salta
+     lineas invalidas y rellena el idioma vacio con el otro; el generador ya no emite
+     nombres vacios.
+  3. **Service worker**: `cacheFirst` cacheaba los packs (hasta ~47 MB descomprimidos) y
+     `cache.put` fallaba con `NetworkError`, tumbando el `fetch` (`net::ERR_FAILED`). El SW
+     hace _passthrough_ de `./barcode/*` y `barcode-manifest.json`, y un fallo de escritura
+     en cache ya no rompe la respuesta.
+     Verificado end-to-end con los packs reales (Chrome headless sobre `dist/`): ES importa
+     ~282k productos y `8480000003089` (Mercadona/Hacendado) y `4056482891380` (Lidl)
+     resuelven.
+- **Pendiente (heredado)**: guardar-en-local tras un miss; `field.barcode` (clave muerta);
+  streaming del JSONL; decidir la API de Mercadona (nombre/ingredientes/alergenos, sin
+  carbs); CDN opcional con `--base-url`; volcar D40-D42 a `docs/decisiones.md`.
