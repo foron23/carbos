@@ -233,7 +233,8 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
       if (stopButton) stopButton.hidden = true;
     };
 
-    // Boton principal: escaneo en vivo; si el navegador no puede, cae a la foto.
+    // Boton principal: escaneo en vivo (nativo o quagga2). Si no hay camara
+    // disponible, cae a la foto o a la entrada manual.
     const beginScan = (): void => {
       statusKey = 'barcode.detecting';
       paint();

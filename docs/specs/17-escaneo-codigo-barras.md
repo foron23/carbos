@@ -324,12 +324,15 @@ a la guarda de acentos del test. No renderizar `origin` si no se pinta en el dia
   (aditivo, `SCHEMA_VERSION` sin tocar), pestana **"Codigo"** en la entrada (visible
   por defecto, junto a Foto/Buscar; lo unico opt-in es la resolucion en linea), i18n ES/EN, tool
   `tools/barcode/build_pack.py`, E2E con `__carbosBarcodeStub`.
-- **Escaneo en tiempo real** (`src/barcode/scanner.ts`): boton **"Escanear"** prominente
-  que abre la camara (`getUserMedia`) y decodifica fotogramas en bucle con
-  `BarcodeDetector` hasta encontrar el codigo; boton "Cancelar" para parar. Si el
-  navegador no trae deteccion en vivo (iOS/Firefox) cae a la **foto** o a la entrada
-  manual. Las opciones secundarias (escribir el EAN, foto, descargar/importar pack,
-  consulta en linea) viven en **"Mas opciones"**.
+- **Escaneo en tiempo real y unificado** (`src/barcode/scanner.ts` + `decode.ts`): boton
+  **"Escanear"** prominente que abre la camara (`getUserMedia`) y decodifica fotogramas
+  en bucle; boton "Cancelar" para parar. `decodeFrame` prueba primero el
+  `BarcodeDetector` **nativo** y, si no esta o no encuentra nada, cae a **quagga2**
+  (MIT, JS puro, `import()` diferido → chunk aparte). Asi el escaneo funciona en
+  **todos** los navegadores (iOS/Firefox incluidos) por el mismo camino; sin camara
+  disponible, cae a la **foto** o a la entrada manual. Las opciones secundarias
+  (escribir el EAN, foto, descargar/importar pack, consulta en linea) viven en
+  **"Mas opciones"**.
 - **Descarga automatizada**: manifest hospedado (`public/barcode-manifest.json`,
   mismo origen; URL relativa `./barcode/es.jsonl.gz`) que la app consulta al pulsar
   "Descargar pack"; descarga con progreso, **verifica sha256** e importa en IndexedDB.

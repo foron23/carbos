@@ -1,11 +1,10 @@
-import { BARCODE_FORMATS, barcodeDetectorCtor, barcodeStub } from './decode';
-import type { BarcodeDetectorLike } from './decode';
+import { barcodeStub, decodeFrame } from './decode';
 
 /**
- * Escaneo en tiempo real: abre la camara y decodifica fotogramas hasta encontrar
- * un codigo. Requiere `BarcodeDetector` (Chrome/Android; no hay deteccion en vivo
- * en iOS/Firefox), en cuyo caso devuelve `null` y la UI cae a la foto o a la
- * entrada manual. El hook `__carbosBarcodeStub` permite al arnes E2E simularlo.
+ * Escaneo en tiempo real y **unificado**: abre la camara (`getUserMedia`) y
+ * decodifica fotogramas en bucle con `decodeFrame` (nativo o quagga2) hasta
+ * encontrar un codigo. Funciona en todos los navegadores; solo requiere permiso
+ * de camara. El hook `__carbosBarcodeStub` permite al arnes E2E simularlo.
  *
  * Todo ocurre en el dispositivo: la camara no sale de aqui y no hay red.
  */
@@ -30,9 +29,8 @@ export async function startLiveScan(opts: LiveScanOptions): Promise<LiveScanHand
     return { stop: () => undefined };
   }
 
-  const ctor = barcodeDetectorCtor();
   const media = navigator.mediaDevices;
-  if (!ctor || !media?.getUserMedia) {
+  if (!media?.getUserMedia) {
     opts.onError?.('unsupported');
     return null;
   }
@@ -53,13 +51,6 @@ export async function startLiveScan(opts: LiveScanOptions): Promise<LiveScanHand
     /* autoplay puede requerir gesto: el bucle igualmente intenta decodificar */
   }
 
-  let detector: BarcodeDetectorLike;
-  try {
-    detector = new ctor({ formats: [...BARCODE_FORMATS] });
-  } catch {
-    detector = new ctor();
-  }
-
   let stopped = false;
   const stop = (): void => {
     if (stopped) return;
@@ -71,19 +62,17 @@ export async function startLiveScan(opts: LiveScanOptions): Promise<LiveScanHand
 
   const timer = setInterval(() => {
     if (stopped) return;
-    void detector
-      .detect(video)
-      .then((results) => {
-        const first = results[0];
-        if (first?.rawValue) {
-          opts.onCode(first.rawValue);
+    void decodeFrame(video)
+      .then((code) => {
+        if (code) {
+          opts.onCode(code);
           stop();
         }
       })
       .catch(() => {
         /* fotograma no decodificable: seguimos */
       });
-  }, opts.intervalMs ?? 250);
+  }, opts.intervalMs ?? 350);
 
   return { stop };
 }
