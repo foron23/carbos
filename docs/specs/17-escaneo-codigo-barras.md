@@ -25,7 +25,7 @@ puro, sin decisiones nuevas) y **B** (opt-in en linea). Ambas aprobadas.
 - La decodificacion es 100% local: leer un EAN no requiere red ni backend.
 - La fuente natural de catalogo de productos es Open Food Facts (ODbL-1.0), **fuente
   nueva** no contemplada en D19 (que exige Ciqual/USDA). Introducirla requiere una
-  decision explicita (**D40**, ver final).
+  decision explicita (**D47**, ver final).
 
 ## Alcance
 
@@ -37,7 +37,7 @@ tests.
 cache del resultado, atribucion ODbL, reescritura honesta de privacidad, manejo ml/g.
 
 **No entra**: publicacion/redistribucion de un dataset ODbL desde este repo (requiere
-D40); ningun camino del escaneo hacia unidades de insulina; analitica.
+D47); ningun camino del escaneo hacia unidades de insulina; analitica.
 
 ## Diseno
 
@@ -183,7 +183,7 @@ nutriments.carbohydrates_100g, serving_quantity, last_modified_t`.
 4. Salida: JSONL ordenado por `code`, o **sqlite** (`code TEXT PRIMARY KEY`) + `zstd`.
 5. **Medir** el tamano real (no fiarse de la estimacion); emitir manifest con sha256.
 
-**Licencia (D40)**: redistribuir un derivado de OFF obliga a **ODbL-1.0** (Share-Alike
+**Licencia (D47)**: redistribuir un derivado de OFF obliga a **ODbL-1.0** (Share-Alike
 sobre la base de datos, no sobre tu codigo) + atribucion; los contenidos son DbCL y las
 imagenes CC-BY-SA-3.0 (no empaquetar fotos). No hay declaracion oficial de
 compatibilidad ODbL <-> AGPL-3.0: es analisis, no consejo legal.
@@ -295,7 +295,7 @@ a la guarda de acentos del test. No renderizar `origin` si no se pinta en el dia
 - **Privacidad**: la tentacion de dejar la resolucion en linea "encendida por comodidad"
   rompe la promesa; el aviso y el defecto-off son la proteccion. Un mirror propio sigue
   siendo online.
-- **Licencia**: ODbL derivada + AGPL-3.0 sin declaracion oficial (D40); empequetar datos
+- **Licencia**: ODbL derivada + AGPL-3.0 sin declaracion oficial (D47); empequetar datos
   de OFF es mas arriesgado que consultarlos en vivo.
 - **Precision de unidades** (ml vs g) y **carbohidratos vs azucares**: fuente de totales
   erroneos; tratar explicitamente.
@@ -305,16 +305,16 @@ a la guarda de acentos del test. No renderizar `origin` si no se pinta en el dia
 - **Decodificacion**: camara movil en envoltorios curvos/baja luz; por eso la entrada
   manual es obligatoria.
 
-## Decisiones propuestas (D40-D42)
+## Decisiones propuestas (D47-D49)
 
-- **D40 - Fuente de productos y licencia**: introducir Open Food Facts (ODbL-1.0) como
+- **D47 - Fuente de productos y licencia**: introducir Open Food Facts (ODbL-1.0) como
   fuente de barcode, en modo **consulta** (no empaquetado) por defecto; si se empaqueta,
   asumir ODbL + atribucion. Alternativas: USDA FDC (CC0, sin lookup por UPC), Wikidata
   P3962 (CC0, empaquetable) o tabla propia.
-- **D41 - Resolucion en linea opt-in**: la app resuelve en local por defecto; la
+- **D48 - Resolucion en linea opt-in**: la app resuelve en local por defecto; la
   resolucion en linea es un modulo opt-in, revocado, avisado ("el codigo sale a
   internet") y con atribucion; nunca silencioso.
-- **D42 - Esquema estable**: la procedencia del escaneo va en `FoodItem.barcode?`
+- **D49 - Esquema estable**: la procedencia del escaneo va en `FoodItem.barcode?`
   (aditivo), sin subir `SCHEMA_VERSION`; se sigue el precedente del chat.
 
 ## Estado (implementado)
@@ -380,4 +380,4 @@ a la guarda de acentos del test. No renderizar `origin` si no se pinta en el dia
      resuelven.
 - **Pendiente (heredado)**: guardar-en-local tras un miss; `field.barcode` (clave muerta);
   streaming del JSONL; decidir la API de Mercadona (nombre/ingredientes/alergenos, sin
-  carbs); CDN opcional con `--base-url`; volcar D40-D42 a `docs/decisiones.md`.
+  carbs); CDN opcional con `--base-url`.

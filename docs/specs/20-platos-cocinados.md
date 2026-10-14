@@ -89,7 +89,7 @@ no era la localizacion, era la agregacion de porcion (ya corregida).
 - **D3. Porcion de guiso** (racion/cazo/cucharon, o area): hoy la caja grande fuerza x1.4
   (`src/model/portion.ts`). Ataca el mayor confusor del MAE sin tabla nueva (deuda D25 sigue).
 - **D4. Codigo de barras (ya existe).** Tarrinas, latas y guisos **envasados** se resuelven por EAN +
-  Open Food Facts **sin vision** (spec 17; OFF es ODbL-1.0, requiere D40). Es la via natural para
+  Open Food Facts **sin vision** (spec 17; OFF es ODbL-1.0, requiere D47). Es la via natural para
   buena parte del "guiso" real (de bote/lata).
 
 ## Escalera de recomendacion

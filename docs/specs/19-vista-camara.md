@@ -209,15 +209,15 @@ Contrato con `main.ts`/`ui.ts`: `setStatus(host, key|text)`, `setViewState(state
 - **Bateria/CPU** en movil: visor en vivo con camara encendida; parar al ocultar y no inferir
   por fotograma.
 
-## Decisiones propuestas (D43-D45)
+## Decisiones propuestas (D50-D52)
 
-- **D43 - Superficie de camara unica**: un modulo `src/camera/` (`CameraSurface`) compartido por
+- **D50 - Superficie de camara unica**: un modulo `src/camera/` (`CameraSurface`) compartido por
   los modos Foto y Codigo; encapsula permiso, visor, overlay, estados y lifecycle. Alternativa
   descartada: mantener dos implementaciones (divergen y duplican permisos/ciclo de vida).
-- **D44 - Deteccion en vivo = previsualizar + capturar**: la vista en vivo **no** infiere por
+- **D51 - Deteccion en vivo = previsualizar + capturar**: la vista en vivo **no** infiere por
   fotograma ni escribe en el borrador; se captura **un** fotograma limpio que entra al pipeline
   actual (alineado con el "una caja limpia" de SPEC 18). Alternativa descartada: inferencia
   continua (sobreconteo).
-- **D45 - Permiso y ciclo de vida**: la camara vive **solo** mientras el modo esta activo; se
+- **D52 - Permiso y ciclo de vida**: la camara vive **solo** mientras el modo esta activo; se
   pide en gesto del usuario y se detiene al ocultar el panel/pestana; `torch`/`facingMode`
   best-effort. Sin red nueva.
