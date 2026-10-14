@@ -114,6 +114,23 @@ def parse_meta(dirpath: Path):
     return gt_ids, totals
 
 
+def ingredient_counts(dirpath: Path) -> dict[str, int]:
+    """Numero de ingredientes por plato (grupos de 7 en el CSV de Nutrition5k)."""
+    counts: dict[str, int] = {}
+    for name in ("cafe1.csv", "cafe2.csv"):
+        for raw in (dirpath / name).read_text(encoding="utf-8").splitlines():
+            if not raw.startswith("dish_"):
+                continue
+            f = raw.split(",")
+            i, c = 6, 0
+            while i + 1 < len(f):
+                if f[i + 1].strip():
+                    c += 1
+                i += 7
+            counts[f[0]] = c
+    return counts
+
+
 def letterbox(img: Image.Image, size: int = 640):
     w, h = img.size
     scale = min(size / w, size / h)
@@ -203,6 +220,8 @@ def main():
     catalog = parse_catalog(ROOT / "src/catalog/catalog.ts")
     classmap = parse_classmap(ROOT / "src/catalog/classmap.ts")
     gt_ids, totals = parse_meta(args.meta)
+    counts = ingredient_counts(args.meta)
+    buckets: dict[str, dict] = {}
     classes = json.loads(args.classes_from.read_text(encoding="utf-8"))["classifier"]["classes"]
 
     det = ort.InferenceSession(str(args.detector), providers=["CPUExecutionProvider"])
@@ -300,13 +319,32 @@ def main():
         mae_single += abs(pred_single - true_carb)
         mae_area += abs(pred_area - true_carb)
         mean_true += true_carb
+        h1 = bool(gt) and any(c in gt for c in top1_ids if c)
+        h3 = bool(gt) and any(c in gt for c in top3_ids if c)
+        if h1:
+            dish_hit1 += 1
+        if h3:
+            dish_hit3 += 1
+        # Troceo por numero de ingredientes del plato (mezcla vs item unico).
+        n_ing = counts.get(did, 0)
+        bkey = "1" if n_ing <= 1 else ("2" if n_ing == 2 else "3+")
+        b = buckets.setdefault(bkey, {"n": 0, "mae_area": 0.0, "hit3": 0, "mapped": 0})
+        b["n"] += 1
+        b["mae_area"] += abs(pred_area - true_carb)
         if gt:
-            if any(c in gt for c in top1_ids if c):
-                dish_hit1 += 1
-            if any(c in gt for c in top3_ids if c):
-                dish_hit3 += 1
+            b["mapped"] += 1
+            if h3:
+                b["hit3"] += 1
 
     mapped = sum(1 for p in paths if gt_ids.get(p.stem))
+    bucket_report = {
+        k: {
+            "dishes": v["n"],
+            "maeCarb_area": float(v["mae_area"] / v["n"]) if v["n"] else 0,
+            "dish_recall_top3": float(v["hit3"] / v["mapped"]) if v["mapped"] else 0,
+        }
+        for k, v in sorted(buckets.items())
+    }
     report = {
         "tag": args.tag,
         "oracle": args.oracle,
@@ -319,6 +357,7 @@ def main():
         "maeCarb_area": float(mae_area / n),
         "maeCarbPct": float((mae / n) / (mean_true / n)) if mean_true else 0,
         "maeMass": float(mae_m / n),
+        "by_ingredients": bucket_report,
         "dishes_with_gt": mapped,
         "box_top1_precision": float(box_hit1 / boxes_total) if boxes_total else 0,
         "box_top3_precision": float(box_hit3 / boxes_total) if boxes_total else 0,

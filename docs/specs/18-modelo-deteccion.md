@@ -120,6 +120,13 @@ del detector**. Si el oracle mejora mucho, el detector es el cuello; si no, lo e
 **arreglar la agregacion de porcion**; el clasificador alineado al catalogo ya esta a la altura del
 baseline cuando la localizacion es decente. Caveat intacto: fuga del student (entrenado sobre el test).
 
+> [!warning] Correccion posterior (D1)
+> Este experimento se corrio **antes** de arreglar la agregacion de porcion. Bajo la suma por caja, el
+> oracle parecia ganar; **una vez aplicado D1 (reparto por area), el detector gana al oracle en todos
+> los tramos**, incluidos los combinados (verificado troceando por nº de ingredientes; ver
+> [`20-platos-cocinados.md`](20-platos-cocinados.md)). Es decir: **el cuello era la agregacion de
+> porcion (D1), no la localizacion**; el modo "un plato" (A2) queda **depriorizado**.
+
 ## Arreglo D1: agregacion de porcion (aplicado)
 
 El banco sumaba una porcion por defecto **por caja**. Se probaron cuatro agregaciones en una sola
@@ -239,8 +246,8 @@ Gating por detector **no** se despliega: se evalua via `make eval --source detec
 2. **Agregacion de porcion (D1)**: reparto por area. **(hecho)**. Sin esto el MAE no era interpretable.
 3. **Student sin fuga (C1)** y **decidir el despliegue** (`weights-0.2.0`): gana en cobertura/top-3,
    empata en MAE. **(preparado, decision pendiente)**
-4. **Modo "un plato"** (A2): una caja limpia para el caso comun; el oracle lo respalda. Barato y de
-   alta palanca sobre la UX.
+4. **Modo "un plato"** (A2): **depriorizado** — medido que con D1 el detector **gana** al modo
+   imagen-completa, tambien en combinados (ver `20-platos-cocinados.md`).
 5. **Fine-tune del detector** (A1) para subir la **precision de recorte** (caja top-1), ahora que
    sabemos que el clasificador no es el cuello.
 6. **Set propio (D25/C3)** para sustituir el numero "comparable" por uno representativo.
