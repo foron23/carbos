@@ -31,18 +31,21 @@ los **atajos de correccion y la lectura del dia** (SPEC 13/D33-D37: mitad/doble/
 teclear, porciones tipicas, la comida gana **hora** y pierde la franja, y barras de la semana). Ya
 esta el **runtime de inferencia** (ONNX en Web
 Worker, WebGPU con fallback WASM, descarga diferida con sha256 y cache) y el **banco de medida**
-sobre Nutrition5k (`make eval`). El modelo elegido (D28) es **YOLO11n COCO + MobileNetV3-Large
-ImageNet int8**; los pesos viven en `weights/` (5.7 MB + 10.7 MB) y se publican desde este mismo
-repo por jsDelivr (`weights-0.1.0`, D24), con el manifest en `public/model-manifest.json`. Para
-probar el flujo de foto en local sin red: `make smoke-models`.
+sobre Nutrition5k (`make eval`). El pipeline es **YOLO11n COCO + clasificador alineado al catalogo**
+(155 clases = ids del catalogo, destilado de CLIP ViT-B/32 sin fuga); los pesos viven en `weights/`
+(4.6 MB + 10.7 MB) y se publican desde este mismo repo por jsDelivr (`weights-0.2.0`, D24), con el
+manifest en `public/model-manifest.json`. El clasificador emite ids del catalogo y se resuelven por el
+**mapa identidad** (`resolveClass`, SPEC 18). Para probar el flujo de foto en local sin red:
+`make smoke-models`.
 
-**Benchmark (Nutrition5k, 507 platos, 2026-10-12):** el mejor candidato es **MobileNetV3-Large
-ImageNet int8** (5.7 MB; etiquetas ImageNet normalizadas y mapeadas al catalogo, D31): **MAE
-15.19 g, cobertura 34.1 %** (IC95 [14.10, 16.27]). Ningun modelo publico se acerca al catalogo: el
-siguiente paso es **fine-tuning al catalogo** o **destilacion** (D32). Aviso: Nutrition5k son
-cafeterias de California, asi que la cifra es **comparable**, no representativa de cocina espanola;
-el set propio pesado sigue como **deuda declarada** (D25). Detalle en
-[`docs/specs/11-comparacion-modelos.md`](docs/specs/11-comparacion-modelos.md).
+**Benchmark (Nutrition5k, 507 platos, 2026-10-14):** el clasificador alineado al catalogo da **MAE
+16.5 g con 100 % de cobertura** (baseline ImageNet: 15.1 g / 34.1 %); con un **oracle de localizacion**
+(una caja limpia) el student baja a **16.4 g**, lo que muestra que el cuello era el detector y la
+**agregacion de porcion por caja**, no el clasificador. Diagnostico, experimentos y la metrica de
+identificacion añadida en [`docs/specs/18-modelo-deteccion.md`](docs/specs/18-modelo-deteccion.md)
+(comparacion de modelos original en [`docs/specs/11-comparacion-modelos.md`](docs/specs/11-comparacion-modelos.md)).
+Aviso: Nutrition5k son cafeterias de California, asi que la cifra es **comparable**, no representativa
+de cocina espanola; el set propio pesado sigue como **deuda declarada** (D25).
 
 **v1.1 (Fase 3, chat on-device):** diseno en [`docs/specs/14-chat.md`](docs/specs/14-chat.md) e
 implementada la **fundacion**: esquema cerrado de intenciones con Zod validado antes de ejecutar,
