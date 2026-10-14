@@ -59,11 +59,20 @@ function testFetcher(): BarcodeFetcher | undefined {
 export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandle {
   let root: HTMLElement | null = null;
   let statusKey: StringKey | null = null;
+  // Texto dinamico (p. ej. "Anadido: <nombre>"): tiene prioridad sobre la clave.
+  let statusText: string | null = null;
   let live: LiveScanHandle | null = null;
+
+  /** Fija un estado traducido y descarta cualquier texto dinamico previo. */
+  const setStatus = (key: StringKey | null): void => {
+    statusKey = key;
+    statusText = null;
+  };
 
   const paintStatus = (): void => {
     const status = root?.querySelector<HTMLElement>('#barcode-status');
-    if (status) status.textContent = statusKey ? t(deps.getLocale(), statusKey) : '';
+    if (!status) return;
+    status.textContent = statusText ?? (statusKey ? t(deps.getLocale(), statusKey) : '');
   };
 
   const localize = (): void => {
@@ -88,7 +97,7 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
   };
 
   async function useCode(code: string): Promise<void> {
-    statusKey = 'barcode.detecting';
+    setStatus('barcode.detecting');
     paint();
     const online = isBarcodeOnlineEnabled();
     // Sin consulta en linea, asegurar los datos locales antes de resolver: la
@@ -109,23 +118,25 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
       if (product.brand !== undefined) add.brand = product.brand;
       deps.onAdd(add);
       // Sin carbohidratos conocidos: identificado, pero el usuario los ajusta.
-      statusKey = hasCarbs ? 'barcode.ready' : 'barcode.identified';
+      setStatus(hasCarbs ? 'barcode.ready' : 'barcode.identified');
+      // Confirmacion con el nombre resuelto: se ve de un vistazo que se anadio.
+      statusText = `${t(deps.getLocale(), 'barcode.added')} ${name}`;
     } else if (result.kind === 'miss') {
       // No se inventa una fila: solo se avisa. El usuario decide (pack, en linea
       // o anadir a mano). Antes se anadia una fila con el EAN y 0 g, que era enganoso.
-      statusKey = 'barcode.notFound';
+      setStatus('barcode.notFound');
     } else {
-      statusKey = 'barcode.notFound';
+      setStatus('barcode.notFound');
     }
     paint();
   }
 
   async function decodeFile(file: File): Promise<void> {
-    statusKey = 'barcode.detecting';
+    setStatus('barcode.detecting');
     paint();
     const code = await decodeBarcodeFromFile(file);
     if (!code) {
-      statusKey = 'barcode.unsupported';
+      setStatus('barcode.unsupported');
       paint();
       return;
     }
@@ -137,7 +148,7 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
    * con progreso, verificacion sha256 e importacion; despues el escaneo es local.
    */
   async function download(): Promise<void> {
-    statusKey = 'barcode.downloading';
+    setStatus('barcode.downloading');
     paint();
     try {
       const fetcher = testFetcher();
@@ -148,7 +159,7 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
       const entries = manifest.packs.filter((pack) => pack.locale === locale);
       const chosen = entries.length > 0 ? entries : manifest.packs;
       if (chosen.length === 0) {
-        statusKey = 'barcode.noPack';
+        setStatus('barcode.noPack');
         paint();
         return;
       }
@@ -158,15 +169,17 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
           ...(fetcher ? { fetcher } : {}),
           onProgress: ({ loaded, total }) => {
             if (status) {
-              const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
+              // Si el transporte descomprime (Content-Encoding: gzip), `loaded` cuenta los
+              // bytes del JSONL y `total` los del .gz: el cociente se dispara. Acotamos.
+              const pct = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
               status.textContent = `${t(deps.getLocale(), 'barcode.downloading')} ${pct}%`;
             }
           },
         });
       }
-      statusKey = 'barcode.downloaded';
+      setStatus('barcode.downloaded');
     } catch {
-      statusKey = 'barcode.downloadFailed';
+      setStatus('barcode.downloadFailed');
     }
     paint();
     void updatePackHint();
@@ -203,7 +216,7 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
   }
 
   async function importFiles(files: File[]): Promise<void> {
-    statusKey = 'barcode.importing';
+    setStatus('barcode.importing');
     paint();
     try {
       const manifestFile = files.find((file) => /\.json$/i.test(file.name));
@@ -211,9 +224,9 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
       if (!manifestFile || !packFile) throw new Error('faltan ficheros');
       const manifest = parseManifest(JSON.parse(await manifestFile.text()));
       await importPack({ manifest, blob: packFile });
-      statusKey = 'barcode.imported';
+      setStatus('barcode.imported');
     } catch {
-      statusKey = 'barcode.importFailed';
+      setStatus('barcode.importFailed');
     }
     paint();
   }
@@ -224,7 +237,11 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
       <fieldset class="card inset">
         <legend data-i18n="section.barcode"></legend>
         <p><button id="barcode-scan" type="button" class="primary" data-i18n="button.scanBarcode"></button></p>
-        <video id="barcode-video" class="barcode-video" hidden autoplay playsinline muted></video>
+        <div id="barcode-viewer" class="barcode-viewer" hidden>
+          <video id="barcode-video" class="barcode-video" autoplay playsinline muted></video>
+          <div class="barcode-reticle" aria-hidden="true"></div>
+          <p class="barcode-reticle-hint" data-i18n="barcode.aimHint"></p>
+        </div>
         <p><button id="barcode-stop" type="button" data-i18n="button.cancel" hidden></button></p>
         <p id="barcode-status" class="muted" aria-live="polite"></p>
         <p id="barcode-empty-hint" class="muted" data-i18n="barcode.emptyHint" hidden></p>
@@ -250,33 +267,54 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
     `;
     root = host.querySelector('fieldset');
     const video = host.querySelector<HTMLVideoElement>('#barcode-video');
+    const viewer = host.querySelector<HTMLElement>('#barcode-viewer');
+    const status = host.querySelector<HTMLElement>('#barcode-status');
     const stopButton = host.querySelector<HTMLButtonElement>('#barcode-stop');
+
+    // Estado visual del visor: `scanning` (animacion de barrido) o `locked`
+    // (codigo ya leido, congelado). Ambas clases viven en src/style.css.
+    const setViewerState = (state: 'scanning' | 'locked' | null): void => {
+      if (!viewer) return;
+      viewer.classList.toggle('is-scanning', state === 'scanning');
+      viewer.classList.toggle('is-locked', state === 'locked');
+    };
+
+    // Indicador de actividad en el propio texto de estado (giro via CSS).
+    const setBusy = (on: boolean): void => {
+      status?.classList.toggle('busy', on);
+    };
+
+    const hideViewer = (): void => {
+      setViewerState(null);
+      setBusy(false);
+      if (viewer) viewer.hidden = true;
+      if (video) video.srcObject = null;
+      if (stopButton) stopButton.hidden = true;
+    };
 
     const stopScan = (): void => {
       live?.stop();
       live = null;
-      if (video) {
-        video.hidden = true;
-        video.srcObject = null;
-      }
-      if (stopButton) stopButton.hidden = true;
+      hideViewer();
     };
 
     // Boton principal: escaneo en vivo (nativo o quagga2). Si no hay camara
     // disponible, cae a la foto o a la entrada manual.
     const beginScan = (): void => {
-      statusKey = 'barcode.detecting';
+      setStatus('barcode.detecting');
       paint();
       // Mostrar el visor ANTES de arrancar: un video `display:none` no dibuja
       // fotogramas y la decodificacion no ve nada.
-      if (video) video.hidden = false;
+      if (viewer) viewer.hidden = false;
+      setViewerState('scanning');
+      setBusy(true);
       if (stopButton) stopButton.hidden = false;
       let fallback = false;
       let detected = false;
       // Si a los 8 s no ha leido nada, sugerir acercar la camara o usar la foto.
       const aimTimer = window.setTimeout(() => {
         if (!detected && live) {
-          statusKey = 'barcode.aim';
+          setStatus('barcode.aim');
           paint();
         }
       }, 8000);
@@ -285,12 +323,20 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
         onCode: (code) => {
           detected = true;
           window.clearTimeout(aimTimer);
-          stopScan();
-          void useCode(code);
+          // Congela la camara y muestra "codigo leido" mientras se resuelve.
+          live?.stop();
+          live = null;
+          if (video) video.srcObject = null;
+          setViewerState('locked');
+          setBusy(false);
+          setStatus('barcode.codeDetected');
+          paint();
+          void useCode(code).finally(() => hideViewer());
         },
         onError: (reason) => {
-          statusKey = reason === 'denied' ? 'barcode.cameraDenied' : 'barcode.unsupported';
+          setStatus(reason === 'denied' ? 'barcode.cameraDenied' : 'barcode.unsupported');
           if (reason === 'unsupported') fallback = true;
+          setBusy(false);
           paint();
         },
       }).then((handle) => {
@@ -299,8 +345,7 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
           return;
         }
         // Sin camara: ocultar el visor y, si procede, caer a la foto.
-        if (video) video.hidden = true;
-        if (stopButton) stopButton.hidden = true;
+        hideViewer();
         if (!detected && fallback) host.querySelector<HTMLInputElement>('#barcode-input')?.click();
       });
     };
@@ -308,7 +353,7 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
     host.querySelector('#barcode-scan')?.addEventListener('click', beginScan);
     stopButton?.addEventListener('click', () => {
       stopScan();
-      statusKey = null;
+      setStatus(null);
       paint();
     });
 

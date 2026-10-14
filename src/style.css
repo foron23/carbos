@@ -1045,7 +1045,9 @@ details[open] > summary::after {
 
 /* `*` no alcanza a los pseudo-elementos: el giro del indicador tambien se apaga. */
 @media (prefers-reduced-motion: reduce) {
-  #photo-status.busy::after {
+  #photo-status.busy::after,
+  #barcode-status.busy::after,
+  .barcode-viewer.is-scanning .barcode-reticle::after {
     animation: none !important;
   }
 }
@@ -1055,10 +1057,87 @@ details[open] > summary::after {
 }
 
 /* Visor del escaneo en tiempo real (spec 17). */
+.barcode-viewer {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #000;
+}
+
 .barcode-video {
+  display: block;
   width: 100%;
   max-height: 320px;
   background: #000;
   border-radius: 8px;
   object-fit: cover;
+}
+
+/* Marco/reticle que encuadra la zona donde debe caer el codigo. */
+.barcode-reticle {
+  position: absolute;
+  inset: 16% 10%;
+  border: 2px solid rgb(255 255 255 / 80%);
+  border-radius: 10px;
+  pointer-events: none;
+  box-shadow: 0 0 0 100vmax rgb(0 0 0 / 25%);
+}
+
+.barcode-reticle-hint {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0.5rem;
+  margin: 0;
+  text-align: center;
+  color: #fff;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 70%);
+}
+
+/* Linea de barrido: visible solo mientras se busca un codigo. */
+.barcode-viewer.is-scanning .barcode-reticle::after {
+  content: '';
+  position: absolute;
+  inset-inline: 4%;
+  inset-block-start: 6%;
+  block-size: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 8px 1px var(--accent);
+  animation: barcode-sweep 1.6s ease-in-out infinite;
+}
+
+@keyframes barcode-sweep {
+  0% {
+    inset-block-start: 6%;
+    opacity: 0.35;
+  }
+  50% {
+    inset-block-start: 94%;
+    opacity: 1;
+  }
+  100% {
+    inset-block-start: 6%;
+    opacity: 0.35;
+  }
+}
+
+/* Codigo ya leido: marco en verde y sin barrido, a la espera de resolver. */
+.barcode-viewer.is-locked .barcode-reticle {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 100vmax rgb(0 0 0 / 40%);
+}
+
+/* Actividad del escaneo en el propio texto de estado (giro indeterminado). */
+#barcode-status.busy::after {
+  content: '';
+  display: inline-block;
+  inline-size: 0.85em;
+  block-size: 0.85em;
+  margin-inline-start: 0.45em;
+  vertical-align: -0.12em;
+  border: 2px solid var(--line-strong);
+  border-block-start-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 900ms linear infinite;
 }
