@@ -59,6 +59,8 @@ y frontera regulatoria que impide que el chat entre en el camino del calculo. El
 y sigue **oculto** hasta publicar los pesos y `public/chat-manifest.json`; la precision de
 intenciones queda como **gate con pesos** (D8/D12).
 
+**Calidad de vida (SPEC 23, D59-D61):** atajos de un toque (**recientes y favoritos**) al añadir comida, **objetivo diario** de carbohidratos con progreso en el topbar y el resumen, y **repetir** una comida registrada. Ajustes locales (`localStorage`), sin backend ni esquema.
+
 Detalle por entregable: [`docs/specs/02-fase1.md`](docs/specs/02-fase1.md).
 
 ## Arranque

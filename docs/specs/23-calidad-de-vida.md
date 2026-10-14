@@ -128,7 +128,7 @@ confirmacion previa al guardado. Sin esquema ni red.
 | D60 | **Objetivo diario de carbohidratos, del usuario** | Objetivo opt-in en gramos, **puesto por la persona**, en `localStorage`; el topbar y el resumen del Diario muestran progreso y restante. Presentacional, sin dosis ni consejo (linea regulatoria).                                                               | propuesta |
 | D61 | **Repetir comida**                                | Accion que **clona los items de una comida registrada al borrador** (ids nuevos, mismo dia en vista); nada se registra sin confirmar. Aditivo, sin esquema.                                                                                                      | propuesta |
 
-Estas decisiones se cerraran (pasaran a **cerrada**) cuando SPEC 23 quede implementada.
+Estas decisiones quedan **cerradas** con la implementacion de SPEC 23.
 
 ## Alcance
 
