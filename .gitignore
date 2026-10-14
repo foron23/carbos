@@ -8,6 +8,9 @@ coverage/
 e2e/screenshots/
 e2e/tmp/
 
+# Prototipos desechables de UI (comparativas de diseno; no forman parte del build)
+prototypes/
+
 # Entrenamiento (datos y pesos nunca al repo; ver docs/specs/08-linear-probe.md)
 training/data/
 training/out/

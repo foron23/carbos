@@ -107,7 +107,11 @@ async function main() {
   try {
     for (const scenario of selected) {
       const page = await browser.newPage();
-      await page.setViewport({ width: 430, height: 932, deviceScaleFactor: 2 });
+      // Viewport por defecto 430x932; un escenario puede fijar el suyo propio
+      // (p.ej. 390x844 para el umbral de 3 entradas o 1280x800 para el rail).
+      await page.setViewport(
+        scenario.viewport ?? { width: 430, height: 932, deviceScaleFactor: 2 },
+      );
       page.on('dialog', (dialog) => {
         void dialog.accept();
       });

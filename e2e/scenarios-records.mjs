@@ -37,7 +37,7 @@ async function addFood(page, query) {
 
 async function register(page) {
   await click(page, '#register');
-  await page.waitForSelector('#diary .timeline-row', { timeout: 8000 });
+  await page.waitForSelector('#diary .timeline-entry', { timeout: 8000 });
 }
 
 export const scenarios = [
@@ -48,6 +48,15 @@ export const scenarios = [
       await addFood(page, 'pan');
       await register(page);
 
+      // Las acciones viven en el detalle: hay que expandirlo antes (B5).
+      await click(page, '#diary .timeline-entry--meal .timeline-toggle');
+      await page.waitForFunction(
+        () => {
+          const detail = document.querySelector('#diary .timeline-entry--meal .timeline-detail');
+          return Boolean(detail) && !detail.hidden;
+        },
+        { timeout: 8000 },
+      );
       await click(page, '#diary .edit-entry');
       // El borrador se rellena y el boton pasa a Guardar.
       await page.waitForFunction(
@@ -80,8 +89,17 @@ export const scenarios = [
       await addFood(page, 'pan');
       await register(page);
 
+      // Las acciones viven en el detalle: hay que expandirlo antes (B5).
+      await click(page, '#diary .timeline-entry--meal .timeline-toggle');
+      await page.waitForFunction(
+        () => {
+          const detail = document.querySelector('#diary .timeline-entry--meal .timeline-detail');
+          return Boolean(detail) && !detail.hidden;
+        },
+        { timeout: 8000 },
+      );
       await click(page, '#diary .delete-entry');
-      await page.waitForFunction(() => !document.querySelector('#diary .timeline-row'), {
+      await page.waitForFunction(() => !document.querySelector('#diary .timeline-entry'), {
         timeout: 8000,
       });
       const meals = await readStore(page, 'meals');

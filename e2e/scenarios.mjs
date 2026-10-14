@@ -27,8 +27,11 @@ async function openApp(page, base) {
   await clearDatabase(page);
   // Estado limpio entre escenarios: idioma es y resolucion en linea APAGADA
   // (defecto); un escenario previo puede haberla dejado activada en localStorage.
+  // Tambien se marca como ya presentada: el dialogo inicial es una capa fija que
+  // falsearia las medidas de geometria (nav, anclas) de los escenarios de layout.
   await page.evaluate(() => {
     localStorage.setItem('carbos.locale', 'es');
+    localStorage.setItem('carbos.onboarded', '1');
     localStorage.removeItem('carbos.barcode.online');
   });
   await reload(page);
@@ -76,6 +79,56 @@ async function assertUnifiedEntry(page) {
 
 async function register(page) {
   await click(page, '#register');
+}
+
+/** Espera a que el navegador asiente el layout (scroll de ancla, rejilla). */
+function settle(page, ms = 150) {
+  return page.evaluate((wait) => new Promise((resolve) => setTimeout(resolve, wait)), ms);
+}
+
+/**
+ * Edita la hora de la comida identificada por `label` (nombre visible del
+ * alimento), expandiendo antes su detalle: revelacion progresiva (B5).
+ */
+async function setMealTime(page, label, time) {
+  const located = await page.evaluate((name) => {
+    const entry = Array.from(document.querySelectorAll('#diary .timeline-entry--meal')).find(
+      (node) => (node.textContent ?? '').includes(name),
+    );
+    if (!entry) return false;
+    const detail = entry.querySelector('.timeline-detail');
+    if (detail?.hidden) entry.querySelector('.timeline-toggle')?.click();
+    return true;
+  }, label);
+  assert(located, `la comida ${label} esta en el diario`);
+  await page.waitForFunction(
+    (name) => {
+      const entry = Array.from(document.querySelectorAll('#diary .timeline-entry--meal')).find(
+        (node) => (node.textContent ?? '').includes(name),
+      );
+      return (entry?.querySelector('input[type="time"]')?.offsetHeight ?? 0) > 0;
+    },
+    { timeout: 8000 },
+    label,
+  );
+  await page.evaluate(
+    (name, value) => {
+      const entry = Array.from(document.querySelectorAll('#diary .timeline-entry--meal')).find(
+        (node) => (node.textContent ?? '').includes(name),
+      );
+      const input = entry?.querySelector('input[type="time"]');
+      if (!input) return;
+      input.value = value;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    },
+    label,
+    time,
+  );
+  for (let i = 0; i < 60; i += 1) {
+    const meals = await readStore(page, 'meals');
+    if (meals.some((meal) => meal.time === time)) break;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
 }
 
 const DEFAULT_DETECTION = [
@@ -398,7 +451,15 @@ export const scenarios = [
       await addFood(page, 'pan');
       await register(page);
       await waitForText(page, '#diary', 'Pan');
-      await page.$eval('#diary input[type="time"]', (el) => {
+      // Revelacion progresiva (B5): la hora vive dentro del detalle colapsado.
+      await click(page, '#diary .timeline-entry--meal .timeline-toggle');
+      await page.waitForFunction(
+        () =>
+          (document.querySelector('#diary .timeline-entry--meal input[type="time"]')
+            ?.offsetHeight ?? 0) > 0,
+        { timeout: 8000 },
+      );
+      await page.$eval('#diary .timeline-entry--meal input[type="time"]', (el) => {
         el.value = '07:15';
         el.dispatchEvent(new Event('change', { bubbles: true }));
       });
@@ -410,7 +471,18 @@ export const scenarios = [
       await reload(page);
       await waitFor(page, '#app header h1');
       await waitForText(page, '#diary', 'Pan');
-      const value = await page.$eval('#diary input[type="time"]', (el) => el.value);
+      // Tras recargar el detalle vuelve a estar colapsado (no se persiste, B5).
+      await click(page, '#diary .timeline-entry--meal .timeline-toggle');
+      await page.waitForFunction(
+        () =>
+          (document.querySelector('#diary .timeline-entry--meal input[type="time"]')
+            ?.offsetHeight ?? 0) > 0,
+        { timeout: 8000 },
+      );
+      const value = await page.$eval(
+        '#diary .timeline-entry--meal input[type="time"]',
+        (el) => el.value,
+      );
       assertEqual(value, '07:15', 'la hora editada persiste tras recargar');
       const meals = await readStore(page, 'meals');
       assertEqual(meals[0]?.time, '07:15', 'la hora guardada es la editada');
@@ -424,7 +496,14 @@ export const scenarios = [
       await addFood(page, 'pan');
       await register(page);
       await waitForText(page, '#diary', 'Pan');
-      await page.$eval('#diary input[type="time"]', (el) => {
+      await click(page, '#diary .timeline-entry--meal .timeline-toggle');
+      await page.waitForFunction(
+        () =>
+          (document.querySelector('#diary .timeline-entry--meal input[type="time"]')
+            ?.offsetHeight ?? 0) > 0,
+        { timeout: 8000 },
+      );
+      await page.$eval('#diary .timeline-entry--meal input[type="time"]', (el) => {
         el.value = '09:00';
         el.dispatchEvent(new Event('change', { bubbles: true }));
       });
@@ -437,8 +516,10 @@ export const scenarios = [
       await setValue(page, '#ins-units', '4');
       await click(page, '#add-insulin');
       await waitForText(page, '#diary', '08:30');
-      const kinds = await page.$$eval('#diary .timeline-row', (rows) =>
-        rows.map((row) => (row.querySelector('input[type="time"]') ? 'meal' : 'insulin')),
+      const kinds = await page.$$eval('#diary .timeline-entry', (entries) =>
+        entries.map((entry) =>
+          entry.classList.contains('timeline-entry--meal') ? 'meal' : 'insulin',
+        ),
       );
       assertEqual(kinds.join(','), 'insulin,meal', 'la insulina anterior precede a la comida');
       await screenshot(page, 'linea-tiempo');
@@ -1182,6 +1263,390 @@ export const scenarios = [
         `el dia activo lleva dia y gramos: ${active}`,
       );
       await screenshot(page, 'semana-etiquetada');
+    },
+  },
+  {
+    name: 'la nav tiene cuatro destinos y marca el activo',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      // Espera a i18n y al scrollspy inicial: la nav arranca con Anadir activo.
+      await page.waitForFunction(
+        () =>
+          document.querySelectorAll('#section-nav a[aria-current="true"]').length === 1 &&
+          Array.from(document.querySelectorAll('#section-nav .nav-text')).every(
+            (node) => (node.textContent ?? '').trim().length > 0,
+          ),
+        { timeout: 8000 },
+      );
+      const links = await page.$$eval('#section-nav a[href]', (nodes) =>
+        nodes.map((link) => {
+          const indicator = link.querySelector('[data-nav-indicator]');
+          const rect = indicator?.getBoundingClientRect();
+          return {
+            target: link.dataset.target ?? '',
+            text: (link.textContent ?? '').trim(),
+            svg: Boolean(link.querySelector('svg')),
+            current: link.getAttribute('aria-current') === 'true',
+            indicatorWidth: rect?.width ?? 0,
+            indicatorHeight: rect?.height ?? 0,
+          };
+        }),
+      );
+      assertEqual(links.length, 4, 'la nav tiene cuatro destinos');
+      assert(
+        links.every((link) => link.text.length > 0 && link.svg),
+        'cada destino lleva nombre accesible e icono SVG inline',
+      );
+      const active = links.filter((link) => link.current);
+      assertEqual(active.length, 1, 'exactamente un destino activo');
+      assertEqual(active[0]?.target, 'entry', 'al cargar el activo es Anadir');
+      assert(
+        Boolean(active[0]) && active[0].indicatorWidth > 0 && active[0].indicatorHeight > 0,
+        'el destino activo lleva un indicador con caja no vacia',
+      );
+      await screenshot(page, 'nav-activa');
+    },
+  },
+  {
+    name: 'navega al diario y aterriza bajo la cabecera',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await click(page, '#section-nav [data-target="s-diario"]');
+      await settle(page);
+      await page.waitForFunction(
+        () =>
+          document.querySelector('#section-nav a[aria-current="true"]')?.dataset.target ===
+          's-diario',
+        { timeout: 8000 },
+      );
+      const headerBottom = await page.$eval('.topbar', (el) => el.getBoundingClientRect().bottom);
+      const sectionTop = await page.$eval('#s-diario', (el) => el.getBoundingClientRect().top);
+      assert(
+        sectionTop >= headerBottom - 1 && sectionTop <= headerBottom + 8,
+        `el diario aterriza bajo la cabecera (header ${headerBottom}, seccion ${sectionTop})`,
+      );
+      const active = await page.$eval(
+        '#section-nav a[aria-current="true"]',
+        (el) => el.dataset.target,
+      );
+      assertEqual(active, 's-diario', 'el destino activo pasa a Diario');
+      await screenshot(page, 'ancla-diario');
+    },
+  },
+  {
+    name: 'el scrollspy sigue el desplazamiento',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      assertEqual(
+        await page.$eval('#section-nav a[aria-current="true"]', (el) => el.dataset.target),
+        'entry',
+        'al cargar el activo es Anadir',
+      );
+      // Desplaza el diario justo bajo la cabecera: el activo pasa a Diario sin clic.
+      await page.evaluate(() => {
+        const daybar =
+          parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--daybar-h')) ||
+          0;
+        const target = document.getElementById('s-diario');
+        window.scrollTo(0, target.getBoundingClientRect().top + window.scrollY - daybar);
+      });
+      await page.waitForFunction(
+        () =>
+          document.querySelector('#section-nav a[aria-current="true"]')?.dataset.target ===
+          's-diario',
+        { timeout: 8000 },
+      );
+      assertEqual(
+        await page.$eval('#section-nav a[aria-current="true"]', (el) => el.dataset.target),
+        's-diario',
+        'el scrollspy sigue al desplazamiento',
+      );
+      await screenshot(page, 'scrollspy');
+    },
+  },
+  {
+    name: 'cada destino de la nav aterriza bajo la cabecera',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      for (const target of ['entry', 's-diario', 's-insulina', 's-ajustes']) {
+        // Aleja el scroll del destino para que el clic tenga que desplazarlo de veras.
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        await settle(page);
+        await page.$eval(`#section-nav [data-target="${target}"]`, (el) => el.click());
+        await settle(page);
+        const { headerBottom, sectionTop } = await page.evaluate(
+          (id) => ({
+            headerBottom: document.querySelector('.topbar').getBoundingClientRect().bottom,
+            sectionTop: document.getElementById(id).getBoundingClientRect().top,
+          }),
+          target,
+        );
+        assert(
+          sectionTop >= headerBottom - 1 && sectionTop <= headerBottom + 8,
+          `${target} aterriza bajo la cabecera (header ${headerBottom}, seccion ${sectionTop})`,
+        );
+      }
+      assertEqual(
+        await page.$eval('#settings', (el) => el.open),
+        true,
+        'navegar a Ajustes abre el details',
+      );
+      await screenshot(page, 'anclas-nav');
+    },
+  },
+  {
+    name: 'el resumen del dia cuadra con las entradas',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await addFood(page, 'manzana');
+      await register(page);
+      await waitForText(page, '#diary', 'Manzana');
+      await addFood(page, 'pan');
+      await register(page);
+      await waitForText(page, '#diary', 'Pan');
+      await setValue(page, '#ins-time', '08:30');
+      await setValue(page, '#ins-units', '4');
+      await click(page, '#add-insulin');
+      await waitForText(page, '#diary', '08:30');
+      const summaryCarbs = parseFloat(await text(page, '#summary-carbs'));
+      const summaryMeals = parseInt(await text(page, '#summary-meals'), 10);
+      const summaryInsulin = parseFloat(await text(page, '#summary-insulin'));
+      assert(Number.isFinite(summaryCarbs) && summaryCarbs > 0, 'el total del resumen es numerico');
+      const entryCarbs = await page.$$eval(
+        '#diary .timeline-entry--meal .timeline-carbs output',
+        (nodes) => nodes.map((node) => parseFloat(node.textContent ?? '')),
+      );
+      const momentCarbs = await page.$$eval('#diary-summary .moment-carbs', (nodes) =>
+        nodes.map((node) => parseFloat(node.textContent ?? '')),
+      );
+      const sumEntries = entryCarbs.reduce((sum, value) => sum + value, 0);
+      const sumMoments = momentCarbs.reduce((sum, value) => sum + value, 0);
+      assert(
+        Math.abs(summaryCarbs - sumEntries) <= 0.5,
+        `el resumen cuadra con las entradas (${summaryCarbs} vs ${sumEntries})`,
+      );
+      assertEqual(summaryMeals, 2, 'el resumen cuenta dos comidas');
+      assertEqual(summaryInsulin, 4, 'el resumen suma cuatro unidades de insulina');
+      assertEqual(momentCarbs.length, 3, 'el reparto por momento tiene tres salidas');
+      assert(
+        Math.abs(sumMoments - summaryCarbs) <= 0.5,
+        `el reparto por momento cuadra con el total (${sumMoments} vs ${summaryCarbs})`,
+      );
+      await screenshot(page, 'resumen-dia');
+    },
+  },
+  {
+    name: 'el diario distingue comida de insulina',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await addFood(page, 'manzana');
+      await register(page);
+      await waitForText(page, '#diary', 'Manzana');
+      await setValue(page, '#ins-time', '08:30');
+      await setValue(page, '#ins-units', '4');
+      await click(page, '#add-insulin');
+      await waitForText(page, '#diary', '08:30');
+      const entries = await page.$$eval('#diary .timeline-entry', (nodes) =>
+        nodes.map((entry) => ({
+          meal: entry.classList.contains('timeline-entry--meal'),
+          insulin: entry.classList.contains('timeline-entry--insulin'),
+          mealMarker: Boolean(entry.querySelector('.timeline-marker--meal')),
+          insulinMarker: Boolean(entry.querySelector('.timeline-marker--insulin')),
+          kind: (entry.querySelector('.timeline-kind')?.textContent ?? '').trim(),
+        })),
+      );
+      const meal = entries.find((entry) => entry.meal);
+      const insulin = entries.find((entry) => entry.insulin);
+      assert(Boolean(meal) && meal.mealMarker, 'la comida lleva marcador circular');
+      assertEqual(meal?.kind, 'Comida', 'la etiqueta de la comida es Comida');
+      assert(Boolean(insulin) && insulin.insulinMarker, 'la insulina lleva marcador rombo');
+      assertEqual(insulin?.kind, 'Insulina', 'la etiqueta de la insulina es Insulina');
+      await screenshot(page, 'diario-tipos');
+    },
+  },
+  {
+    name: 'expandir revela la hora editable',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await addFood(page, 'pan');
+      await register(page);
+      await waitForText(page, '#diary', 'Pan');
+      const collapsed = await page.$eval(
+        '#diary .timeline-entry--meal input[type="time"]',
+        (el) => ({
+          height: el.offsetHeight,
+          expanded: el
+            .closest('.timeline-entry')
+            ?.querySelector('.timeline-toggle')
+            ?.getAttribute('aria-expanded'),
+        }),
+      );
+      assertEqual(collapsed.height, 0, 'la hora esta colapsada en reposo');
+      assertEqual(collapsed.expanded, 'false', 'el control declara aria-expanded=false');
+      await click(page, '#diary .timeline-entry--meal .timeline-toggle');
+      await page.waitForFunction(
+        () =>
+          (document.querySelector('#diary .timeline-entry--meal input[type="time"]')
+            ?.offsetHeight ?? 0) > 0,
+        { timeout: 8000 },
+      );
+      const expanded = await page.$eval('#diary .timeline-entry--meal .timeline-toggle', (el) =>
+        el.getAttribute('aria-expanded'),
+      );
+      assertEqual(expanded, 'true', 'al expandir el control declara aria-expanded=true');
+      await screenshot(page, 'diario-expandido');
+    },
+  },
+  {
+    name: 'Ajustes abre el details',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      assertEqual(await page.$eval('#settings', (el) => el.open), false, 'Ajustes arranca plegado');
+      await click(page, '#section-nav [data-target="s-ajustes"]');
+      await settle(page);
+      assertEqual(await page.$eval('#settings', (el) => el.open), true, 'navegar abre el details');
+      const headerBottom = await page.$eval('.topbar', (el) => el.getBoundingClientRect().bottom);
+      const sectionTop = await page.$eval('#s-ajustes', (el) => el.getBoundingClientRect().top);
+      assert(
+        sectionTop >= headerBottom - 1 && sectionTop <= headerBottom + 8,
+        `Ajustes aterriza bajo la cabecera (header ${headerBottom}, seccion ${sectionTop})`,
+      );
+      await screenshot(page, 'ajustes-abierto');
+    },
+  },
+  {
+    name: 'el estado vacio oculta el resumen y ofrece salida',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await page.waitForFunction(
+        () => {
+          const summary = document.getElementById('diary-summary');
+          return (
+            Boolean(summary) &&
+            summary.hidden &&
+            Boolean(document.querySelector('#diary .diary-empty'))
+          );
+        },
+        { timeout: 8000 },
+      );
+      assertEqual(
+        await page.$eval('#diary-summary', (el) => el.hidden),
+        true,
+        'sin entradas el resumen queda oculto',
+      );
+      const empty = await page.$eval('#diary .diary-empty .muted', (el) => ({
+        text: (el.textContent ?? '').trim(),
+        visible: !el.hidden && el.getClientRects().length > 0,
+      }));
+      assert(empty.visible && empty.text.length > 0, 'el estado vacio muestra el mensaje');
+      const cta = await page.$eval('#diary a.diary-cta', (el) => ({
+        href: el.getAttribute('href'),
+        text: (el.textContent ?? '').trim(),
+      }));
+      assertEqual(cta.href, '#entry', 'la salida apunta a Anadir');
+      assert(cta.text.length > 0, 'la salida tiene texto');
+      await screenshot(page, 'diario-vacio');
+    },
+  },
+  {
+    name: 'se ven al menos 3 entradas al anclar el diario',
+    async run(page, ctx) {
+      await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
+      await openApp(page, ctx.base);
+      const meals = [
+        ['manzana', 'Manzana', '06:00'],
+        ['pan blanco', 'Pan blanco', '07:00'],
+        ['quinoa', 'Quinoa cocida', '08:00'],
+        ['muesli', 'Muesli', '09:00'],
+      ];
+      for (const [query, label, time] of meals) {
+        await addFood(page, query);
+        await register(page);
+        await waitForText(page, '#diary', label);
+        await setMealTime(page, label, time);
+      }
+      // Deja todas las entradas colapsadas para que quepan mas de tres.
+      await page.$$eval('#diary .timeline-toggle[aria-expanded="true"]', (toggles) => {
+        toggles.forEach((toggle) => toggle.click());
+      });
+      await click(page, '#section-nav [data-target="s-diario"]');
+      await settle(page);
+      const visible = await page.$$eval('#diary .timeline-entry', (entries) => {
+        const headerBottom = document.querySelector('.topbar').getBoundingClientRect().bottom;
+        const navTop = document.querySelector('#section-nav').getBoundingClientRect().top;
+        const viewportH = window.innerHeight;
+        return entries.filter((entry) => {
+          const rect = entry.getBoundingClientRect();
+          return rect.top >= headerBottom && rect.bottom <= viewportH && rect.bottom <= navTop;
+        }).length;
+      });
+      assert(visible >= 3, `se ven al menos 3 entradas completas (${visible})`);
+      await screenshot(page, 'diario-tres-entradas');
+
+      // A 320 px el umbral del criterio 14 baja a 2 entradas completas.
+      await page.setViewport({ width: 320, height: 568, deviceScaleFactor: 2 });
+      await click(page, '#section-nav [data-target="s-diario"]');
+      await settle(page);
+      const visible320 = await page.$$eval('#diary .timeline-entry', (entries) => {
+        const headerBottom = document.querySelector('.topbar').getBoundingClientRect().bottom;
+        const navTop = document.querySelector('#section-nav').getBoundingClientRect().top;
+        const viewportH = window.innerHeight;
+        return entries.filter((entry) => {
+          const rect = entry.getBoundingClientRect();
+          return rect.top >= headerBottom && rect.bottom <= viewportH && rect.bottom <= navTop;
+        }).length;
+      });
+      assert(visible320 >= 2, `se ven al menos 2 entradas completas a 320 (${visible320})`);
+      await screenshot(page, 'diario-dos-entradas-320');
+    },
+  },
+  {
+    name: 'idioma: la seccion se llama Diario y la nav se traduce',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await setValue(page, '#locale', 'en');
+      await page.waitForFunction(() => document.documentElement.lang === 'en', { timeout: 8000 });
+      await waitForText(page, '#s-diario legend', 'Diary');
+      assertEqual(await text(page, '#s-diario legend'), 'Diary', 'la leyenda se traduce');
+      assertEqual(await text(page, '#s-diario h2'), 'Diary', 'el encabezado se traduce');
+      assertEqual(
+        await page.$eval('#section-nav', (el) => el.getAttribute('aria-label')),
+        'Sections',
+        'la nav tiene nombre accesible traducido',
+      );
+      const leaked = await page.$$eval('#app [aria-label]', (nodes) =>
+        nodes
+          .map((node) => (node.getAttribute('aria-label') ?? '').trim())
+          .filter((label) => label.length === 0 || /^[a-z]+\.[a-zA-Z]+$/.test(label)),
+      );
+      assertEqual(leaked.length, 0, `aria-label sin traducir: ${leaked.join(' | ')}`);
+      await screenshot(page, 'idioma-nav');
+    },
+  },
+  {
+    name: 'el rail de escritorio no tapa la columna',
+    async run(page, ctx) {
+      await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 2 });
+      await openApp(page, ctx.base);
+      const metrics = await page.evaluate(() => {
+        const nav = document.querySelector('#section-nav').getBoundingClientRect();
+        const app = document.querySelector('#app').getBoundingClientRect();
+        return {
+          navRight: nav.right,
+          navBottom: nav.bottom,
+          appLeft: app.left,
+          innerHeight: window.innerHeight,
+        };
+      });
+      assert(
+        metrics.navRight <= metrics.appLeft + 1,
+        `el rail no tapa la columna (rail ${metrics.navRight}, columna ${metrics.appLeft})`,
+      );
+      assert(
+        Math.abs(metrics.navBottom - metrics.innerHeight) > 4,
+        'la barra inferior no esta anclada al fondo en escritorio',
+      );
+      await screenshot(page, 'rail-escritorio');
     },
   },
 ];

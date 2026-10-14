@@ -1,6 +1,7 @@
 import './style.css';
 import {
   applyAlternative,
+  carbsByMoment,
   dayCarbs,
   dayTimeline,
   deleteInsulin,
@@ -10,7 +11,9 @@ import {
   itemCarbs,
   loadVault,
   mealCarbs,
+  mealsForDate,
   mergeDetections,
+  MOMENTS,
   portionGrams,
   PORTION_SIZES,
   putInsulin,
@@ -260,6 +263,13 @@ app.innerHTML = `
     <p id="header-disclaimer" class="header-disclaimer" role="note" data-i18n="footer.disclaimerShort"></p>
   </header>
 
+  <nav id="section-nav" class="section-nav" data-i18n-aria="nav.label">
+    <a class="nav-item" href="#entry" data-target="entry"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg><span class="nav-text" data-i18n="nav.add"></span><span class="nav-indicator" data-nav-indicator aria-hidden="true"></span></a>
+    <a class="nav-item" href="#s-diario" data-target="s-diario"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg><span class="nav-text" data-i18n="nav.diary"></span><span class="nav-indicator" data-nav-indicator aria-hidden="true"></span></a>
+    <a class="nav-item" href="#s-insulina" data-target="s-insulina"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22" aria-hidden="true"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path></svg><span class="nav-text" data-i18n="nav.insulin"></span><span class="nav-indicator" data-nav-indicator aria-hidden="true"></span></a>
+    <a class="nav-item" href="#s-ajustes" data-target="s-ajustes"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg><span class="nav-text" data-i18n="nav.settings"></span><span class="nav-indicator" data-nav-indicator aria-hidden="true"></span></a>
+  </nav>
+
   <main>
   <fieldset id="entry" class="card entry">
     <legend id="entry-legend" data-i18n="section.addFood"></legend>
@@ -318,13 +328,23 @@ app.innerHTML = `
     <p class="muted" data-i18n="text.estimateNote"></p>
   </fieldset>
 
-  <fieldset class="card">
+  <fieldset class="card" id="s-diario">
     <legend data-i18n="section.diary"></legend>
     <h2 class="sr-only" data-i18n="section.diary"></h2>
+    <div id="diary-summary" class="diary-summary">
+      <p class="summary-row summary-total"><span data-i18n="summary.total"></span><strong class="summary-carbs"><output id="summary-carbs"></output></strong></p>
+      <p class="summary-row"><output id="summary-meals" class="summary-count"></output><span data-i18n="summary.meals"></span></p>
+      <p class="summary-row"><output id="summary-insulin" class="summary-count"></output><span data-i18n="summary.insulin"></span></p>
+      <ul class="moment-breakdown">
+        <li class="moment"><span data-i18n="moment.morning"></span><output class="moment-carbs" data-moment="morning"></output></li>
+        <li class="moment"><span data-i18n="moment.afternoon"></span><output class="moment-carbs" data-moment="afternoon"></output></li>
+        <li class="moment"><span data-i18n="moment.evening"></span><output class="moment-carbs" data-moment="evening"></output></li>
+      </ul>
+    </div>
     <ul id="diary"></ul>
   </fieldset>
 
-  <fieldset class="card">
+  <fieldset class="card" id="s-insulina">
     <legend data-i18n="section.insulinLog"></legend>
     <h2 class="sr-only" data-i18n="section.insulinLog"></h2>
     <p class="muted" data-i18n="insulin.note"></p>
@@ -358,6 +378,7 @@ app.innerHTML = `
     <p class="muted" data-i18n="storage.notice"></p>
   </details>
 
+  <div id="s-ajustes" class="settings-anchor">
   <details class="card" id="settings">
     <summary data-i18n="section.settings"></summary>
     <h2 class="sr-only" data-i18n="section.settings"></h2>
@@ -372,11 +393,13 @@ app.innerHTML = `
     <p><button id="contrib-clear" type="button" data-i18n="contrib.clear"></button></p>
     <p class="muted" data-i18n="contrib.note"></p>
   </details>
+  </div>
   </main>
 
   <footer>
     <p class="notice" role="note" data-i18n="footer.disclaimer"></p>
   </footer>
+  <div class="page-tail" aria-hidden="true"></div>
 `;
 
 const localeSelect = byId<HTMLSelectElement>('locale');
@@ -1035,6 +1058,50 @@ function pulseDayTotal(): void {
   window.setTimeout(() => total.classList.remove('pulse'), 400);
 }
 
+const SVG_UTENSILS = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></svg>`;
+const SVG_DROPLET = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>`;
+
+/**
+ * Entradas del diario expandidas en esta sesion (B5): la revelacion progresiva
+ * no se persiste al recargar, pero un re-render dentro de la sesion la conserva.
+ */
+const expandedEntries = new Set<string>();
+
+/** Crea un nodo cuyo texto traduce `key` y deja la clave para futuras pasadas. */
+function i18nEl(tag: string, key: StringKey, className?: string): HTMLElement {
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  el.setAttribute('data-i18n', key);
+  el.textContent = tr(key);
+  return el;
+}
+
+function mealName(meal: Meal): string {
+  return meal.items.map((food) => food.name).join(', ') || tr('diary.meal');
+}
+
+/**
+ * Control de revelacion progresiva (B5). Mantiene `aria-expanded` sincronizado
+ * con `hidden` del detalle y recuerda la expansion dentro de la sesion.
+ */
+function createToggle(key: string, name: string, detail: HTMLElement): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'timeline-toggle';
+  button.textContent = tr('diary.expand');
+  button.setAttribute('aria-label', `${tr('diary.expand')} ${name}`);
+  detail.hidden = !expandedEntries.has(key);
+  button.setAttribute('aria-expanded', String(!detail.hidden));
+  button.addEventListener('click', () => {
+    const nextExpanded = detail.hidden;
+    detail.hidden = !nextExpanded;
+    button.setAttribute('aria-expanded', String(nextExpanded));
+    if (nextExpanded) expandedEntries.add(key);
+    else expandedEntries.delete(key);
+  });
+  return button;
+}
+
 function timeInput(value: string, onCommit: (time: string) => void): HTMLInputElement {
   const input = document.createElement('input');
   input.type = 'time';
@@ -1111,67 +1178,175 @@ function removeInsulin(log: InsulinLog): void {
   void deleteInsulin(log.id).then(refresh);
 }
 
+/** Nodo de una entrada de comida (B1-B5): marcador circular, carbs protagonistas. */
+function mealEntry(meal: Meal): HTMLLIElement {
+  const item = document.createElement('li');
+  item.className = 'timeline-entry timeline-entry--meal';
+
+  const marker = document.createElement('span');
+  marker.className = 'timeline-marker timeline-marker--meal';
+  marker.setAttribute('aria-hidden', 'true');
+  marker.innerHTML = SVG_UTENSILS;
+  item.appendChild(marker);
+
+  const card = document.createElement('div');
+  card.className = 'timeline-card';
+
+  const head = document.createElement('div');
+  head.className = 'timeline-head';
+  head.appendChild(i18nEl('span', 'diary.meal', 'timeline-kind'));
+  head.appendChild(
+    i18nEl(
+      'span',
+      meal.origin === 'photo' ? 'diary.originPhoto' : 'diary.originManual',
+      'timeline-origin',
+    ),
+  );
+
+  // Fila colapsada: el dato protagonista (carbs) y el control de detalle.
+  const main = document.createElement('div');
+  main.className = 'timeline-main';
+  const carbs = document.createElement('p');
+  carbs.className = 'timeline-carbs';
+  const carbsOut = document.createElement('output');
+  carbsOut.textContent = `${roundCarbs(mealCarbs(meal))} ${tr('unit.grams')}`;
+  carbs.appendChild(carbsOut);
+  main.appendChild(carbs);
+
+  // Detalle (B5): info secundaria (chips, confianza) + hora editable + acciones.
+  const detail = document.createElement('div');
+  detail.className = 'timeline-detail';
+
+  const chips = document.createElement('ul');
+  chips.className = 'timeline-chips';
+  for (const food of meal.items) {
+    const chip = document.createElement('li');
+    chip.className = 'timeline-chip';
+    const name = document.createElement('span');
+    name.className = 'chip-name';
+    name.textContent = food.name;
+    const grams = document.createElement('span');
+    grams.className = 'chip-grams';
+    grams.textContent = `${Math.round(food.grams)} ${tr('unit.grams')}`;
+    const chipCarbs = document.createElement('span');
+    chipCarbs.className = 'chip-carbs';
+    chipCarbs.textContent = `${roundCarbs(itemCarbs(food))} ${tr('unit.grams')}`;
+    chip.append(name, grams, chipCarbs);
+    chips.appendChild(chip);
+  }
+  detail.appendChild(chips);
+
+  if (meal.confidence !== null) {
+    const pct = Math.round(meal.confidence * 100);
+    const conf = document.createElement('p');
+    conf.className = 'timeline-confidence';
+    const meter = document.createElement('span');
+    meter.className = 'confidence-meter';
+    const fill = document.createElement('span');
+    fill.className = 'confidence-fill';
+    fill.style.inlineSize = `${pct}%`;
+    meter.appendChild(fill);
+    const label = document.createElement('span');
+    label.className = 'muted';
+    label.textContent = `${tr('confidence.label')}: ${pct}%`;
+    conf.append(meter, label);
+    detail.appendChild(conf);
+  }
+
+  detail.appendChild(
+    timeInput(meal.time, (time) => {
+      void putMeal({ ...meal, time }).then(refresh);
+    }),
+  );
+  detail.appendChild(
+    entryActions(mealName(meal), [
+      { key: 'button.edit', cls: 'edit-entry', run: () => startEditMeal(meal) },
+      { key: 'button.remove', cls: 'delete-entry', run: () => removeMeal(meal) },
+    ]),
+  );
+
+  main.appendChild(createToggle(`meal:${meal.id}`, mealName(meal), detail));
+  card.append(head, main, detail);
+  item.appendChild(card);
+  return item;
+}
+
+/** Nodo de una entrada de insulina (B1/B2): ficha fina con marcador rombo. */
+function insulinEntry(log: InsulinLog): HTMLLIElement {
+  const item = document.createElement('li');
+  item.className = 'timeline-entry timeline-entry--insulin';
+
+  const marker = document.createElement('span');
+  marker.className = 'timeline-marker timeline-marker--insulin';
+  marker.setAttribute('aria-hidden', 'true');
+  marker.innerHTML = SVG_DROPLET;
+  item.appendChild(marker);
+
+  const card = document.createElement('div');
+  card.className = 'timeline-card timeline-card--insulin';
+
+  const head = document.createElement('div');
+  head.className = 'timeline-head';
+  head.appendChild(i18nEl('span', 'diary.insulin', 'timeline-kind'));
+  const time = document.createElement('span');
+  time.className = 'timeline-time-static';
+  time.textContent = log.time;
+  head.appendChild(time);
+
+  const main = document.createElement('div');
+  main.className = 'timeline-main';
+  const body = document.createElement('p');
+  body.className = 'timeline-insulin-body';
+  body.textContent = insulinBody(log);
+  main.appendChild(body);
+
+  const detail = document.createElement('div');
+  detail.className = 'timeline-detail';
+  detail.appendChild(
+    entryActions(insulinBody(log), [
+      { key: 'button.remove', cls: 'delete-entry', run: () => removeInsulin(log) },
+    ]),
+  );
+  main.appendChild(createToggle(`insulin:${log.id}`, insulinBody(log), detail));
+  card.append(head, main, detail);
+  item.appendChild(card);
+  return item;
+}
+
 function renderDiary(): void {
   const list = byId('diary');
+  const summary = byId('diary-summary');
+  const dayMeals = mealsForDate(vault.meals, currentDate);
+  const dayLogs = vault.insulin.filter((log) => log.date === currentDate);
   const entries = dayTimeline(vault.meals, vault.insulin, currentDate);
+
+  const total = roundCarbs(dayMeals.reduce((sum, meal) => sum + mealCarbs(meal), 0));
+  const insulinTotal = roundCarbs(dayLogs.reduce((sum, log) => sum + log.units, 0));
+  const moments = carbsByMoment(dayMeals);
+  byId('summary-carbs').textContent = `${total} ${tr('unit.grams')}`;
+  byId('summary-meals').textContent = String(dayMeals.length);
+  byId('summary-insulin').textContent = `${insulinTotal} ${tr('unit.units')}`;
+  for (const moment of MOMENTS) {
+    const cell = document.querySelector<HTMLOutputElement>(
+      `.moment-carbs[data-moment="${moment}"]`,
+    );
+    if (cell) cell.textContent = `${roundCarbs(moments[moment])} ${tr('unit.grams')}`;
+  }
+  summary.hidden = entries.length === 0;
+
+  list.innerHTML = '';
   if (entries.length === 0) {
-    list.innerHTML = `<li class="muted">${tr('diary.empty')}</li>`;
+    const empty = document.createElement('li');
+    empty.className = 'diary-empty';
+    empty.appendChild(i18nEl('p', 'diary.empty', 'muted'));
+    const cta = i18nEl('a', 'diary.emptyCta', 'primary diary-cta') as HTMLAnchorElement;
+    cta.href = '#entry';
+    empty.appendChild(cta);
+    list.appendChild(empty);
     return;
   }
-  list.innerHTML = '';
   for (const entry of entries) {
-    const row = document.createElement('li');
-    row.className = 'timeline-row';
-    if (entry.kind === 'meal') {
-      const meal = entry.meal;
-      row.appendChild(
-        timeInput(meal.time, (time) => {
-          void putMeal({ ...meal, time }).then(refresh);
-        }),
-      );
-      const body = document.createElement('div');
-      body.className = 'timeline-body';
-      const head = document.createElement('strong');
-      head.textContent = `${roundCarbs(mealCarbs(meal))} ${tr('unit.grams')}`;
-      if (meal.confidence !== null) {
-        const conf = document.createElement('span');
-        conf.className = 'muted';
-        conf.textContent = ` · ${tr('confidence.label')}: ${Math.round(meal.confidence * 100)}%`;
-        head.appendChild(conf);
-      }
-      const detail = document.createElement('div');
-      detail.className = 'muted';
-      detail.textContent = meal.items
-        .map(
-          (food) =>
-            `${food.name} ${food.grams} ${tr('unit.grams')} (${roundCarbs(itemCarbs(food))} ${tr('unit.grams')})`,
-        )
-        .join(' · ');
-      body.append(
-        head,
-        detail,
-        entryActions(meal.items.map((food) => food.name).join(', '), [
-          { key: 'button.edit', cls: 'edit-entry', run: () => startEditMeal(meal) },
-          { key: 'button.remove', cls: 'delete-entry', run: () => removeMeal(meal) },
-        ]),
-      );
-      row.appendChild(body);
-    } else {
-      const log = entry.log;
-      const time = document.createElement('span');
-      time.className = 'timeline-time';
-      time.textContent = log.time;
-      const body = document.createElement('div');
-      body.className = 'timeline-body';
-      body.textContent = insulinBody(log);
-      body.appendChild(
-        entryActions(insulinBody(log), [
-          { key: 'button.remove', cls: 'delete-entry', run: () => removeInsulin(log) },
-        ]),
-      );
-      row.append(time, body);
-    }
-    list.appendChild(row);
+    list.appendChild(entry.kind === 'meal' ? mealEntry(entry.meal) : insulinEntry(entry.log));
   }
 }
 
@@ -1210,13 +1385,93 @@ function render(): void {
   insulin?.refresh();
   chat?.refresh();
   barcode?.refresh();
-  requestAnimationFrame(publishDaybarHeight);
+  requestAnimationFrame(() => {
+    publishDaybarHeight();
+    publishNavHeight();
+  });
 }
 
 function publishDaybarHeight(): void {
   const topbar = document.querySelector<HTMLElement>('.topbar');
   if (!topbar) return;
   document.documentElement.style.setProperty('--daybar-h', `${topbar.offsetHeight}px`);
+}
+
+/**
+ * Altura efectiva de la nav: su alto real en movil (barra inferior) y 0 en
+ * escritorio, donde es un rail a la izquierda que no ocupa el flujo (A6).
+ */
+function navHeight(): number {
+  const nav = document.getElementById('section-nav');
+  if (!nav) return 0;
+  return window.matchMedia('(min-width: 64rem)').matches ? 0 : nav.offsetHeight;
+}
+
+function publishNavHeight(): void {
+  document.documentElement.style.setProperty('--nav-h', `${navHeight()}px`);
+}
+
+const SECTION_IDS = ['entry', 's-diario', 's-insulina', 's-ajustes'] as const;
+let scrollspyReady = false;
+
+/**
+ * Scrollspy (A5): un unico observer marca el destino visible con `aria-current`.
+ * La raiz descuenta la cabecera y la barra inferior para que la seccion activa
+ * sea la primera visible por debajo del chrome. Al cargar, *Añadir*.
+ */
+function setupScrollspy(): void {
+  if (scrollspyReady) return;
+  scrollspyReady = true;
+  const nav = byId('section-nav');
+  const links = new Map<string, HTMLAnchorElement>();
+  for (const link of nav.querySelectorAll<HTMLAnchorElement>('.nav-item')) {
+    const target = link.dataset.target;
+    if (target) links.set(target, link);
+  }
+  const setActive = (target: string): void => {
+    for (const [key, link] of links) {
+      if (key === target) link.setAttribute('aria-current', 'true');
+      else link.removeAttribute('aria-current');
+    }
+  };
+  const topInset =
+    (document.querySelector<HTMLElement>('.topbar')?.offsetHeight ?? 0) + navHeight();
+
+  const state = new Map<string, { top: number; intersecting: boolean }>();
+  let current = 'entry';
+  const update = (): void => {
+    let best: string | null = null;
+    let bestTop = Infinity;
+    for (const id of SECTION_IDS) {
+      const info = state.get(id);
+      if (!info?.intersecting) continue;
+      if (info.top < bestTop) {
+        bestTop = info.top;
+        best = id;
+      }
+    }
+    if (best && best !== current) {
+      current = best;
+      setActive(best);
+    }
+  };
+  const observer = new IntersectionObserver(
+    (records) => {
+      for (const record of records) {
+        state.set(record.target.id, {
+          top: record.boundingClientRect.top,
+          intersecting: record.isIntersecting,
+        });
+      }
+      update();
+    },
+    { rootMargin: `-${topInset}px 0px 0px 0px`, threshold: 0 },
+  );
+  setActive('entry');
+  for (const id of SECTION_IDS) {
+    const section = document.getElementById(id);
+    if (section) observer.observe(section);
+  }
 }
 
 async function refresh(): Promise<void> {
@@ -1564,6 +1819,17 @@ function wire(): void {
     },
   });
   renderExportReminder();
+
+  // Nav persistente: al destino Ajustes se le abre el <details> plegado. Sin
+  // `preventDefault`: el enlace y el `scroll-padding` hacen el desplazamiento.
+  byId('section-nav').addEventListener('click', (event) => {
+    const link = (event.target as HTMLElement).closest<HTMLAnchorElement>('.nav-item');
+    if (link?.dataset.target === 's-ajustes') {
+      const settings = document.getElementById('settings');
+      if (settings instanceof HTMLDetailsElement) settings.open = true;
+    }
+  });
+  setupScrollspy();
 }
 
 wire();
@@ -1573,7 +1839,10 @@ void renderContribStatus();
 window.addEventListener('online', () => {
   void flushContributions();
 });
-window.addEventListener('resize', publishDaybarHeight);
+window.addEventListener('resize', () => {
+  publishDaybarHeight();
+  publishNavHeight();
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

@@ -100,6 +100,33 @@ describe('cadenas de la interfaz', () => {
     }
   });
 
+  it('las claves nuevas de nav, diario y resumen existen en ambos idiomas', () => {
+    const nuevas = [
+      'nav.label',
+      'nav.add',
+      'nav.diary',
+      'nav.insulin',
+      'nav.settings',
+      'section.diary',
+      'diary.insulin',
+      'diary.expand',
+      'diary.emptyCta',
+      'summary.total',
+      'summary.meals',
+      'summary.insulin',
+      'moment.morning',
+      'moment.afternoon',
+      'moment.evening',
+    ] as const;
+    for (const key of nuevas) {
+      expect(isStringKey(key), `la clave ${key} debe existir`).toBe(true);
+      for (const locale of LOCALES) {
+        expect(t(locale, key), `${locale}.${key} falta`).not.toBe('');
+        expect(t(locale, key), `${locale}.${key} sin recortar`).toBe(t(locale, key).trim());
+      }
+    }
+  });
+
   it('reconoce las claves validas y rechaza el resto', () => {
     expect(isStringKey('app.title')).toBe(true);
     expect(isStringKey('clave.que.no.existe')).toBe(false);

@@ -56,12 +56,13 @@ const PASSES = [
     features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
   },
   {
-    id: 'dark-390x844',
+    id: 'detect-boxes-390x844',
     width: 390,
     height: 844,
-    features: [{ name: 'prefers-color-scheme', value: 'dark' }],
+    detections: true,
   },
-  { id: 'detect-boxes-390x844', width: 390, height: 844, detections: true },
+  // Pasada de escritorio (>= 64rem) imprescindible para verificar el rail.
+  { id: 'desktop-1280x800', width: 1280, height: 800 },
 ];
 
 /**
@@ -108,6 +109,19 @@ function collect() {
     if (wrapped?.textContent?.trim()) return wrapped.textContent.trim();
     if (el.tagName === 'INPUT') return el.value?.trim() ?? '';
     return el.textContent?.trim() || el.getAttribute('title')?.trim() || '';
+  };
+
+  const rectOf = (el) => {
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    return {
+      top: rect.top,
+      right: rect.right,
+      bottom: rect.bottom,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+    };
   };
 
   const parse = (value) => {
@@ -200,6 +214,52 @@ function collect() {
       }
     : null;
 
+  // Nav persistente: caja, posicion, destinos y el indicador del activo.
+  const navEl = document.getElementById('section-nav');
+  const navLinks = navEl ? Array.from(navEl.querySelectorAll('a')) : [];
+  const activeLink = navLinks.find((link) => link.getAttribute('aria-current') === 'true') ?? null;
+  const indicatorEl = activeLink
+    ? activeLink.querySelector('.nav-indicator, [data-nav-indicator]')
+    : null;
+  const indicatorRect = rectOf(indicatorEl);
+  const nav = navEl
+    ? {
+        present: true,
+        rect: rectOf(navEl),
+        position: window.getComputedStyle(navEl).position,
+        links: navLinks.map((link) => ({
+          name: nameOf(link),
+          current: link.getAttribute('aria-current') === 'true',
+          target: link.getAttribute('data-target') ?? link.getAttribute('href'),
+          hasIcon: Boolean(link.querySelector('svg')),
+        })),
+        currentCount: navLinks.filter((link) => link.getAttribute('aria-current') === 'true')
+          .length,
+        indicator: {
+          present: Boolean(indicatorEl),
+          w: indicatorRect ? indicatorRect.width : 0,
+          h: indicatorRect ? indicatorRect.height : 0,
+        },
+      }
+    : {
+        present: false,
+        rect: null,
+        position: null,
+        links: [],
+        currentCount: 0,
+        indicator: { present: false, w: 0, h: 0 },
+      };
+
+  const pageEl = document.getElementById('app');
+  const appRect = rectOf(pageEl);
+  const pageRect = appRect ? { left: appRect.left, right: appRect.right } : null;
+
+  const mainEl = document.querySelector('#app > main');
+  const mainPaddingBottom = mainEl
+    ? parseFloat(window.getComputedStyle(mainEl).paddingBottom)
+    : Number.NaN;
+  const navH = window.getComputedStyle(document.documentElement).getPropertyValue('--nav-h').trim();
+
   const detectLabels = Array.from(document.querySelectorAll('.detect-box-label')).map((label) => {
     const style = window.getComputedStyle(label);
     const fg = parse(style.color);
@@ -221,6 +281,10 @@ function collect() {
     unnamed,
     disclaimer,
     week,
+    nav,
+    pageRect,
+    navH,
+    mainPaddingBottom,
     detectLabels,
     media: {
       reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -379,6 +443,62 @@ async function runPass(browser, base, fixture, pass, fatal) {
       fatal.push(`${prefix} #week-bars no existe`);
     }
 
+    // (e) Nav persistente: presencia, 4 destinos, activo unico con icono e indicador.
+    {
+      const nav = data.nav;
+      const problems = [];
+      if (!nav.present) problems.push('#section-nav no existe');
+      if (nav.links.length !== 4) problems.push(`${nav.links.length} destinos (esperado 4)`);
+      if (nav.currentCount !== 1) problems.push(`${nav.currentCount} aria-current (esperado 1)`);
+      const active = nav.links.find((link) => link.current);
+      if (!active) problems.push('sin destino activo');
+      else if (!active.hasIcon) problems.push('el destino activo no tiene SVG inline');
+      if (!nav.indicator.present) problems.push('indicador del activo ausente');
+      else if (!(nav.indicator.w > 0 && nav.indicator.h > 0))
+        problems.push('indicador del activo sin caja');
+      if (problems.length > 0) {
+        fatal.push(`${prefix} nav: ${problems.join('; ')}`);
+        console.log('  NAV:', problems.join('; '));
+      } else {
+        console.log('  #section-nav con 4 destinos, activo unico con icono e indicador');
+      }
+
+      const navHValue = parseFloat(data.navH);
+      const bottomGap = nav.rect ? Math.abs(nav.rect.bottom - data.innerHeight) : null;
+
+      if (pass.width < 1024) {
+        // Movil: barra inferior fija anclada al fondo y contenido reservado.
+        const mobileProblems = [];
+        if (nav.position !== 'fixed')
+          mobileProblems.push(`position ${nav.position} (esperado fixed)`);
+        if (!(data.mainPaddingBottom >= navHValue - 1))
+          mobileProblems.push(`main padding ${data.mainPaddingBottom} < nav-h ${navHValue}`);
+        if (bottomGap === null || bottomGap > 2)
+          mobileProblems.push(`barra no anclada al fondo (gap ${bottomGap})`);
+        if (mobileProblems.length > 0) {
+          fatal.push(`${prefix} nav movil: ${mobileProblems.join('; ')}`);
+          console.log('  NAV MOVIL:', mobileProblems.join('; '));
+        } else {
+          console.log(`  barra inferior anclada (gap ${bottomGap}), contenido reservado`);
+        }
+      } else {
+        // Escritorio: rail que no tapa la columna y sin barra inferior.
+        const desktopProblems = [];
+        if (nav.rect && data.pageRect && !(nav.rect.right <= data.pageRect.left + 1))
+          desktopProblems.push(
+            `rail solapa la columna (${nav.rect.right} > ${data.pageRect.left})`,
+          );
+        if (bottomGap === null || !(bottomGap > 4))
+          desktopProblems.push('la barra inferior no esta oculta');
+        if (desktopProblems.length > 0) {
+          fatal.push(`${prefix} nav escritorio: ${desktopProblems.join('; ')}`);
+          console.log('  NAV ESCRITORIO:', desktopProblems.join('; '));
+        } else {
+          console.log('  rail sin solape y barra inferior oculta');
+        }
+      }
+    }
+
     // (c) Foco bajo la cabecera pegajosa (solo en viewports altos y sin deteccion).
     if (!pass.detections && pass.height >= 500) {
       // Trigger de busqueda para tener un ultimo resultado que enfocar.
@@ -403,7 +523,12 @@ async function runPass(browser, base, fixture, pass, fatal) {
           el.focus();
           const rect = el.getBoundingClientRect();
           const bottom = header ? header.getBoundingClientRect().bottom : 0;
-          out.push({ name, top: Math.round(rect.top), headerBottom: Math.round(bottom) });
+          out.push({
+            name,
+            top: Math.round(rect.top),
+            bottom: Math.round(rect.bottom),
+            headerBottom: Math.round(bottom),
+          });
         }
         return out;
       });
@@ -411,6 +536,7 @@ async function runPass(browser, base, fixture, pass, fatal) {
         fatal.push(`${prefix} no se pudo enfocar #ins-time ni el ultimo resultado`);
         console.log('  FOCO: sin objetivos');
       }
+      const navTop = data.nav.rect ? data.nav.rect.top : data.innerHeight;
       for (const item of focus) {
         if (item.top < item.headerBottom - 1) {
           fatal.push(
@@ -419,6 +545,13 @@ async function runPass(browser, base, fixture, pass, fatal) {
           console.log(`  FOCO OCULTO: ${JSON.stringify(item)}`);
         } else {
           console.log(`  foco ${item.name}: top ${item.top} >= cabecera ${item.headerBottom}`);
+        }
+        // Ademas no debe quedar bajo la barra inferior (no aplica al rail de escritorio).
+        if (pass.width < 1024 && item.bottom > navTop + 1) {
+          fatal.push(
+            `${prefix} ${item.name} queda bajo la barra inferior (bottom ${item.bottom} > navTop ${Math.round(navTop)})`,
+          );
+          console.log(`  FOCO BAJO LA BARRA: ${JSON.stringify(item)}`);
         }
       }
     }

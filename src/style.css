@@ -62,6 +62,7 @@
 html {
   -webkit-text-size-adjust: 100%;
   scroll-padding-top: calc(var(--daybar-h, 0px) + env(safe-area-inset-top));
+  scroll-padding-bottom: var(--nav-h, 0px);
 }
 
 body {
@@ -506,6 +507,7 @@ button:disabled:active {
 
 :focus {
   scroll-margin-top: calc(var(--daybar-h, 0px) + env(safe-area-inset-top));
+  scroll-margin-bottom: var(--nav-h, 0px);
 }
 
 :focus-visible {
@@ -670,51 +672,392 @@ button.result {
   flex: 1 1 10rem;
 }
 
-.timeline-row {
+/* --- Navegacion persistente (A1/A3) ------------------------------------- */
+
+/* Movil (por defecto, < 64rem): barra fija inferior icono sobre etiqueta. */
+.section-nav {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: 0;
+  display: flex;
+  z-index: 20;
+  background: var(--surface);
+  border-block-start: 1px solid var(--card-line);
+  padding-block-end: env(safe-area-inset-bottom);
+}
+
+.nav-item {
+  flex: 1 1 0;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.nav-item[aria-current='true'] {
+  color: var(--accent);
+}
+
+.nav-indicator {
+  display: none;
+}
+
+.nav-item[aria-current='true'] .nav-indicator {
+  display: block;
+  inline-size: 1.25rem;
+  block-size: 2px;
+  background: currentColor;
+  border-radius: 2px;
+}
+
+.nav-icon {
+  inline-size: 22px;
+  block-size: 22px;
+}
+
+.nav-text {
+  font-size: var(--text-xs);
+}
+
+/* Reserva el alto de la barra inferior para que no tape el final (A6). */
+main {
+  padding-block-end: var(--nav-h, 0px);
+}
+
+/* Escritorio (>= 64rem): rail fijo vertical centrado a la izquierda; la barra
+   inferior desaparece (el mismo nodo cambia de forma). */
+@media (min-width: 64rem) {
+  .section-nav {
+    inset: auto;
+    inset-inline-start: max(0.75rem, env(safe-area-inset-left));
+    inset-block-start: 50%;
+    transform: translateY(-50%);
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    border: 1px solid var(--card-line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .nav-item {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* --- Diario: linea de tiempo visual (B) --------------------------------- */
+
+#diary {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Eje vertical continuo alineado con el centro de la columna de marcadores. */
+#diary::before {
+  content: '';
+  position: absolute;
+  inset-block: 0.5rem;
+  inset-inline-start: 1.125rem;
+  inline-size: 2px;
+  background: var(--line);
+  transform: translateX(-50%);
+}
+
+.timeline-entry {
   display: grid;
-  grid-template-columns: 3.25rem minmax(0, 1fr);
-  align-items: start;
+  grid-template-columns: 2.25rem minmax(0, 1fr);
   gap: 0.6rem;
+  align-items: start;
   min-inline-size: 0;
-  padding-block: 0.55rem;
-  border-block-end: 1px solid var(--line);
+  padding-block: 0.35rem;
 }
 
-.timeline-row:last-child {
-  padding-block-end: 0;
-  border-block-end: 0;
+.timeline-marker {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  inline-size: 1.7rem;
+  block-size: 1.7rem;
+  margin-inline: auto;
+  color: var(--accent);
+  background: var(--surface);
 }
 
-.timeline-time {
+.timeline-marker svg {
+  display: block;
+}
+
+.timeline-marker--meal {
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+}
+
+.timeline-marker--insulin {
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  transform: rotate(45deg);
+}
+
+.timeline-marker--insulin svg {
+  transform: rotate(-45deg);
+}
+
+.timeline-card {
   min-inline-size: 0;
+  padding: 0.4rem 0.7rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.timeline-card--insulin {
+  padding-block: 0.4rem;
+}
+
+.timeline-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-inline-size: 0;
+}
+
+.timeline-kind {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.timeline-origin,
+.timeline-time-static {
+  margin-inline-start: auto;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.timeline-time-static {
+  font-variant-numeric: tabular-nums;
+}
+
+/* El dato principal: el total de carbohidratos es el numero de mayor tamano. */
+.timeline-carbs {
+  margin: 0.1rem 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+/* Fila colapsada: dato protagonista + control de detalle en un solo renglon. */
+.timeline-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-inline-size: 0;
+}
+
+.timeline-main .timeline-carbs,
+.timeline-main .timeline-insulin-body {
+  margin: 0;
+}
+
+.timeline-main .timeline-toggle {
+  flex: 0 0 auto;
+  margin-block-start: 0;
+}
+
+.timeline-confidence {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.3rem 0 0;
+  font-size: var(--text-xs);
+}
+
+.confidence-meter {
+  display: inline-block;
+  inline-size: 3.5rem;
+  block-size: 0.3rem;
+  overflow: hidden;
+  background: var(--accent-soft);
+  border-radius: 999px;
+}
+
+.confidence-fill {
+  display: block;
+  block-size: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+}
+
+.timeline-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  padding: 0.1rem 0.5rem;
+  font-size: var(--text-xs);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.chip-name {
+  min-inline-size: 0;
+  overflow: hidden;
+  max-inline-size: 9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip-grams {
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
 
-input.timeline-time {
+.chip-carbs {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+.timeline-insulin-body {
+  margin: 0.15rem 0 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-toggle {
+  min-height: 44px;
+  margin-block-start: 0.25rem;
+  padding-inline: 0.7rem;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.timeline-detail {
+  margin-block-start: 0.35rem;
+}
+
+/* La hora editable vive dentro del detalle: colapsada no ocupa alto (B5). */
+.timeline-time {
   inline-size: 100%;
-  padding-inline: 0.3rem;
-}
-
-.timeline-body {
   min-inline-size: 0;
+  margin-block-end: 0.4rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.timeline-body strong {
-  display: block;
-  font-size: 0.95rem;
-}
-
-.timeline-body .muted {
-  font-size: 0.85rem;
-}
-
-/* Acciones de una entrada del diario (editar / quitar). */
 .timeline-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin-block-start: 0.5rem;
+}
+
+.timeline-actions button {
+  min-height: 44px;
+}
+
+/* --- Resumen del dia dentro del Diario (B6/B7) -------------------------- */
+
+.diary-summary {
+  margin-block-end: 0.5rem;
+}
+
+.summary-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0;
+  line-height: 1.35;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.summary-total {
+  color: var(--fg);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.summary-carbs,
+.summary-count {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+.moment-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+  margin: 0.3rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.moment {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.moment-carbs {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+/* --- Estado vacio con salida (B8) --------------------------------------- */
+
+.diary-empty {
+  display: grid;
+  gap: 0.6rem;
+  justify-items: center;
+  padding: 1rem;
+  text-align: center;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.diary-empty .muted {
+  margin: 0;
+}
+
+.diary-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.5rem 0.9rem;
+  font-weight: 600;
+  color: var(--accent-fg);
+  text-decoration: none;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
 }
 
 /* Vacio: se anuncia, no se deja en blanco. */
@@ -858,6 +1201,13 @@ footer .notice {
   color: var(--muted);
   background: var(--surface);
   border-inline-start-color: var(--accent);
+}
+
+/* Cola de pagina: da recorrido de scroll bajo la ultima seccion, de modo que
+   al anclar Ajustes (el ultimo destino) su cabecera pueda quedar justo bajo la
+   barra pegajosa sin que el final del documento lo impida (SPEC 22, criterio 15). */
+.page-tail {
+  block-size: clamp(6rem, 16dvh, 18rem);
 }
 
 .inset {
@@ -1015,10 +1365,6 @@ details[open] > summary::after {
 @media (max-width: 26rem) {
   .daynav input[type='date'] {
     flex: 1 0 100%;
-  }
-
-  .timeline-row {
-    grid-template-columns: 4.5rem minmax(0, 1fr);
   }
 
   /* La navegacion vive ahora en la cabecera compacta (A1): la fecha comparte
