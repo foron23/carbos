@@ -6,11 +6,18 @@ export const foodNameSchema = z.object({
   en: z.string().min(1),
 });
 
+export const carbsRangeSchema = z
+  .tuple([z.number().nonnegative(), z.number().nonnegative()])
+  .refine(([min, max]) => min <= max, {
+    message: 'carbsRange debe cumplir min <= max',
+  });
+
 export const foodSchema = z.object({
   id: z.string().min(1),
   name: foodNameSchema,
   synonyms: z.array(z.string().min(1)),
   carbsPer100g: z.number().nonnegative(),
+  carbsRange: carbsRangeSchema.optional(),
   defaultPortionGrams: z.number().positive(),
   source: z.string().min(1),
 });

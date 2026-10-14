@@ -1,0 +1,162 @@
+{
+  "salmorejo": {
+    "title": "Salmorejo cordobés",
+    "yieldGrams": 700,
+    "uncertainty": 0.2,
+    "ingredients": [
+      { "id": "tomate", "grams": 500 },
+      { "id": "pan_blanco", "grams": 100 },
+      { "id": "aceite_oliva", "grams": 60 },
+      { "id": "ajo", "grams": 5 }
+    ]
+  },
+  "ajoblanco": {
+    "title": "Ajoblanco",
+    "yieldGrams": 650,
+    "uncertainty": 0.2,
+    "ingredients": [
+      { "id": "almendras", "grams": 80 },
+      { "id": "pan_blanco", "grams": 60 },
+      { "id": "ajo", "grams": 8 },
+      { "id": "aceite_oliva", "grams": 50 }
+    ]
+  },
+  "marmitako": {
+    "title": "Marmitako",
+    "yieldGrams": 750,
+    "uncertainty": 0.2,
+    "ingredients": [
+      { "id": "atun", "grams": 150 },
+      { "id": "patata_cocida", "grams": 300 },
+      { "id": "pimiento_verde", "grams": 80 },
+      { "id": "tomate", "grams": 100 },
+      { "id": "cebolla", "grams": 60 },
+      { "id": "aceite_oliva", "grams": 40 }
+    ]
+  },
+  "zarzuela": {
+    "title": "Zarzuela de pescado y marisco",
+    "yieldGrams": 600,
+    "uncertainty": 0.2,
+    "ingredients": [
+      { "id": "salmon", "grams": 150 },
+      { "id": "gambas", "grams": 100 },
+      { "id": "tomate", "grams": 120 },
+      { "id": "cebolla", "grams": 60 },
+      { "id": "aceite_oliva", "grams": 40 }
+    ]
+  },
+  "rabo_toro": {
+    "title": "Rabo de toro estofado",
+    "yieldGrams": 600,
+    "uncertainty": 0.2,
+    "ingredients": [
+      { "id": "ternera", "grams": 300 },
+      { "id": "cebolla", "grams": 80 },
+      { "id": "zanahoria", "grams": 80 },
+      { "id": "tomate", "grams": 100 },
+      { "id": "aceite_oliva", "grams": 40 }
+    ]
+  },
+  "migas": {
+    "title": "Migas",
+    "yieldGrams": 225,
+    "uncertainty": 0.2,
+    "ingredients": [
+      { "id": "pan_blanco", "grams": 150 },
+      { "id": "chorizo", "grams": 40 },
+      { "id": "ajo", "grams": 5 },
+      { "id": "aceite_oliva", "grams": 30 }
+    ]
+  },
+  "huevos_rotos": {
+    "title": "Huevos rotos",
+    "yieldGrams": 360,
+    "uncertainty": 0.2,
+    "ingredients": [
+      { "id": "patata_cocida", "grams": 200 },
+      { "id": "huevo", "grams": 120 },
+      { "id": "aceite_oliva", "grams": 40 }
+    ]
+  },
+  "patatas_bravas": {
+    "title": "Patatas bravas",
+    "yieldGrams": 350,
+    "uncertainty": 0.2,
+    "ingredients": [
+      { "id": "patata_cocida", "grams": 250 },
+      { "id": "tomate_frito", "grams": 60 },
+      { "id": "aceite_oliva", "grams": 40 }
+    ]
+  },
+  "arroz_cubana": {
+    "title": "Arroz a la cubana",
+    "yieldGrams": 370,
+    "uncertainty": 0.2,
+    "ingredients": [
+      { "id": "arroz_blanco", "grams": 200 },
+      { "id": "huevo", "grams": 60 },
+      { "id": "tomate_frito", "grams": 50 },
+      { "id": "platano", "grams": 60 }
+    ]
+  },
+  "lacon_grelos": {
+    "title": "Lacón con grelos",
+    "yieldGrams": 490,
+    "uncertainty": 0.2,
+    "ingredients": [
+      { "id": "judias_blancas", "grams": 200 },
+      { "id": "jamon_serrano", "grams": 80 },
+      { "id": "patata_cocida", "grams": 150 },
+      { "id": "cebolla", "grams": 40 },
+      { "id": "aceite_oliva", "grams": 20 }
+    ]
+  },
+  "empanada_gallega": {
+    "title": "Empanada gallega",
+    "yieldGrams": 410,
+    "uncertainty": 0.2,
+    "ingredients": [
+      { "id": "pan_blanco", "grams": 150 },
+      { "id": "atun", "grams": 120 },
+      { "id": "cebolla", "grams": 60 },
+      { "id": "tomate_frito", "grams": 50 },
+      { "id": "aceite_oliva", "grams": 30 }
+    ]
+  },
+  "sopa_castellana": {
+    "title": "Sopa castellana",
+    "yieldGrams": 500,
+    "uncertainty": 0.2,
+    "ingredients": [
+      { "id": "pan_blanco", "grams": 60 },
+      { "id": "ajo", "grams": 8 },
+      { "id": "huevo", "grams": 60 },
+      { "id": "aceite_oliva", "grams": 20 }
+    ]
+  },
+  "canelones": {
+    "title": "Canelones a la boloñesa",
+    "yieldGrams": 500,
+    "uncertainty": 0.2,
+    "ingredients": [
+      { "id": "pasta_cocida", "grams": 200 },
+      { "id": "ternera", "grams": 120 },
+      { "id": "tomate_frito", "grams": 80 },
+      { "id": "nata", "grams": 60 },
+      { "id": "queso_curado", "grams": 40 }
+    ]
+  },
+  "fabada": {
+    "title": "Fabada asturiana",
+    "yieldGrams": 450,
+    "uncertainty": 0.2,
+    "ingredients": [
+      { "id": "judias_blancas", "grams": 250 },
+      { "id": "chorizo", "grams": 50 },
+      { "id": "cerdo", "grams": 60 },
+      { "id": "cebolla", "grams": 40 },
+      { "id": "aceite_oliva", "grams": 20 }
+    ]
+  }
+}

@@ -8,6 +8,7 @@ export interface Food {
   name: FoodName;
   synonyms: string[];
   carbsPer100g: number;
+  carbsRange?: [number, number];
   defaultPortionGrams: number;
   source: string;
 }

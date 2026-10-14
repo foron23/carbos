@@ -1,16 +1,18 @@
-# Catalogo de alimentos (154 clases)
+# Catalogo de alimentos (186 clases)
 
 > [!abstract] TL;DR
-> Catalogo curado (**154 clases**) generado desde Ciqual 2020 con `make catalog`
-> (`tools/catalog/build_catalog.py`). Esta es la **tabla por grupos** con las imagenes de
+> Catalogo curado (**186 clases**) generado con `make catalog`
+> (`tools/catalog/build_catalog.py`) desde **Ciqual 2020** y, para las ampliaciones, desde **USDA
+> FoodData Central (CC0)** y **recetas propias**. Esta es la **tabla por grupos** con las imagenes de
 > entrenamiento disponibles (`data/images`) por clase. **negrita = hueco de datos** (<8 imagenes).
 > Los huecos estructurales estan al final. Diagnostico de modelo y detector en
 > [`specs/18-modelo-deteccion.md`](specs/18-modelo-deteccion.md).
 
 El catalogo vive en `src/catalog/catalog.ts` (id, nombre ES/EN, sinonimos, `carbsPer100g`,
 `defaultPortionGrams`, `source`). El modelo publico se mapea al catalogo por `classmap.ts` (D31); el
-clasificador propio emite directamente estos ids (mapa identidad, SPEC 18). Fuente de datos: Ciqual
-2020 (Licence Ouverte), plan B abierto (D19).
+clasificador propio emite directamente estos ids (mapa identidad, SPEC 18). Fuentes de datos: Ciqual
+2020 (Licence Ouverte) para la base, USDA FoodData Central (CC0) y recetas propias (composicion de
+ingredientes, cifra publicada como **rango**) para las ampliaciones de platos cocinados.
 
 ## A. Cereales, tuberculos y feculas (15)
 
@@ -117,7 +119,7 @@ clasificador propio emite directamente estos ids (mapa identidad, SPEC 18). Fuen
 | Sardina en conserva | `sardina` | 21   |
 | Gambas              | `gambas`  | 21   |
 
-## H. Platos preparados (16)
+## H. Platos preparados (48)
 
 | Clase               | id                  | imgs  |     | Clase               | id                    | imgs  |
 | ------------------- | ------------------- | ----- | --- | ------------------- | --------------------- | ----- |
@@ -129,6 +131,22 @@ clasificador propio emite directamente estos ids (mapa identidad, SPEC 18). Fuen
 | Pizza               | `pizza`             | 21    |     | Sandwich mixto      | `sandwich_mixto`      | 15    |
 | Lasana              | `lasana`            | 21    |     | Hamburguesa         | `hamburguesa`         | 16    |
 | Canelones           | `canelones`         | 8     |     | Espaguetis bolonesa | `espaguetis_bolonesa` | **6** |
+| Albondigas en salsa | `albondigas`        | **0** |     | Cocido              | `cocido`              | **0** |
+| Cuscus              | `cuscus`            | **0** |     | Arroz tres delicias | `arroz_tres_delicias` | **0** |
+| Arroz con pollo     | `arroz_con_pollo`   | **0** |     | Estofado de ternera | `estofado_ternera`    | **0** |
+| Ternera borgonona   | `ternera_borgonona` | **0** |     | Pollo a la vasca    | `pollo_vasca`         | **0** |
+| Guiso de cordero    | `guiso_cordero`     | **0** |     | Tajin               | `tajin`               | **0** |
+| Musaka              | `musaka`            | **0** |     | Pastel de carne     | `pastel_carne`        | **0** |
+| Pasta al horno      | `pasta_horno`       | **0** |     | Patatas panadera    | `patatas_graten`      | **0** |
+| Raviolis            | `raviolis`          | **0** |     | Sushi               | `sushi`               | **0** |
+| Chili con carne     | `chili`             | **0** |     | Pollo al vino       | `pollo_al_vino`       | **0** |
+| Callos              | `callos`            | **0** |     | Verdura gratinada   | `verdura_gratinada`   | **0** |
+| Salmorejo           | `salmorejo`         | **0** |     | Ajoblanco           | `ajoblanco`           | **0** |
+| Marmitako           | `marmitako`         | **0** |     | Zarzuela            | `zarzuela`            | **0** |
+| Rabo de toro        | `rabo_toro`         | **0** |     | Migas               | `migas`               | **0** |
+| Huevos rotos        | `huevos_rotos`      | **0** |     | Patatas bravas      | `patatas_bravas`      | **0** |
+| Arroz a la cubana   | `arroz_cubana`      | **0** |     | Lacon con grelos    | `lacon_grelos`        | **0** |
+| Empanada gallega    | `empanada_gallega`  | **0** |     | Sopa castellana     | `sopa_castellana`     | **0** |
 
 ## I. Dulces, reposteria y postres (20)
 
@@ -187,23 +205,30 @@ clasificador propio emite directamente estos ids (mapa identidad, SPEC 18). Fuen
 | **Frutos secos** (solo 4)        | pistachos, anacardos, pinones, castanas, pipas                                                           |
 | **Cereales**                     | cuscus, palomitas, tortitas de arroz/maiz, cebada, bulgur                                                |
 | **Carnes**                       | cordero, conejo, morcilla, salchichas/fuet, costillas                                                    |
-| **Platos cocinados**             | albondigas, huevos rotos, salmorejo, cocido, patatas bravas, sushi, kebab, arroz a la cubana, estofados  |
+| **Platos cocinados**             | kebab, gyozas, burrito, tacos, ramen                                                                     |
 | **Dulces**                       | churros, crepes, caramelos/gominolas, membrillo                                                          |
 | **Lacteos**                      | bebidas vegetales (avena, soja, almendra), kefir, cuajada, queso azul                                    |
 | **Verduras**                     | rucula, rabano, endivia/escarola, canonigos, berza/grelos                                                |
 
-### 2. Huecos de datos (<8 imagenes, 26 de 154 clases)
+### 2. Huecos de datos (<8 imagenes, 58 de 186 clases)
 
 Criticos: `pasta_integral` (2), `fabada` (2), `mango` (3), `crema_verduras` (3),
 `arroz_basmati` / `coliflor` / `espinacas` / `tomate_cherry` / `jamon_serrano` / `chorizo` /
 `avellanas` (4), `judias_blancas` / `col_lombarda` / `puerro` / `paella` (5). Ademas
-`review_labels` marco ~72 % para revision: son **pocas y ruidosas**.
+`review_labels` marco ~72 % para revision: son **pocas y ruidosas**. Las **32 clases nuevas** de la
+expansion (grupo H, SPEC 21) todavia no tienen imagenes.
 
 ### 3. Huecos de equilibrio
 
 Pescado y frutos secos (4 clases cada uno) son marginales frente a dulces (20) o verduras (28): el
 modelo aprende mucho de postres y poco de pescado/marisco. Los **platos cocinados/guisos** (grupo H,
-16 clases, varias con <6 imagenes) son el hueco cualitativo: hay buen soporte de **ingredientes
-sueltos** pero menor de **combinados**. Ver investigacion en
-[`specs/20-platos-cocinados.md`](specs/20-platos-cocinados.md) y el plan de expansion en
-[`specs/21-expansion-catalogo.md`](specs/21-expansion-catalogo.md).
+48 clases tras la expansion SPEC 21, pero 32 de ellas sin imagenes) siguen siendo el hueco
+cualitativo: hay buen soporte de **ingredientes sueltos** pero menor de **combinados**. Ver
+investigacion en [`specs/20-platos-cocinados.md`](specs/20-platos-cocinados.md) y el plan de expansion
+en [`specs/21-expansion-catalogo.md`](specs/21-expansion-catalogo.md).
+
+> [!note] Expansion en curso (SPEC 21)
+> El grupo H suma **32 clases nuevas** (F1 con codigo Ciqual directo + F2 por USDA/composicion
+> propia; ver [`specs/21-expansion-catalogo.md`](specs/21-expansion-catalogo.md)). **F3 (imagenes +
+> re-destilado del clasificador) queda pendiente**: estas clases ya entran en el buscador por
+> sinonimos, pero todavia no tienen fotos ni recall medido.

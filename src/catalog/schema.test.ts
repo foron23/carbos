@@ -31,6 +31,29 @@ describe('catalog schema', () => {
   it('rechaza carbohidratos negativos', () => {
     expect(() => foodSchema.parse({ ...tortilla, carbsPer100g: -1 })).toThrow();
   });
+
+  it('acepta un carbsRange valido', () => {
+    expect(foodSchema.parse({ ...tortilla, carbsRange: [7, 10] }).carbsRange).toEqual([7, 10]);
+  });
+
+  it('acepta un alimento sin carbsRange', () => {
+    expect(() => foodSchema.parse(tortilla)).not.toThrow();
+    expect(foodSchema.parse(tortilla).carbsRange).toBeUndefined();
+  });
+
+  it('rechaza una tupla de carbsRange mal formada', () => {
+    expect(() => foodSchema.parse({ ...tortilla, carbsRange: [7] })).toThrow();
+    expect(() => foodSchema.parse({ ...tortilla, carbsRange: [7, 8, 9] })).toThrow();
+  });
+
+  it('rechaza carbsRange con numeros negativos', () => {
+    expect(() => foodSchema.parse({ ...tortilla, carbsRange: [-1, 5] })).toThrow();
+    expect(() => foodSchema.parse({ ...tortilla, carbsRange: [1, -5] })).toThrow();
+  });
+
+  it('rechaza carbsRange con min mayor que max', () => {
+    expect(() => foodSchema.parse({ ...tortilla, carbsRange: [10, 5] })).toThrow();
+  });
 });
 
 describe('class map', () => {
