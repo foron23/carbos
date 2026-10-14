@@ -10,6 +10,12 @@ import { scenarios as recordsScenarios } from './scenarios-records.mjs';
 
 // El diario editable/quitable vive en su propio fichero (spec 17 toca scenarios.mjs).
 const scenarios = [...coreScenarios, ...recordsScenarios];
+// Depuracion: E2E_ONLY=<subcadena>[,<subcadena>...] ejecuta solo esos escenarios.
+const E2E_ONLY = process.env.E2E_ONLY;
+const onlyTerms = E2E_ONLY ? E2E_ONLY.split(',') : [];
+const selected = onlyTerms.length
+  ? scenarios.filter((s) => onlyTerms.some((term) => s.name.includes(term)))
+  : scenarios;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.E2E_PORT ?? 4173);
@@ -99,7 +105,7 @@ async function main() {
   const browser = await puppeteer.launch(launchOptions);
 
   try {
-    for (const scenario of scenarios) {
+    for (const scenario of selected) {
       const page = await browser.newPage();
       await page.setViewport({ width: 430, height: 932, deviceScaleFactor: 2 });
       page.on('dialog', (dialog) => {

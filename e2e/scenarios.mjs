@@ -25,7 +25,12 @@ async function openApp(page, base) {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
   await unregisterServiceWorkers(page);
   await clearDatabase(page);
-  await page.evaluate(() => localStorage.setItem('carbos.locale', 'es'));
+  // Estado limpio entre escenarios: idioma es y resolucion en linea APAGADA
+  // (defecto); un escenario previo puede haberla dejado activada en localStorage.
+  await page.evaluate(() => {
+    localStorage.setItem('carbos.locale', 'es');
+    localStorage.removeItem('carbos.barcode.online');
+  });
   await reload(page);
   await waitFor(page, '#app header h1');
 }
@@ -131,10 +136,14 @@ async function installBarcodeFetchStub(page, fixtures) {
         });
       }
       if (url === data.packUrl) {
-        return new Response(packBytes, {
-          status: 200,
-          headers: { 'content-length': String(packBytes.byteLength) },
-        });
+        const headers = {
+          'content-length': String(data.packContentLength ?? packBytes.byteLength),
+        };
+        // Fiel a la red real: si el servidor manda `Content-Encoding: gzip`, el
+        // navegador descomprime de forma transparente y la app recibe el JSONL
+        // en claro. El stub con `packContentEncoding` reproduce ese caso.
+        if (data.packContentEncoding) headers['content-encoding'] = data.packContentEncoding;
+        return new Response(packBytes, { status: 200, headers });
       }
       if (url.includes('openfoodfacts.org')) {
         return new Response(JSON.stringify(data.off), {
@@ -825,8 +834,10 @@ export const scenarios = [
           source: 'test',
           savedAt: 0,
         }) + '\n';
-      const packGz = gzipSync(Buffer.from(packLine, 'utf8'), { mtime: 0 });
+      const packRaw = Buffer.from(packLine, 'utf8');
+      const packGz = gzipSync(packRaw, { mtime: 0 });
       const sha256 = createHash('sha256').update(packGz).digest('hex');
+      const sha256Raw = createHash('sha256').update(packRaw).digest('hex');
       const packUrl = 'https://packs.test/es.jsonl.gz';
       const manifest = {
         format: 'carbos-barcode-packs',
@@ -838,6 +849,8 @@ export const scenarios = [
             url: packUrl,
             sha256,
             bytes: packGz.byteLength,
+            sha256_raw: sha256Raw,
+            raw_bytes: packRaw.byteLength,
             product_count: 1,
             generated_at: '2026-01-01T00:00:00Z',
           },
@@ -901,6 +914,77 @@ export const scenarios = [
       const products = await readStore(page, 'products');
       assertEqual(products.length, 2, 'la resolucion en linea cachea el producto');
       await screenshot(page, 'codigo-barras-online');
+    },
+  },
+  {
+    // REGRESION: el servidor manda el pack con `Content-Encoding: gzip`; el
+    // navegador descomprime de forma transparente, asi que la app recibe el
+    // JSONL en claro (~47,6 MB) y NO el .gz (4,68 MB). El stub sirve el cuerpo
+    // ya descomprimido con esa cabecera, fiel a lo que observa la app.
+    name: 'importa el pack ya descomprimido por el transporte (Content-Encoding: gzip)',
+    async run(page, ctx) {
+      const packBarcode = '8480000003089';
+      const packLine =
+        JSON.stringify({
+          barcode: packBarcode,
+          name: { es: 'Producto descomprimido', en: 'Decoded product' },
+          carbsPer100g: 37.5,
+          source: 'test',
+          savedAt: 0,
+        }) + '\n';
+      // `raw` = JSONL en claro (lo que la app parsea e importa).
+      // `gz` = el .gz publicado, que describe `sha256`/`bytes`.
+      const packRaw = Buffer.from(packLine, 'utf8');
+      const packGz = gzipSync(packRaw, { mtime: 0 });
+      const sha256 = createHash('sha256').update(packGz).digest('hex');
+      const sha256Raw = createHash('sha256').update(packRaw).digest('hex');
+      const packUrl = 'https://packs.test/es.jsonl.gz';
+      const manifest = {
+        format: 'carbos-barcode-packs',
+        version: 1,
+        packs: [
+          {
+            id: 'es',
+            locale: 'es',
+            url: packUrl,
+            sha256,
+            bytes: packGz.byteLength,
+            sha256_raw: sha256Raw,
+            raw_bytes: packRaw.byteLength,
+            product_count: 1,
+            generated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      };
+      await installBarcodeStub(page, packBarcode);
+      await installBarcodeFetchStub(page, {
+        manifest,
+        packUrl,
+        // El body es el JSONL en claro: el transporte ya lo descomprimio.
+        packBase64: packRaw.toString('base64'),
+        packContentEncoding: 'gzip',
+        // El `content-length` publicado sigue siendo el del .gz comprimido.
+        packContentLength: packGz.byteLength,
+        off: {},
+      });
+      await openApp(page, ctx.base);
+      await page.$eval('#entry-mode-barcode', (el) => {
+        el.checked = true;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await waitFor(page, '#barcode-panel:not([hidden]) #barcode-scan');
+
+      // La importacion automatica debe completar: sin ella el store queda vacio
+      // y cualquier EAN del pack es un miss (el bug original).
+      await waitForText(page, '#barcode-status', 'Pack descargado');
+      const imported = await readStore(page, 'products');
+      assertEqual(imported.length, 1, 'el pack descomprimido importa un producto');
+      assertEqual(imported[0]?.barcode, packBarcode, 'el producto del pack queda en el store');
+
+      // Escanear un EAN que SI esta en el pack: debe resolver contra el local.
+      await click(page, '#barcode-scan');
+      await waitForText(page, '#draft-items', 'Producto descomprimido');
+      await screenshot(page, 'codigo-barras-content-encoding');
     },
   },
   {

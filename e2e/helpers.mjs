@@ -105,15 +105,40 @@ export async function readStore(page, store) {
 }
 
 export async function clearDatabase(page) {
-  await page.evaluate(
-    () =>
-      new Promise((resolve) => {
-        const request = indexedDB.deleteDatabase('carbos');
-        request.onsuccess = () => resolve(true);
-        request.onerror = () => resolve(false);
-        request.onblocked = () => resolve(false);
-      }),
-  );
+  await page.evaluate(async () => {
+    await new Promise((resolve) => {
+      const request = indexedDB.deleteDatabase('carbos');
+      request.onsuccess = () => resolve(true);
+      request.onerror = () => resolve(false);
+      request.onblocked = () => resolve(false);
+    });
+    // Si el borrado se bloquea (la app mantiene una conexion abierta), el
+    // deleteDatabase no se completa y los datos persisten de un escenario a
+    // otro. Como red de seguridad, vaciamos los stores directamente.
+    await new Promise((resolve) => {
+      const request = indexedDB.open('carbos');
+      request.onsuccess = () => {
+        const db = request.result;
+        const names = Array.from(db.objectStoreNames);
+        if (names.length === 0) {
+          db.close();
+          resolve(true);
+          return;
+        }
+        const tx = db.transaction(names, 'readwrite');
+        for (const name of names) tx.objectStore(name).clear();
+        tx.oncomplete = () => {
+          db.close();
+          resolve(true);
+        };
+        tx.onerror = () => {
+          db.close();
+          resolve(false);
+        };
+      };
+      request.onerror = () => resolve(false);
+    });
+  });
 }
 
 /**
