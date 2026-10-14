@@ -1320,6 +1320,8 @@ function wire(): void {
     photoPanel.hidden = mode !== 'entry-mode-photo';
     searchPanel.hidden = mode !== 'entry-mode-search';
     barcodePanel.hidden = mode !== 'entry-mode-barcode';
+    // Al abrir "Codigo", preparar los datos en segundo plano (descarga del pack).
+    if (mode === 'entry-mode-barcode') barcode?.prepare();
   };
   for (const radio of app.querySelectorAll<HTMLInputElement>('input[name="entry-mode"]')) {
     radio.addEventListener('change', applyEntryMode);

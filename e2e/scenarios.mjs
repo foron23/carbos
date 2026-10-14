@@ -786,10 +786,17 @@ export const scenarios = [
     },
   },
   {
-    name: 'escanea un codigo de barras y prellena el borrador',
+    name: 'escanea un codigo de barras y no inventa fila si no hay datos',
     async run(page, ctx) {
       const ean = '4006381333931';
       await installBarcodeStub(page, ean);
+      // Manifest de packs vacio: no hay datos -> la resolucion es un miss.
+      await installBarcodeFetchStub(page, {
+        manifest: { format: 'carbos-barcode-packs', version: 1, packs: [] },
+        packUrl: '',
+        packBase64: '',
+        off: {},
+      });
       await openApp(page, ctx.base);
       await page.$eval('#entry-mode-barcode', (el) => {
         el.checked = true;
@@ -797,32 +804,11 @@ export const scenarios = [
       });
       await waitFor(page, '#barcode-panel:not([hidden]) #barcode-scan');
 
-      // Boton principal "Escanear" (escaneo en vivo via stub): prellena el EAN.
+      // Boton principal "Escanear" (via stub). Sin datos, no se inventa fila.
       await click(page, '#barcode-scan');
-      await waitForText(page, '#draft-items', ean);
-      assert(
-        (await text(page, '#draft-items')).includes(ean),
-        'el escaneo con el stub prellena el EAN',
-      );
-
-      // Camino manual (en "Mas opciones"): escribir el EAN prellena otro item.
-      await page.$eval('#barcode-panel details', (el) => {
-        el.open = true;
-      });
-      await setValue(page, '#barcode-manual', ean);
-      await click(page, '#barcode-manual-go');
-      await page.waitForFunction(
-        () => document.querySelectorAll('#draft-items .draft-row').length === 2,
-        { timeout: 8000 },
-      );
-      const rows = await page.$$eval('#draft-items .draft-row .draft-name', (nodes) =>
-        nodes.map((node) => (node.textContent ?? '').trim()),
-      );
-      assertEqual(rows.length, 2, 'dos items prellenados con el codigo');
-      assert(
-        rows.every((name) => name === ean),
-        `los items llevan el EAN: ${rows.join(' | ')}`,
-      );
+      await waitForText(page, '#barcode-status', 'No se encontró');
+      const rows = await page.$$eval('#draft-items .draft-row', (nodes) => nodes.length);
+      assertEqual(rows, 0, 'un escaneo sin datos no crea ninguna fila');
       await screenshot(page, 'codigo-barras');
     },
   },
@@ -880,14 +866,14 @@ export const scenarios = [
         el.dispatchEvent(new Event('change', { bubbles: true }));
       });
       await waitFor(page, '#barcode-panel:not([hidden]) #barcode-scan');
-      // El pack/manual/online viven en "Mas opciones" (details): abrirlo.
+
+      // 1) El pack se descarga SOLO al abrir la pestana (auto-preparacion:
+      //    manifest -> sha256 -> IndexedDB), sin pulsar nada; sigue offline.
+      await waitForText(page, '#barcode-status', 'Pack descargado');
+      // El manual/online viven en "Mas opciones" (details): abrirlo.
       await page.$eval('#barcode-panel details', (el) => {
         el.open = true;
       });
-
-      // 1) Descarga automatizada (manifest -> sha256 -> IndexedDB), sigue offline.
-      await click(page, '#barcode-download');
-      await waitForText(page, '#barcode-status', 'Pack descargado');
       const imported = await readStore(page, 'products');
       assertEqual(imported.length, 1, 'el pack descargado importa un producto');
       assertEqual(imported[0]?.barcode, packBarcode, 'el producto del pack queda en el store');

@@ -38,8 +38,10 @@ export interface BarcodeDeps {
 }
 
 export interface BarcodeHandle {
-  /** Retraduce el panel y lo monta/desmonta segun el flag opt-in. */
+  /** Retraduce el panel. */
   refresh(): void;
+  /** Prepara los datos (descarga el pack si hace falta) en segundo plano. */
+  prepare(): void;
 }
 
 /** Racion por defecto cuando el pack no trae `defaultPortionGrams`. */
@@ -89,6 +91,9 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
     statusKey = 'barcode.detecting';
     paint();
     const online = isBarcodeOnlineEnabled();
+    // Sin consulta en linea, asegurar los datos locales antes de resolver: la
+    // primera vez descarga el pack (una sola accion del usuario: escanear).
+    if (!online) await ensurePack();
     const fetcher = testFetcher();
     const result = await resolveBarcode(code, fetcher ? { online, fetcher } : { online });
     if (result.kind === 'hit') {
@@ -165,6 +170,25 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
     }
     paint();
     void updatePackHint();
+  }
+
+  // Descarga perezosa y automatica del pack: se lanza al abrir la pestana o en
+  // el primer escaneo, y el escaneo espera a que termine. No hay que pulsar nada.
+  let packPrep: Promise<void> | null = null;
+  function ensurePack(): Promise<void> {
+    if (isBarcodeOnlineEnabled()) return Promise.resolve();
+    if (packPrep) return packPrep;
+    packPrep = (async () => {
+      try {
+        if ((await countProducts()) > 0) return;
+        await download();
+      } catch {
+        /* sin datos: el escaneo caera a "no encontrado" */
+      } finally {
+        packPrep = null;
+      }
+    })();
+    return packPrep;
   }
 
   /** Muestra el aviso de "sin datos" mientras el store local este vacio. */
@@ -328,5 +352,5 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
 
   refresh();
 
-  return { refresh };
+  return { refresh, prepare: () => void ensurePack() };
 }
