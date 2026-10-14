@@ -205,4 +205,5 @@ Pescado y frutos secos (4 clases cada uno) son marginales frente a dulces (20) o
 modelo aprende mucho de postres y poco de pescado/marisco. Los **platos cocinados/guisos** (grupo H,
 16 clases, varias con <6 imagenes) son el hueco cualitativo: hay buen soporte de **ingredientes
 sueltos** pero menor de **combinados**. Ver investigacion en
-[`specs/20-platos-cocinados.md`](specs/20-platos-cocinados.md).
+[`specs/20-platos-cocinados.md`](specs/20-platos-cocinados.md) y el plan de expansion en
+[`specs/21-expansion-catalogo.md`](specs/21-expansion-catalogo.md).

@@ -21,6 +21,7 @@ de tu dispositivo.
 - Deteccion de alimentos (diagnostico y experimentos): [`docs/specs/18-modelo-deteccion.md`](docs/specs/18-modelo-deteccion.md)
 - Catalogo de alimentos y huecos: [`docs/catalogo.md`](docs/catalogo.md)
 - Platos cocinados / guisos: [`docs/specs/20-platos-cocinados.md`](docs/specs/20-platos-cocinados.md)
+- Expansion del catalogo (platos): [`docs/specs/21-expansion-catalogo.md`](docs/specs/21-expansion-catalogo.md)
 - Contrato de trabajo: [`docs/receta-de-codigo.md`](docs/receta-de-codigo.md)
 
 ## Estado
