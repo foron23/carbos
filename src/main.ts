@@ -1342,6 +1342,25 @@ function cancelEdit(): void {
   renderDiary();
 }
 
+/**
+ * Repetir una comida (D61): clona sus items al borrador como una **comida nueva**
+ * (ids nuevos, dia en vista, hora actual al registrar). No registra nada: la
+ * persona confirma con Registrar. Conserva los atajos por item (D34).
+ */
+function repeatMeal(meal: Meal): void {
+  editingMeal = null;
+  draft = { origin: meal.origin, items: meal.items.map((item) => ({ ...item, id: uid() })) };
+  // Una repeticion no hereda detecciones de foto: no hay modelo que rellenar.
+  detections = [];
+  detectionDraftIds = [];
+  detectionMeta = null;
+  detectionEngine = '';
+  clearStatus('register-status');
+  renderDraft();
+  renderDiary();
+  byId('entry').scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
 /** Quita una comida del diario (con confirmacion: es un registro de salud). */
 function removeMeal(meal: Meal): void {
   if (!window.confirm(tr('diary.confirmDelete'))) return;
@@ -1439,6 +1458,7 @@ function mealEntry(meal: Meal): HTMLLIElement {
   detail.appendChild(
     entryActions(mealName(meal), [
       { key: 'button.edit', cls: 'edit-entry', run: () => startEditMeal(meal) },
+      { key: 'button.repeat', cls: 'repeat-entry', run: () => repeatMeal(meal) },
       { key: 'button.remove', cls: 'delete-entry', run: () => removeMeal(meal) },
     ]),
   );

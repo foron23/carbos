@@ -1064,6 +1064,10 @@ main {
   min-height: 44px;
 }
 
+.timeline-actions .repeat-entry {
+  color: var(--accent);
+}
+
 /* --- Resumen del dia dentro del Diario (B6/B7) -------------------------- */
 
 .diary-summary {

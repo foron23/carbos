@@ -1734,4 +1734,40 @@ export const scenarios = [
       await screenshot(page, 'objetivo-diario');
     },
   },
+  {
+    name: 'repetir una comida la clona al borrador sin registrar',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await addFood(page, 'manzana');
+      await register(page);
+      await waitForText(page, '#diary', 'Manzana');
+
+      // Expande la comida y pulsa Repetir (D56/B5: la accion vive en el detalle).
+      await page.evaluate(() => {
+        const entry = document.querySelector('#diary .timeline-entry--meal');
+        entry?.querySelector('.timeline-toggle')?.click();
+      });
+      await page.waitForSelector('#diary .repeat-entry', { timeout: 8000 });
+      await page.evaluate(() => document.querySelector('#diary .repeat-entry')?.click());
+      await page.waitForSelector('#draft-items .draft-row', { timeout: 8000 });
+
+      // Repetir no registra nada por si sola.
+      assertEqual((await readStore(page, 'meals')).length, 1, 'repetir no registra por si sola');
+      assertEqual(await text(page, '#register'), 'Registrar', 'el borrador es una comida nueva');
+
+      await register(page);
+      for (let i = 0; i < 120; i += 1) {
+        if ((await readStore(page, 'meals')).length === 2) break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      const meals = await readStore(page, 'meals');
+      assertEqual(meals.length, 2, 'registrar la repeticion crea la segunda comida');
+      assertEqual(
+        meals[0]?.items?.[0]?.classId,
+        meals[1]?.items?.[0]?.classId,
+        'la repeticion conserva el alimento',
+      );
+      await screenshot(page, 'repetir-comida');
+    },
+  },
 ];
