@@ -37,7 +37,7 @@ import { setupInsulin } from './insulin';
 import type { InsulinHandle } from './insulin';
 import { isChatEnabled, setChatDisabled, setChatEnabled, setupChat } from './chat';
 import type { ChatHandle } from './chat';
-import { isBarcodeEnabled, setBarcodeEnabled, setupBarcode } from './barcode';
+import { setupBarcode } from './barcode';
 import type { BarcodeAdd, BarcodeHandle } from './barcode';
 import { cropToJpeg } from './contrib/crop';
 import {
@@ -273,6 +273,10 @@ app.innerHTML = `
         <input type="radio" name="entry-mode" id="entry-mode-search" />
         <span data-i18n="button.search"></span>
       </label>
+      <label class="seg">
+        <input type="radio" name="entry-mode" id="entry-mode-barcode" />
+        <span data-i18n="entry.barcode"></span>
+      </label>
     </div>
     <div id="photo-panel" class="entry-panel">
       <div id="photo-wrap" class="preview-wrap" hidden>
@@ -301,6 +305,7 @@ app.innerHTML = `
       </div>
       <ul id="search-results" class="results"></ul>
     </div>
+    <div id="barcode-panel" class="entry-panel" hidden></div>
     <p id="draft-editing" class="notice" role="status" data-i18n="diary.editing" hidden></p>
     <h3 data-i18n="draft.items"></h3>
     <ul id="draft-items" class="draft"></ul>
@@ -362,8 +367,6 @@ app.innerHTML = `
     <div id="insulin-host" hidden></div>
     <label class="check"><input id="chat-toggle" type="checkbox" /> <span data-i18n="settings.chatModule"></span></label>
     <div id="chat-host" hidden></div>
-    <label class="check"><input id="barcode-toggle" type="checkbox" /> <span data-i18n="settings.barcodeModule"></span></label>
-    <div id="barcode-host" hidden></div>
     <label class="check"><input id="contrib-toggle" type="checkbox" /> <span data-i18n="settings.contribAuto"></span></label>
     <p id="contrib-status" class="muted" aria-live="polite" data-i18n="contrib.none"></p>
     <p><button id="contrib-clear" type="button" data-i18n="contrib.clear"></button></p>
@@ -1311,10 +1314,12 @@ function wire(): void {
   // Los radios nativos solo revelan un panel; no hay logica de dominio nueva.
   const photoPanel = byId('photo-panel');
   const searchPanel = byId('search-panel');
+  const barcodePanel = byId('barcode-panel');
   const applyEntryMode = (): void => {
-    const photo = byId<HTMLInputElement>('entry-mode-photo').checked;
-    photoPanel.hidden = !photo;
-    searchPanel.hidden = photo;
+    const mode = app.querySelector<HTMLInputElement>('input[name="entry-mode"]:checked')?.id;
+    photoPanel.hidden = mode !== 'entry-mode-photo';
+    searchPanel.hidden = mode !== 'entry-mode-search';
+    barcodePanel.hidden = mode !== 'entry-mode-barcode';
   };
   for (const radio of app.querySelectorAll<HTMLInputElement>('input[name="entry-mode"]')) {
     radio.addEventListener('change', applyEntryMode);
@@ -1539,17 +1544,11 @@ function wire(): void {
       void refresh();
     },
   });
-  barcode = setupBarcode(byId('barcode-host'), {
+  barcode = setupBarcode(byId('barcode-panel'), {
     getLocale: () => locale,
     onAdd: (product) => {
       pushBarcodeItem(product);
     },
-  });
-  const barcodeToggle = byId<HTMLInputElement>('barcode-toggle');
-  barcodeToggle.checked = isBarcodeEnabled();
-  barcodeToggle.addEventListener('change', () => {
-    setBarcodeEnabled(barcodeToggle.checked);
-    barcode?.refresh();
   });
   renderExportReminder();
 }

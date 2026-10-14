@@ -3,7 +3,7 @@ import type { Locale, StringKey } from '../i18n';
 import { decodeBarcodeFromFile } from './decode';
 import { downloadPack, fetchPacksManifest } from './download';
 import { normalizeEan } from './ean';
-import { isBarcodeEnabled, isBarcodeOnlineEnabled, setBarcodeOnlineEnabled } from './flag';
+import { isBarcodeOnlineEnabled, setBarcodeOnlineEnabled } from './flag';
 import type { BarcodeFetcher } from './lookup/client';
 import { importPack, parseManifest } from './pack';
 import { resolveBarcode } from './resolve';
@@ -17,8 +17,8 @@ import { resolveBarcode } from './resolve';
  * explicitas: (a) el boton "Descargar pack" y (b) la consulta en linea opt-in
  * ("Consultar en linea"), que avisa de que el codigo sale del dispositivo.
  *
- * Modulo separable (D7): `setupBarcode` no dibuja **nada** mientras el flag
- * opt-in este apagado.
+ * Modulo separable (D7): la pestana "Codigo" siempre esta disponible; lo unico
+ * opt-in es la **resolucion en linea** (`carbos.barcode.online`, por defecto off).
  */
 
 /** Producto resuelto que se empuja al borrador (contrato con `main.ts`). */
@@ -55,13 +55,6 @@ function testFetcher(): BarcodeFetcher | undefined {
 export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandle {
   let root: HTMLElement | null = null;
   let statusKey: StringKey | null = null;
-
-  const clear = (): void => {
-    host.innerHTML = '';
-    host.hidden = true;
-    root = null;
-    statusKey = null;
-  };
 
   const paintStatus = (): void => {
     const status = root?.querySelector<HTMLElement>('#barcode-status');
@@ -195,7 +188,7 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
   }
 
   const mount = (): void => {
-    host.hidden = false;
+    // La visibilidad del panel la gobierna el conmutador de modo (main.ts).
     host.innerHTML = `
       <fieldset class="card inset">
         <legend data-i18n="section.barcode"></legend>
@@ -251,10 +244,6 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
   };
 
   const refresh = (): void => {
-    if (!isBarcodeEnabled()) {
-      clear();
-      return;
-    }
     if (!root) mount();
     else paint();
   };

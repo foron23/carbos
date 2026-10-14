@@ -321,7 +321,8 @@ a la guarda de acentos del test. No renderizar `origin` si no se pinta en el dia
 
 - **Fase A (offline, opcion E)**: modulo `src/barcode/` (ean, decode, pack, store,
   resolve, flag, ui), store IndexedDB `products`, `FoodItem.barcode?`/`brand?`
-  (aditivo, `SCHEMA_VERSION` sin tocar), UI en Ajustes (opt-in), i18n ES/EN, tool
+  (aditivo, `SCHEMA_VERSION` sin tocar), pestana **"Codigo"** en la entrada (visible
+  por defecto, junto a Foto/Buscar; lo unico opt-in es la resolucion en linea), i18n ES/EN, tool
   `tools/barcode/build_pack.py`, E2E con `__carbosBarcodeStub`.
 - **Descarga automatizada**: manifest hospedado (`public/barcode-manifest.json`,
   mismo origen; URL relativa `./barcode/es.jsonl.gz`) que la app consulta al pulsar

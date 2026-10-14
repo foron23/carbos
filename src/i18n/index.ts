@@ -17,6 +17,7 @@ export const STRINGS = {
     'field.carbsPer100g': 'Carbohidratos por 100 g',
     'field.search': 'Buscar en el catálogo',
     'button.search': 'Buscar',
+    'entry.barcode': 'Código',
     'button.register': 'Registrar',
     'button.addItem': 'Añadir',
     'button.remove': 'Quitar',
@@ -159,7 +160,7 @@ export const STRINGS = {
     'contrib.none': 'No has compartido ninguna foto.',
     'contrib.shareFailed': 'No se pudo compartir. Se intentará de nuevo.',
     'section.barcode': 'Código de barras',
-    'settings.barcodeModule': 'Activar el módulo de código de barras (opt-in)',
+
     'field.barcode': 'Código de barras',
     'button.scanBarcode': 'Escanear',
     'barcode.hint':
@@ -204,6 +205,7 @@ export const STRINGS = {
     'field.carbsPer100g': 'Carbs per 100 g',
     'field.search': 'Search the catalog',
     'button.search': 'Search',
+    'entry.barcode': 'Barcode',
     'button.register': 'Log it',
     'button.addItem': 'Add',
     'button.remove': 'Remove',
@@ -344,7 +346,7 @@ export const STRINGS = {
     'contrib.none': 'You have not shared any photo.',
     'contrib.shareFailed': 'Could not share. It will be retried.',
     'section.barcode': 'Barcode',
-    'settings.barcodeModule': 'Enable the barcode module (opt-in)',
+
     'field.barcode': 'Barcode',
     'button.scanBarcode': 'Scan',
     'barcode.hint':

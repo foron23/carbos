@@ -791,14 +791,11 @@ export const scenarios = [
       const ean = '4006381333931';
       await installBarcodeStub(page, ean);
       await openApp(page, ctx.base);
-      await page.$eval('#settings', (el) => {
-        el.open = true;
-      });
-      await page.$eval('#barcode-toggle', (el) => {
+      await page.$eval('#entry-mode-barcode', (el) => {
         el.checked = true;
         el.dispatchEvent(new Event('change', { bubbles: true }));
       });
-      await waitFor(page, '#barcode-host:not([hidden]) #barcode-manual');
+      await waitFor(page, '#barcode-panel:not([hidden]) #barcode-manual');
 
       // Camino de camara via stub: la imagen se decodifica al EAN del stub.
       await uploadFile(page, '#barcode-input', ctx.fixturePng);
@@ -875,14 +872,11 @@ export const scenarios = [
         off,
       });
       await openApp(page, ctx.base);
-      await page.$eval('#settings', (el) => {
-        el.open = true;
-      });
-      await page.$eval('#barcode-toggle', (el) => {
+      await page.$eval('#entry-mode-barcode', (el) => {
         el.checked = true;
         el.dispatchEvent(new Event('change', { bubbles: true }));
       });
-      await waitFor(page, '#barcode-host:not([hidden]) #barcode-download');
+      await waitFor(page, '#barcode-panel:not([hidden]) #barcode-download');
 
       // 1) Descarga automatizada (manifest -> sha256 -> IndexedDB), sigue offline.
       await click(page, '#barcode-download');
@@ -897,7 +891,7 @@ export const scenarios = [
       await waitForText(page, '#draft-items', 'Producto de pack');
 
       // 3) El aviso de que "sale del dispositivo" esta presente.
-      const host = await text(page, '#barcode-host');
+      const host = await text(page, '#barcode-panel');
       assert(
         host.includes('sale de tu dispositivo'),
         'el aviso de resolucion en linea esta presente',
