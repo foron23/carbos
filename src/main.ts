@@ -154,7 +154,7 @@ const DAILY_TARGET_KEY = 'carbos.dailyTarget';
 function readDailyTarget(): number {
   try {
     const raw = localStorage.getItem(DAILY_TARGET_KEY);
-    const value = raw === null ? Number.NaN : Number.parseFloat(raw);
+    const value = raw === null ? Number.NaN : Number(raw);
     return Number.isFinite(value) && value > 0 ? value : 0;
   } catch {
     return 0;
@@ -1117,8 +1117,7 @@ async function startDetection(image: CapturedImage): Promise<void> {
     ) {
       return;
     }
-    detections = [];
-    detectionDraftIds = [];
+    clearDetections();
     renderDetect();
     // Visible solo en consola: permite diagnosticar fallos del runtime sin UI.
     console.warn(
@@ -1357,11 +1356,15 @@ function repeatMeal(meal: Meal): void {
   editingMeal = null;
   repeatPending = true;
   draft = { origin: meal.origin, items: meal.items.map((item) => ({ ...item, id: uid() })) };
-  // Una repeticion no hereda detecciones de foto: no hay modelo que rellenar.
+  // Una repeticion no hereda detecciones ni la foto pendiente de otra captura:
+  // evita emparejar una imagen ajena con esta comida al registrar.
   clearDetections();
+  capture = null;
+  photoStatusKey = null;
   clearStatus('register-status');
   renderDraft();
   renderDiary();
+  renderPhoto();
   byId('entry').scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 

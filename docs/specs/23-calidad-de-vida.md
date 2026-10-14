@@ -160,7 +160,7 @@ aplican. Sin dependencias nuevas y sin cambios de esquema.
 
 ### F2. Objetivo diario de carbohidratos
 
-- **F2a.** En _Ajustes_, un campo numerico `daily-target` (`field.dailyTarget`) con la
+- **F2a.** En _Ajustes_, un campo numerico `daily-target` (`settings.dailyTarget`) con la
   etiqueta del objetivo. Vacio = sin objetivo. Valor guardado en `localStorage`
   (`carbos.dailyTarget`); no negativo; `0` se trata como "sin objetivo".
 - **F2b.** Con objetivo definido, el **topbar** muestra, junto al total, `consumido /

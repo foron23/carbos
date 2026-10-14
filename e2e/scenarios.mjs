@@ -1656,6 +1656,9 @@ export const scenarios = [
       await page.evaluate(() => localStorage.removeItem('carbos.favorites'));
       await reload(page);
       await waitFor(page, '#app header h1');
+      await page.waitForFunction(
+        () => (document.querySelector('#day-total')?.textContent ?? '').length > 0,
+      );
       // C3: sin favoritos ni recientes el bloque no se renderiza.
       assert(await page.$eval('#quickadd', (el) => el.hidden), 'sin atajos no hay bloque');
       // Registra una comida: su alimento pasa a "Recientes".
@@ -1825,6 +1828,10 @@ export const scenarios = [
         'mismos carbohidratos',
       );
       assertEqual(repeated.items[0]?.classId, original.items[0]?.classId, 'mismo alimento');
+      assert(
+        repeated.items[0]?.id !== original.items[0]?.id,
+        'la repeticion usa ids de item nuevos',
+      );
       await screenshot(page, 'repetir-comida');
     },
   },
