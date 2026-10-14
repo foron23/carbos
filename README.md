@@ -18,6 +18,7 @@ de tu dispositivo.
 - Chat on-device (v1.1): [`docs/specs/14-chat.md`](docs/specs/14-chat.md)
 - Subida de contribuciones desde la app: [`docs/specs/15-subida-contribuciones.md`](docs/specs/15-subida-contribuciones.md)
 - Escaneo de productos por código de barras: [`docs/specs/17-escaneo-codigo-barras.md`](docs/specs/17-escaneo-codigo-barras.md)
+- Deteccion de alimentos (diagnostico y experimentos): [`docs/specs/18-modelo-deteccion.md`](docs/specs/18-modelo-deteccion.md)
 - Contrato de trabajo: [`docs/receta-de-codigo.md`](docs/receta-de-codigo.md)
 
 ## Estado

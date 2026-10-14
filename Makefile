@@ -65,6 +65,17 @@ WEIGHTS_ARGS    ?=
 # Ver docs/specs/10-experimento.md. --limit 0 evalua los 709 platos del test.
 EVAL_ARGS ?= --manifest public/model-manifest.json --root public --limit 25
 
+# --- Identificacion y techo del teacher (SPEC 18) ---------------------------
+# Mecanica en docs/specs/18-modelo-deteccion.md. Compara un clasificador
+# candidato en el MISMO pipeline (detector + recorte + clasificador).
+CAND_CLASSIFIER ?= weights/classifier.int8.onnx
+CAND_CLASSES    ?= public/model-manifest.json
+CAND_TAG        ?= imagenet
+CAND_OUT        ?= training/out/candidate.eval-manifest.json
+IDENTIFY_ARGS   ?=
+TEACHER_ARGS    ?=
+CLIP_TEACHER    ?= training/out/clip_teacher.npz
+
 # --- Pack de codigos de barras (Open Food Facts, spec 17, opcion E) ---------
 # Genera packs offline (JSONL.gz + manifest) desde la API de OFF y los deja en
 # public/barcode/, de modo que viajan JUNTO CON LA APP (mismo origen, sin CDN).
@@ -342,6 +353,21 @@ eval:
 	@npx --no-install esbuild eval/run.ts --bundle --platform=node --format=esm --target=node20 \
 		--outfile=eval/.build/run.mjs --external:onnxruntime-node --external:pngjs
 	@node eval/.build/run.mjs $(EVAL_ARGS)
+
+## teacher-eval: Techo del teacher CLIP zero-shot alineado al catalogo (SPEC 18)
+teacher-eval:
+	tools/shortlist/.venv/bin/python training/eval_clip.py --teacher $(CLIP_TEACHER) $(TEACHER_ARGS)
+
+## identify: Identificacion por caja sobre Nutrition5k (SPEC 18); CAND_CLASSIFIER/CAND_CLASSES/CAND_TAG
+identify:
+	tools/shortlist/.venv/bin/python training/eval_identify.py \
+		--classifier $(CAND_CLASSIFIER) --classes-from $(CAND_CLASSES) \
+		--tag $(CAND_TAG) --out $(TRAIN_OUT)/identify-$(CAND_TAG).json $(IDENTIFY_ARGS)
+
+## candidate-manifest: Manifest de evaluacion para un clasificador candidato (SPEC 18)
+candidate-manifest:
+	python3 tools/eval/make_candidate_manifest.py --classifier $(CAND_CLASSIFIER) \
+		--classes-from $(CAND_CLASSES) --out $(CAND_OUT)
 
 ## clean: Remove build artifacts and caches
 clean:

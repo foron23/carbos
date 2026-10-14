@@ -253,14 +253,28 @@ export function classForFood(map: ClassMap, foodId: string): string | null {
   return null;
 }
 
+/**
+ * Resuelve la etiqueta de un modelo a un alimento del catalogo.
+ *
+ * Dos vias, en este orden:
+ * 1. El mapa de clases (D31) traduce etiquetas de modelos publicos ("Granny
+ *    Smith" -> `manzana`).
+ * 2. **Identidad**: un modelo ya alineado al catalogo (p.ej. el destilado de
+ *    CLIP, `student_catalog`) emite directamente el `id` del alimento
+ *    (`pan_blanco`). Sin esta via, sus clases no estarian en el mapa y todo
+ *    caeria en "desconocido" (cobertura 0).
+ */
 export function resolveClass(
   map: ClassMap,
   label: string,
   catalog: Catalog,
 ): { food: Food; classId: string } | null {
-  const id = foodForClass(map, label);
-  if (id === null) return null;
-  const food = catalog.foods.find((entry) => entry.id === id);
-  if (!food) return null;
-  return { food, classId: label };
+  const mapped = foodForClass(map, label);
+  if (mapped !== null) {
+    const food = catalog.foods.find((entry) => entry.id === mapped);
+    if (food) return { food, classId: label };
+  }
+  const direct = catalog.foods.find((entry) => entry.id === label);
+  if (direct) return { food: direct, classId: label };
+  return null;
 }

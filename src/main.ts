@@ -30,7 +30,7 @@ import type { Locale, StringKey } from './i18n';
 import { prepareImage } from './capture/image';
 import type { CapturedImage } from './capture/image';
 import { createDetectionClient } from './model';
-import { suggestPortion } from './model/portion';
+import { suggestPortion, suggestPortions } from './model/portion';
 import type { DetectionClient, DetectionResult, InferencePhase, TopKEntry } from './model';
 import { decryptVault, encryptVault, isEncrypted } from './export/crypto';
 import { setupInsulin } from './insulin';
@@ -824,11 +824,22 @@ function chooseDetection(index: number, entry: TopKEntry): void {
 }
 
 function applyDetections(results: DetectionResult[]): void {
-  detectionDraftIds = results.map((result) => {
-    const food = foodById(result.classId);
-    if (!food) return '';
-    // La porcion inicial se guia por el tamano de la caja detectada (E6/D35).
-    return pushFood(food, suggestPortion(result.box, food.defaultPortionGrams).grams);
+  // La porcion inicial se reparte por AREA entre los items resueltos (SPEC 18,
+  // D1): sumar una porcion completa por caja sobrecuenta con varias detecciones.
+  const resolved = results
+    .map((result, index) => ({ result, index, food: foodById(result.classId) }))
+    .filter((entry): entry is { result: DetectionResult; index: number; food: Food } =>
+      Boolean(entry.food),
+    );
+  const grams = suggestPortions(
+    resolved.map((entry) => ({
+      box: entry.result.box,
+      defaultGrams: entry.food.defaultPortionGrams,
+    })),
+  );
+  detectionDraftIds = results.map(() => '');
+  resolved.forEach((entry, i) => {
+    detectionDraftIds[entry.index] = pushFood(entry.food, grams[i]);
   });
   animateDetectBoxes = true;
   renderDraft();

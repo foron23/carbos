@@ -170,23 +170,47 @@ export class Inference {
   }
 }
 
+/**
+ * Estimacion del plato a partir de las detecciones.
+ *
+ * D1 (SPEC 18): la porcion de cada caja se reparte por **area** (share =
+ * area_caja / area_total) en vez de sumar una porcion por defecto COMPLETA por
+ * caja. Sumar por caja sobrecuenta cuando el modelo resuelve muchas cajas
+ * (2,28 de media) y hacia que un modelo con cobertura alta empeorara el MAE
+ * (student: 29,2 g -> 16,3 g con el reparto por area). Con una sola caja el
+ * resultado no cambia.
+ */
 export function predictedCarbs(detections: Detection[]): {
   carbs: number;
   mass: number;
   resolved: number;
 } {
-  let carbs = 0;
-  let mass = 0;
-  let resolved = 0;
+  const items: { food: (typeof CATALOG.foods)[number]; area: number }[] = [];
   for (const detection of detections) {
     if (!detection.classId) continue;
     const food = CATALOG.foods.find((entry) => entry.id === detection.classId);
     if (!food) continue;
-    resolved += 1;
-    mass += food.defaultPortionGrams;
-    carbs += (food.defaultPortionGrams * food.carbsPer100g) / 100;
+    items.push({ food, area: Math.max(0, detection.box.w * detection.box.h) });
   }
-  return { carbs, mass, resolved };
+  return splitPlate(items);
+}
+
+/** Reparte una porcion de plato entre los items segun el area de su caja. */
+function splitPlate(items: { food: (typeof CATALOG.foods)[number]; area: number }[]): {
+  carbs: number;
+  mass: number;
+  resolved: number;
+} {
+  const totalArea = items.reduce((a, item) => a + item.area, 0);
+  let carbs = 0;
+  let mass = 0;
+  for (const item of items) {
+    const share = totalArea > 0 ? item.area / totalArea : 1 / items.length;
+    const grams = item.food.defaultPortionGrams * share;
+    mass += grams;
+    carbs += (grams * item.food.carbsPer100g) / 100;
+  }
+  return { carbs, mass, resolved: items.length };
 }
 
 // Clases COCO (detector) que son comida y su nombre, para usar la clase del detector.
@@ -212,9 +236,7 @@ export function predictedCarbsDetector(detections: Detection[]): {
   mass: number;
   resolved: number;
 } {
-  let carbs = 0;
-  let mass = 0;
-  let resolved = 0;
+  const items: { food: (typeof CATALOG.foods)[number]; area: number }[] = [];
   for (const detection of detections) {
     const label = COCO_FOOD_CLASS[detection.detectorClass];
     const fromDetector = label ? resolveClass(DEFAULT_CLASSMAP, label, CATALOG) : null;
@@ -222,11 +244,9 @@ export function predictedCarbsDetector(detections: Detection[]): {
     if (!classId) continue;
     const food = CATALOG.foods.find((entry) => entry.id === classId);
     if (!food) continue;
-    resolved += 1;
-    mass += food.defaultPortionGrams;
-    carbs += (food.defaultPortionGrams * food.carbsPer100g) / 100;
+    items.push({ food, area: Math.max(0, detection.box.w * detection.box.h) });
   }
-  return { carbs, mass, resolved };
+  return splitPlate(items);
 }
 
 export { decodePng };

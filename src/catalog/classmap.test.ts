@@ -37,6 +37,13 @@ describe('mapa de clases (E2)', () => {
     expect(UNKNOWN_CLASS).toBe('desconocido');
   });
 
+  it('resuelve por identidad un modelo ya alineado al catalogo', () => {
+    // El estudiante destilado al catalogo emite ids directamente (p.ej. "pan_blanco").
+    const resolved = resolveClass(DEFAULT_CLASSMAP, 'pan_blanco', CATALOG);
+    expect(resolved?.food.id).toBe('pan_blanco');
+    expect(resolved?.classId).toBe('pan_blanco');
+  });
+
   it('normaliza etiquetas de modelos publicos (D31)', () => {
     expect(normalizeLabel('Granny Smith')).toBe('granny_smith');
     expect(normalizeLabel('  ice cream ')).toBe('ice_cream');

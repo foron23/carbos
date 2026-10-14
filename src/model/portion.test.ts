@@ -5,6 +5,7 @@ import {
   type PortionBox,
   type PortionSize,
   suggestPortion,
+  suggestPortions,
 } from './portion';
 
 function box(w: number, h: number, x = 0, y = 0): PortionBox {
@@ -129,5 +130,40 @@ describe('suggestPortion monotonía y determinismo', () => {
     const a = suggestPortion(box(0.5, 0.5, 0, 0), 80);
     const b = suggestPortion(box(0.5, 0.5, 100, -50), 80);
     expect(a).toEqual(b);
+  });
+});
+
+describe('suggestPortions (reparto por area, SPEC 18/D1)', () => {
+  it('un solo item conserva el factor por tamano de suggestPortion', () => {
+    expect(suggestPortions([{ box: box(0.2, 0.2), defaultGrams: 60 }])).toEqual([42]);
+    expect(suggestPortions([{ box: box(0.8, 0.8), defaultGrams: 60 }])).toEqual([84]);
+  });
+
+  it('reparte por area entre varios items', () => {
+    const items = [
+      { box: box(0.8, 1), defaultGrams: 60 }, // area 0.8 -> 0.8
+      { box: box(0.2, 1), defaultGrams: 100 }, // area 0.2 -> 0.2
+    ];
+    expect(suggestPortions(items)).toEqual([48, 20]);
+  });
+
+  it('areas iguales reparten a la mitad', () => {
+    const items = [
+      { box: box(0.5, 0.5), defaultGrams: 60 },
+      { box: box(0.5, 0.5), defaultGrams: 100 },
+    ];
+    expect(suggestPortions(items)).toEqual([30, 50]);
+  });
+
+  it('areas degeneradas reparten a partes iguales y respetan el suelo de 1 g', () => {
+    const items = [
+      { box: box(0, 0), defaultGrams: 60 },
+      { box: box(NaN, NaN), defaultGrams: 0 },
+    ];
+    expect(suggestPortions(items)).toEqual([30, 1]);
+  });
+
+  it('lista vacia devuelve lista vacia', () => {
+    expect(suggestPortions([])).toEqual([]);
   });
 });
