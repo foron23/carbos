@@ -784,13 +784,20 @@ export const scenarios = [
         '#draft-items .draft-row:nth-child(1) input[type="number"]',
         (el) => Number(el.value),
       );
+      const gramsSmall = await page.$eval(
+        '#draft-items .draft-row:nth-child(2) input[type="number"]',
+        (el) => Number(el.value),
+      );
       await click(page, '#draft-items .draft-row:nth-child(1) .draft-portions button:nth-child(2)');
       const gramsMedium = await page.$eval(
         '#draft-items .draft-row:nth-child(1) input[type="number"]',
         (el) => Number(el.value),
       );
       assertEqual(gramsMedium, 60, 'mediano coincide con la porcion por defecto del catalogo');
-      assert(gramsLarge > gramsMedium, 'una caja grande sugiere mas porcion que mediano');
+      // SPEC 18 D1: con varias detecciones la porcion se reparte por AREA, asi
+      // que la caja grande ya no se compara con el default del catalogo (eso es
+      // el caso de una sola caja): se compara con la caja pequena.
+      assert(gramsLarge > gramsSmall, 'una caja grande sugiere mas porcion que la pequena');
       await screenshot(page, 'deteccion-dedupe-porcion');
     },
   },
@@ -815,6 +822,8 @@ export const scenarios = [
 
       // Boton principal "Escanear" (via stub). Sin datos, no se inventa fila.
       await click(page, '#barcode-scan');
+      // El visor confirma el fallo con un popup rojo sobre el reticulo.
+      await page.waitForSelector('#barcode-flash.is-error', { timeout: 8000 });
       await waitForText(page, '#barcode-status', 'No se encontró');
       const rows = await page.$$eval('#draft-items .draft-row', (nodes) => nodes.length);
       assertEqual(rows, 0, 'un escaneo sin datos no crea ninguna fila');
@@ -981,8 +990,10 @@ export const scenarios = [
       assertEqual(imported.length, 1, 'el pack descomprimido importa un producto');
       assertEqual(imported[0]?.barcode, packBarcode, 'el producto del pack queda en el store');
 
-      // Escanear un EAN que SI esta en el pack: debe resolver contra el local.
+      // Escanear un EAN que SI esta en el pack: debe resolver contra el local y
+      // confirmarlo con un popup verde sobre el reticulo.
       await click(page, '#barcode-scan');
+      await page.waitForSelector('#barcode-flash.is-success', { timeout: 8000 });
       await waitForText(page, '#draft-items', 'Producto descomprimido');
       await screenshot(page, 'codigo-barras-content-encoding');
     },
