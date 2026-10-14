@@ -1649,4 +1649,54 @@ export const scenarios = [
       await screenshot(page, 'rail-escritorio');
     },
   },
+  {
+    name: 'recientes y favoritos de un toque (quick-add)',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await page.evaluate(() => localStorage.removeItem('carbos.favorites'));
+      // Registra una comida: su alimento pasa a "Recientes".
+      await addFood(page, 'manzana');
+      await register(page);
+      await waitForText(page, '#diary', 'Manzana');
+
+      await switchEntryMode(page, '#entry-mode-search');
+      await waitFor(page, '#quickadd .quickadd-chip');
+      assert((await text(page, '#quickadd')).includes('Recientes'), 'el bloque muestra Recientes');
+
+      const chip = await page.evaluate(() => {
+        const target = Array.from(document.querySelectorAll('#quickadd .quickadd-chip')).find(
+          (node) => (node.textContent ?? '').includes('Manzana'),
+        );
+        if (!target) return null;
+        const rect = target.getBoundingClientRect();
+        target.click();
+        return { h: rect.height };
+      });
+      assert(chip, 'hay un chip de Recientes con Manzana');
+      assert(chip.h >= 43, `el chip mide al menos 44 px (${chip.h})`);
+      await page.waitForSelector('#draft-items .draft-row', { timeout: 8000 });
+
+      // Favorito: la estrella del resultado de busqueda.
+      await setValue(page, '#food-search', 'manzana');
+      await page.waitForSelector('#search-results .fav-toggle', { timeout: 8000 });
+      const starH = await page.$eval(
+        '#search-results .fav-toggle',
+        (el) => el.getBoundingClientRect().height,
+      );
+      assert(starH >= 43, `la estrella mide al menos 44 px (${starH})`);
+      await click(page, '#search-results .fav-toggle');
+      assertEqual(
+        await page.$eval('#search-results .fav-toggle', (el) => el.getAttribute('aria-pressed')),
+        'true',
+        'la estrella queda marcada',
+      );
+      await waitForText(page, '#quickadd', 'Favoritos');
+
+      // Persiste tras recargar.
+      await reload(page);
+      await switchEntryMode(page, '#entry-mode-search');
+      await waitForText(page, '#quickadd', 'Favoritos');
+      await screenshot(page, 'quickadd');
+    },
+  },
 ];

@@ -6,5 +6,6 @@ export * from './portion';
 export * from './detection';
 export * from './timeline';
 export * from './moments';
+export * from './recents';
 export * from './export';
 export * from './db';

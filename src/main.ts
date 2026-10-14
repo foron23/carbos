@@ -18,6 +18,7 @@ import {
   PORTION_SIZES,
   putInsulin,
   putMeal,
+  recentClassIds,
   replaceVault,
   roundCarbs,
   scaleGrams,
@@ -103,6 +104,45 @@ function readContribEndpoint(): string {
 const VIEW_DATE_KEY = 'carbos.viewDate';
 const VIEW_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}$/;
+
+/**
+ * Atajos de calidad de vida (D59): ids de alimentos marcados como favoritos por
+ * la persona. Son un ajuste de UI (no dominio): viven en `localStorage` y no
+ * tocan el esquema. Los recientes no se almacenan; se derivan del diario.
+ */
+const FAVORITES_KEY = 'carbos.favorites';
+const QUICKADD_LIMIT = 8;
+
+function readFavorites(): string[] {
+  try {
+    const raw = localStorage.getItem(FAVORITES_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeFavorites(ids: readonly string[]): void {
+  try {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(ids));
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
+function isFavorite(id: string): boolean {
+  return readFavorites().includes(id);
+}
+
+function toggleFavorite(id: string): void {
+  const ids = readFavorites();
+  const index = ids.indexOf(id);
+  if (index >= 0) ids.splice(index, 1);
+  else ids.push(id);
+  writeFavorites(ids);
+}
 
 function readViewDate(): string | null {
   try {
@@ -309,6 +349,7 @@ app.innerHTML = `
       <p id="share-status" class="muted" aria-live="polite"></p>
     </div>
     <div id="search-panel" class="entry-panel" hidden>
+      <div id="quickadd" class="quickadd" hidden></div>
       <label for="food-search" data-i18n="field.search"></label>
       <div class="row">
         <input id="food-search" type="search" autocomplete="off" />
@@ -489,6 +530,29 @@ function portionKey(size: PortionSize): StringKey {
   return `portion.${size}`;
 }
 
+/** Estrella de favorito (D59) del resultado de busqueda; persiste y repinta. */
+function favoriteStar(food: Food): HTMLButtonElement {
+  const star = document.createElement('button');
+  star.type = 'button';
+  star.className = 'fav-toggle';
+  const paint = (): void => {
+    const on = isFavorite(food.id);
+    star.setAttribute('aria-pressed', String(on));
+    star.setAttribute(
+      'aria-label',
+      `${tr(on ? 'quickadd.unfavorite' : 'quickadd.favorite')}: ${food.name[locale]}`,
+    );
+    star.textContent = on ? '★' : '☆';
+  };
+  paint();
+  star.addEventListener('click', () => {
+    toggleFavorite(food.id);
+    paint();
+    renderQuickAdd();
+  });
+  return star;
+}
+
 function renderSearch(): void {
   const query = byId<HTMLInputElement>('food-search').value;
   const list = byId('search-results');
@@ -504,6 +568,7 @@ function renderSearch(): void {
   list.innerHTML = '';
   for (const food of results) {
     const item = document.createElement('li');
+    item.className = 'result-row';
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'result';
@@ -513,9 +578,52 @@ function renderSearch(): void {
       byId<HTMLInputElement>('food-search').value = '';
       list.innerHTML = '';
     });
+    item.append(button, favoriteStar(food));
+    list.appendChild(item);
+  }
+}
+
+/** Un grupo de atajos (titulo + chips) del bloque de quick-add (D59). */
+function quickAddGroup(titleKey: StringKey, foods: readonly Food[]): HTMLElement {
+  const group = document.createElement('div');
+  group.className = 'quickadd-group';
+  group.appendChild(i18nEl('p', titleKey, 'quickadd-title'));
+  const list = document.createElement('ul');
+  list.className = 'quickadd-list';
+  for (const food of foods) {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'quickadd-chip';
+    button.textContent = food.name[locale];
+    button.addEventListener('click', () => addFoodToDraft(food));
     item.appendChild(button);
     list.appendChild(item);
   }
+  group.appendChild(list);
+  return group;
+}
+
+/**
+ * Atajos de un toque (D59): favoritos (marcados a mano) y recientes (derivados
+ * del diario, patron D57). Se oculta si no hay ninguno, para no dejar ruido.
+ */
+function renderQuickAdd(): void {
+  const host = byId('quickadd');
+  const favorites = readFavorites()
+    .map((id) => foodById(id))
+    .filter((food): food is Food => food !== undefined);
+  const recents = recentClassIds(vault.meals, QUICKADD_LIMIT)
+    .map((id) => foodById(id))
+    .filter((food): food is Food => food !== undefined);
+  host.textContent = '';
+  if (favorites.length === 0 && recents.length === 0) {
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+  if (favorites.length > 0) host.appendChild(quickAddGroup('quickadd.favorites', favorites));
+  if (recents.length > 0) host.appendChild(quickAddGroup('quickadd.recents', recents));
 }
 
 function renderDraft(): void {
@@ -1379,6 +1487,7 @@ function render(): void {
   renderDraft();
   renderDetect();
   renderSearch();
+  renderQuickAdd();
   renderDiary();
   renderExportReminder();
   relocalizeStatuses();
