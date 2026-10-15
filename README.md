@@ -24,6 +24,7 @@ de tu dispositivo.
 - Expansion del catalogo (platos): [`docs/specs/21-expansion-catalogo.md`](docs/specs/21-expansion-catalogo.md)
 - Navegacion persistente y Diario como linea de tiempo (UI/UX v3): [`docs/specs/22-uiux-v3.md`](docs/specs/22-uiux-v3.md)
 - Calidad de vida: quick-add, objetivo diario y repetir: [`docs/specs/23-calidad-de-vida.md`](docs/specs/23-calidad-de-vida.md)
+- Calidad de vida (ronda 2): borrador persistente, busqueda por uso y explorar por categorias: [`docs/specs/24-calidad-de-vida-2.md`](docs/specs/24-calidad-de-vida-2.md)
 - Contrato de trabajo: [`docs/receta-de-codigo.md`](docs/receta-de-codigo.md)
 
 ## Estado
