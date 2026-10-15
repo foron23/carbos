@@ -25,6 +25,11 @@ async function openApp(page, base) {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
   await unregisterServiceWorkers(page);
   await clearDatabase(page);
+  // Espera a que el primer render termine (el borrador ya esta pintado si habia
+  // uno persistido de un escenario previo).
+  await page.waitForFunction(
+    () => (document.querySelector('#day-total')?.textContent ?? '').length > 0,
+  );
   // Estado limpio entre escenarios: idioma es y resolucion en linea APAGADA
   // (defecto); un escenario previo puede haberla dejado activada en localStorage.
   // Tambien se marca como ya presentada: el dialogo inicial es una capa fija que
@@ -33,6 +38,17 @@ async function openApp(page, base) {
     localStorage.setItem('carbos.locale', 'es');
     localStorage.setItem('carbos.onboarded', '1');
     localStorage.removeItem('carbos.barcode.online');
+    localStorage.removeItem('carbos.draft');
+  });
+  // Un escenario previo pudo dejar un borrador persistente (D62); empty it via the
+  // UI so the in-memory draft is also clean before reloading (the pagehide flush
+  // would otherwise resurrect it on the reload).
+  await page.evaluate(() => {
+    for (let guard = 0; guard < 100; guard += 1) {
+      const remove = document.querySelector('#draft-items .remove');
+      if (!remove) break;
+      remove.click();
+    }
   });
   await reload(page);
   await waitFor(page, '#app header h1');
@@ -1832,6 +1848,69 @@ export const scenarios = [
       );
       assertEqual(repeated.date, original.date, 'la repeticion queda en el dia en vista');
       await screenshot(page, 'repetir-comida');
+    },
+  },
+  {
+    name: 'el borrador sobrevive a la recarga (F1/D62)',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      // Sin borrador previo, no hay nada persistido.
+      assertEqual(
+        await page.evaluate(() => localStorage.getItem('carbos.draft')),
+        null,
+        'sin borrador, no hay nada persistido',
+      );
+      await addFood(page, 'manzana');
+      const before = await page.$eval('#draft-items .draft-row', (el) => ({
+        text: (el.textContent ?? '').trim(),
+        grams: el.querySelector('input[type="number"]')?.value ?? '',
+      }));
+      assert(before.text.includes('Manzana'), 'el borrador tiene la manzana');
+      // El borrador se guarda con debounce: se espera a que aterrice.
+      await page.waitForFunction(
+        () => (localStorage.getItem('carbos.draft') ?? '').includes('manzana'),
+        { timeout: 4000 },
+      );
+
+      // Recargar restaura el borrador (mismos gramos) y lo anuncia.
+      await reload(page);
+      await waitFor(page, '#app header h1');
+      await page.waitForSelector('#draft-items .draft-row', { timeout: 8000 });
+      const after = await page.$eval('#draft-items .draft-row', (el) => ({
+        text: (el.textContent ?? '').trim(),
+        grams: el.querySelector('input[type="number"]')?.value ?? '',
+      }));
+      assert(after.text.includes('Manzana'), 'el borrador vuelve tras recargar');
+      assertEqual(after.grams, before.grams, 'conserva los gramos');
+      assertEqual(
+        await text(page, '#register-status'),
+        'Borrador restaurado.',
+        'avisa al restaurar',
+      );
+
+      // Quitar el ultimo item descarta el borrador persistido.
+      await page.$eval('#draft-items .remove', (el) => el.click());
+      await page.waitForFunction(
+        () => document.querySelectorAll('#draft-items .draft-row').length === 0,
+      );
+      await page.waitForFunction(() => localStorage.getItem('carbos.draft') === null, {
+        timeout: 4000,
+      });
+      assertEqual(
+        await page.evaluate(() => localStorage.getItem('carbos.draft')),
+        null,
+        'un borrador vacio se descarta',
+      );
+
+      // Y tras recargar ya no vuelve.
+      await reload(page);
+      await waitFor(page, '#app header h1');
+      assertEqual(
+        await page.$$eval('#draft-items .draft-row', (els) => els.length),
+        0,
+        'un borrador vacio no se restaura',
+      );
+      await screenshot(page, 'borrador-persistente');
     },
   },
 ];

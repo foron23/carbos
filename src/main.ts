@@ -2,6 +2,7 @@ import './style.css';
 import {
   applyAlternative,
   carbsByMoment,
+  clearDraft,
   dayCarbs,
   dayTimeline,
   deleteInsulin,
@@ -9,6 +10,7 @@ import {
   emptyVault,
   fromJson,
   itemCarbs,
+  loadDraft,
   loadVault,
   mealCarbs,
   mealsForDate,
@@ -21,6 +23,7 @@ import {
   recentClassIds,
   replaceVault,
   roundCarbs,
+  saveDraft,
   scaleGrams,
   selectableTopk,
   targetProgress,
@@ -216,6 +219,38 @@ let editingMeal: Meal | null = null;
 let repeatPending = false;
 let capture: CapturedImage | null = null;
 let vault: Vault = emptyVault();
+
+/**
+ * Borrador persistente (D62): se guarda con `debounce` en cada mutacion y se
+ * vuelca al ocultar la pestana. `restoredDraft` solo sirve para anunciar una vez
+ * que el borrador volvio tras una recarga.
+ */
+const DRAFT_SAVE_MS = 400;
+let draftSaveTimer: number | null = null;
+let restoredDraft = false;
+
+function persistDraft(immediate = false): void {
+  if (draftSaveTimer !== null) {
+    window.clearTimeout(draftSaveTimer);
+    draftSaveTimer = null;
+  }
+  if (immediate) {
+    saveDraft(draft.origin, draft.items);
+    return;
+  }
+  draftSaveTimer = window.setTimeout(() => {
+    draftSaveTimer = null;
+    saveDraft(draft.origin, draft.items);
+  }, DRAFT_SAVE_MS);
+}
+
+/** Restaura el borrador persistido (si lo hay) antes del primer render. */
+function hydrateDraft(): void {
+  const persisted = loadDraft();
+  if (!persisted) return;
+  draft = { origin: persisted.origin, items: persisted.items };
+  restoredDraft = true;
+}
 
 const MODEL_MANIFEST_URL = new URL('model-manifest.json', document.baseURI).href;
 const MODEL_CACHE = 'carbos-models-v1';
@@ -791,6 +826,8 @@ function renderDraft(): void {
   byId<HTMLButtonElement>('register-cancel').hidden = !(editing || repeatPending);
   byId('draft-editing').hidden = !editing;
   renderOverlay();
+  // D62: toda mutacion del borrador pasa por aqui; se persiste con debounce.
+  persistDraft();
 }
 
 function setPhotoStatus(key: StringKey | null): void {
@@ -1327,6 +1364,8 @@ function resetEdit(): void {
   editingMeal = null;
   repeatPending = false;
   draft = { origin: 'manual', items: [] };
+  // D62: registrar o cancelar descarta el borrador persistido.
+  clearDraft();
 }
 
 /** Carga una comida registrada en el borrador para ajustarla y guardarla. */
@@ -2047,9 +2086,17 @@ function wire(): void {
 }
 
 wire();
+// D62: restaura el borrador antes del primer render y lo anuncia una vez.
+hydrateDraft();
+if (restoredDraft) setStatus('register-status', 'draft.restored');
 void refresh();
 void flushContributions();
 void renderContribStatus();
+// D62: vuelca el borrador pendiente antes de que la pestana se vaya a segundo plano.
+window.addEventListener('pagehide', () => persistDraft(true));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') persistDraft(true);
+});
 window.addEventListener('online', () => {
   void flushContributions();
 });
