@@ -3,11 +3,11 @@ import { migrateVault, slotToTime, upgradeMeal } from './migrate';
 import { SCHEMA_VERSION } from './types';
 
 describe('migracion de esquema (slot -> time)', () => {
-  it('la version actual es 4', () => {
-    expect(SCHEMA_VERSION).toBe(4);
+  it('la version actual es 5', () => {
+    expect(SCHEMA_VERSION).toBe(5);
   });
 
-  it('sube un vault v1 a v4 con time desde la franja y origin manual', () => {
+  it('sube un vault v1 a v5 con time desde la franja y origin manual', () => {
     const legacy = {
       version: 1,
       meals: [
@@ -22,12 +22,12 @@ describe('migracion de esquema (slot -> time)', () => {
       insulin: [],
     };
     const vault = migrateVault(legacy);
-    expect(vault.version).toBe(4);
+    expect(vault.version).toBe(5);
     expect(vault.meals[0]?.time).toBe('14:00');
     expect(vault.meals[0]?.origin).toBe('manual');
   });
 
-  it('sube un vault v2 a v4 conservando origin', () => {
+  it('sube un vault v2 a v5 conservando origin', () => {
     const current = {
       version: 2,
       meals: [
@@ -43,7 +43,7 @@ describe('migracion de esquema (slot -> time)', () => {
       insulin: [],
     };
     const vault = migrateVault(current);
-    expect(vault.version).toBe(4);
+    expect(vault.version).toBe(5);
     expect(vault.meals[0]?.time).toBe('21:00');
     expect(vault.meals[0]?.origin).toBe('photo');
   });
@@ -98,15 +98,75 @@ describe('migracion de esquema (slot -> time)', () => {
       ],
       insulin: [],
     });
-    expect(vault.version).toBe(4);
+    expect(vault.version).toBe(5);
     expect(vault.groups).toEqual([]);
     expect(vault.meals).toHaveLength(1);
   });
 
   it('un vault v4 sin groups migra a groups: []', () => {
     const vault = migrateVault({ version: 4, meals: [], insulin: [] });
-    expect(vault.version).toBe(4);
+    expect(vault.version).toBe(5);
     expect(vault.groups).toEqual([]);
+  });
+
+  it('sube un vault v4 con un item sin macros dejandolas undefined (tolerante)', () => {
+    const vault = migrateVault({
+      version: 4,
+      meals: [
+        {
+          id: 'm1',
+          date: '2026-10-12',
+          time: '14:00',
+          items: [{ id: 'f1', name: 'pan', grams: 60, carbsPer100g: 50 }],
+          confidence: null,
+          origin: 'manual',
+        },
+      ],
+      insulin: [],
+    });
+    expect(vault.version).toBe(5);
+    expect(vault.meals[0]?.items[0]?.carbsPer100g).toBe(50);
+    expect(vault.meals[0]?.items[0]?.proteinPer100g).toBeUndefined();
+    expect(vault.meals[0]?.items[0]?.fatPer100g).toBeUndefined();
+    expect(vault.meals[0]?.items[0]?.kcalPer100g).toBeUndefined();
+    expect(vault.meals[0]?.items[0]?.kcalDerived).toBeUndefined();
+    expect(vault.meals[0]?.items[0]?.fiberPer100g).toBeUndefined();
+    expect(vault.meals[0]?.items[0]?.sugarsPer100g).toBeUndefined();
+  });
+
+  it('conserva los macros presentes en un item v4', () => {
+    const vault = migrateVault({
+      version: 4,
+      meals: [
+        {
+          id: 'm1',
+          date: '2026-10-12',
+          time: '14:00',
+          items: [
+            {
+              id: 'f1',
+              name: 'yogur',
+              grams: 125,
+              carbsPer100g: 5,
+              proteinPer100g: 10,
+              fatPer100g: 3,
+              kcalPer100g: 80,
+              kcalDerived: false,
+              fiberPer100g: 0,
+              sugarsPer100g: 5,
+            },
+          ],
+          confidence: null,
+          origin: 'manual',
+        },
+      ],
+      insulin: [],
+    });
+    expect(vault.version).toBe(5);
+    expect(vault.meals[0]?.items[0]?.proteinPer100g).toBe(10);
+    expect(vault.meals[0]?.items[0]?.kcalPer100g).toBe(80);
+    expect(vault.meals[0]?.items[0]?.kcalDerived).toBe(false);
+    expect(vault.meals[0]?.items[0]?.fiberPer100g).toBe(0);
   });
 
   it('conserva los grupos validos y descarta los invalidos (lectura tolerante)', () => {
@@ -125,7 +185,7 @@ describe('migracion de esquema (slot -> time)', () => {
         null,
       ],
     });
-    expect(vault.version).toBe(4);
+    expect(vault.version).toBe(5);
     expect(vault.groups).toEqual([
       { id: 'g1', date: '2026-10-12', name: 'Desayuno', mealIds: ['a', 'b'] },
     ]);

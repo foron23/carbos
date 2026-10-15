@@ -16,6 +16,14 @@ export interface FoodItem {
   name: string;
   grams: number;
   carbsPer100g: number;
+  // Macros y energia opcionales (SPEC 26 / D68): un item sin ellos (vault antiguo
+  // o fuente sin dato) queda `undefined`; el desglose los omite, nunca los inventa.
+  proteinPer100g?: number | undefined;
+  fatPer100g?: number | undefined;
+  kcalPer100g?: number | undefined;
+  kcalDerived?: boolean | undefined;
+  fiberPer100g?: number | undefined;
+  sugarsPer100g?: number | undefined;
   classId?: string | undefined;
   // Procedencia del escaneo (spec 17): aditivo, sin bump de esquema.
   barcode?: string | undefined;
@@ -54,7 +62,9 @@ export interface MealGroup {
   mealIds: string[];
 }
 
-export const SCHEMA_VERSION = 4;
+// SPEC 26 preveia 3 -> 4, pero el repo ya subio a 4 con SPEC 25 (grupos de
+// comidas); la desviacion documentada es 4 -> 5 por los macros opcionales.
+export const SCHEMA_VERSION = 5;
 
 export interface Vault {
   version: number;

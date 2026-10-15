@@ -50,8 +50,16 @@ export function normalizeGroups(input: unknown): MealGroup[] {
 export function migrateVault(input: unknown): Vault {
   const record = asRecord(input);
   const version = typeof record.version === 'number' ? record.version : Number.NaN;
-  // Acepta explicitamente 1 | 2 | 3 | 4. `version === 3` (vault actuales) sube a 4.
-  if (version === 1 || version === 2 || version === 3 || version === SCHEMA_VERSION) {
+  // Acepta explicitamente 1 | 2 | 3 | 4 | 5. Los vault v3 (sin grupos) y v4
+  // (grupos ya presentes, SPEC 25) de instalaciones existentes suben a 5; los
+  // items sin los macros de SPEC 26 quedan con esos campos `undefined`.
+  if (
+    version === 1 ||
+    version === 2 ||
+    version === 3 ||
+    version === 4 ||
+    version === SCHEMA_VERSION
+  ) {
     const rawMeals = Array.isArray(record.meals) ? record.meals : [];
     const meals = rawMeals.map(upgradeMeal);
     const groups = normalizeGroups(record.groups);

@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { FoodItem, Meal } from './types';
 import {
   dayCarbs,
+  dayMacros,
+  hasMacros,
   itemCarbs,
+  itemMacros,
   mealCarbs,
+  mealMacros,
   roundCarbs,
   startOfWeek,
   weekBreakdown,
@@ -11,8 +15,8 @@ import {
   targetProgress,
 } from './totals';
 
-function food(grams: number, carbsPer100g: number): FoodItem {
-  return { id: 'f', name: 'alimento', grams, carbsPer100g };
+function food(grams: number, carbsPer100g: number, extra: Partial<FoodItem> = {}): FoodItem {
+  return { id: 'f', name: 'alimento', grams, carbsPer100g, ...extra };
 }
 
 function meal(id: string, date: string, time: string, items: FoodItem[]): Meal {
@@ -106,5 +110,114 @@ describe('totals', () => {
     expect(info.remaining).toBe(0);
     expect(info.ratio).toBe(1);
     expect(info.over).toBe(false);
+  });
+});
+
+describe('macros', () => {
+  it('itemMacros escala protein, grasa, fibra y azucares por 100 g', () => {
+    const macros = itemMacros(
+      food(150, 20, {
+        proteinPer100g: 10,
+        fatPer100g: 4,
+        fiberPer100g: 2,
+        sugarsPer100g: 6,
+      }),
+    );
+    expect(macros.protein).toBeCloseTo(15);
+    expect(macros.fat).toBeCloseTo(6);
+    expect(macros.fiber).toBeCloseTo(3);
+    expect(macros.sugars).toBeCloseTo(9);
+  });
+
+  it('itemMacros deriva kcal 4/4/9 y la marca cuando falta la fuente', () => {
+    const macros = itemMacros(food(100, 20, { proteinPer100g: 10, fatPer100g: 5 }));
+    expect(macros.kcal).toBeCloseTo(4 * 10 + 4 * 20 + 9 * 5);
+    expect(macros.kcalDerived).toBe(true);
+  });
+
+  it('itemMacros usa la kcal de la fuente y no la marca', () => {
+    const macros = itemMacros(
+      food(100, 20, { proteinPer100g: 10, fatPer100g: 5, kcalPer100g: 200 }),
+    );
+    expect(macros.kcal).toBeCloseTo(200);
+    expect(macros.kcalDerived).toBe(false);
+  });
+
+  it('itemMacros respeta kcalDerived true de la fuente', () => {
+    const macros = itemMacros(
+      food(100, 20, { proteinPer100g: 10, fatPer100g: 5, kcalPer100g: 200, kcalDerived: true }),
+    );
+    expect(macros.kcalDerived).toBe(true);
+  });
+
+  it('itemMacros omite kcal si falta proteina o grasa', () => {
+    const macros = itemMacros(food(100, 20, { proteinPer100g: 10 }));
+    expect(macros.kcal).toBeUndefined();
+    expect(macros.kcalDerived).toBeUndefined();
+  });
+
+  it('itemMacros omite fibra y azucares ausentes sin derivarlos', () => {
+    const macros = itemMacros(food(100, 20, { proteinPer100g: 10, fatPer100g: 5 }));
+    expect(macros.fiber).toBeUndefined();
+    expect(macros.sugars).toBeUndefined();
+  });
+
+  it('mealMacros suma los valores definidos y omite los ausentes', () => {
+    const macros = mealMacros(
+      meal('m1', '2026-10-12', '14:00', [
+        food(100, 20, { proteinPer100g: 10, fatPer100g: 5, kcalPer100g: 200 }),
+        food(100, 20, { proteinPer100g: 4 }),
+      ]),
+    );
+    expect(macros.protein).toBeCloseTo(14);
+    expect(macros.fat).toBeCloseTo(5);
+    expect(macros.kcal).toBeCloseTo(200);
+    expect(macros.kcalDerived).toBe(false);
+  });
+
+  it('mealMacros marca kcalDerived si algun contribuyente es derivado', () => {
+    const macros = mealMacros(
+      meal('m1', '2026-10-12', '14:00', [
+        food(100, 20, { proteinPer100g: 10, fatPer100g: 5, kcalPer100g: 200 }),
+        food(100, 20, { proteinPer100g: 10, fatPer100g: 5 }),
+      ]),
+    );
+    expect(macros.kcal).toBeCloseTo(200 + (4 * 10 + 4 * 20 + 9 * 5));
+    expect(macros.kcalDerived).toBe(true);
+  });
+
+  it('mealMacros deja los nutrientes en undefined si ningun item los trae', () => {
+    const macros = mealMacros(meal('m1', '2026-10-12', '14:00', [food(100, 20)]));
+    expect(macros.protein).toBeUndefined();
+    expect(macros.fat).toBeUndefined();
+    expect(macros.kcal).toBeUndefined();
+    expect(macros.kcalDerived).toBeUndefined();
+    expect(macros.fiber).toBeUndefined();
+    expect(macros.sugars).toBeUndefined();
+  });
+
+  it('dayMacros agrega solo las comidas de la fecha', () => {
+    const meals = [
+      meal('m1', '2026-10-12', '14:00', [
+        food(100, 20, { proteinPer100g: 10, fatPer100g: 5, fiberPer100g: 4 }),
+      ]),
+      meal('m2', '2026-10-12', '21:00', [food(100, 20, { proteinPer100g: 20, sugarsPer100g: 8 })]),
+      meal('m3', '2026-10-11', '14:00', [food(100, 20, { proteinPer100g: 99, fatPer100g: 99 })]),
+    ];
+    const macros = dayMacros(meals, '2026-10-12');
+    expect(macros.protein).toBeCloseTo(30);
+    expect(macros.fat).toBeCloseTo(5);
+    expect(macros.fiber).toBeCloseTo(4);
+    expect(macros.sugars).toBeCloseTo(8);
+  });
+
+  it('hasMacros detecta cualquier nutriente numerico (kcalDerived no cuenta)', () => {
+    expect(hasMacros({})).toBe(false);
+    expect(hasMacros({ kcalDerived: true })).toBe(false);
+    expect(hasMacros({ protein: 0 })).toBe(true);
+    expect(hasMacros({ fat: 0 })).toBe(true);
+    expect(hasMacros({ kcal: 0 })).toBe(true);
+    expect(hasMacros({ fiber: 0 })).toBe(true);
+    expect(hasMacros({ sugars: 0 })).toBe(true);
   });
 });

@@ -8,6 +8,102 @@ export function mealCarbs(meal: Meal): number {
   return meal.items.reduce((sum, item) => sum + itemCarbs(item), 0);
 }
 
+/** Desglose de composicion (SPEC 26 / D68). Todo campo es opcional: lo ausente no se pinta. */
+export interface Macros {
+  protein?: number | undefined;
+  fat?: number | undefined;
+  kcal?: number | undefined;
+  kcalDerived?: boolean | undefined;
+  fiber?: number | undefined;
+  sugars?: number | undefined;
+}
+
+/** Factores de Atwater para derivar kcal de proteina/carbohidratos/grasa (SPEC 26). */
+export const KCAL_FACTORS = { protein: 4, carbs: 4, fat: 9 } as const;
+
+function scale(grams: number, per100g: number | undefined): number | undefined {
+  return per100g === undefined ? undefined : (grams * per100g) / 100;
+}
+
+/**
+ * Macros de un item escalados por gramos (`grams * per100g / 100`). `protein`,
+ * `fat`, `fiber` y `sugars` solo si el campo del item esta definido. `kcal` usa
+ * la fuente si existe; si no, y hay protein+a grasa, la deriva `4p + 4c + 9f` y
+ * la marca (`kcalDerived: true`); si falta protein o grasa, omite kcal.
+ */
+export function itemMacros(item: FoodItem): Macros {
+  const macros: Macros = {};
+  const protein = scale(item.grams, item.proteinPer100g);
+  const fat = scale(item.grams, item.fatPer100g);
+  const fiber = scale(item.grams, item.fiberPer100g);
+  const sugars = scale(item.grams, item.sugarsPer100g);
+  if (protein !== undefined) macros.protein = protein;
+  if (fat !== undefined) macros.fat = fat;
+  if (fiber !== undefined) macros.fiber = fiber;
+  if (sugars !== undefined) macros.sugars = sugars;
+
+  if (item.kcalPer100g !== undefined) {
+    macros.kcal = scale(item.grams, item.kcalPer100g);
+    macros.kcalDerived = item.kcalDerived ?? false;
+  } else if (item.proteinPer100g !== undefined && item.fatPer100g !== undefined) {
+    const derivedPer100g =
+      KCAL_FACTORS.protein * item.proteinPer100g +
+      KCAL_FACTORS.carbs * item.carbsPer100g +
+      KCAL_FACTORS.fat * item.fatPer100g;
+    macros.kcal = scale(item.grams, derivedPer100g);
+    macros.kcalDerived = true;
+  }
+  return macros;
+}
+
+function sumDefined(values: readonly (number | undefined)[]): number | undefined {
+  const defined = values.filter((value): value is number => value !== undefined);
+  return defined.length > 0 ? defined.reduce((sum, value) => sum + value, 0) : undefined;
+}
+
+/**
+ * Agrega un desglose por comida o dia: suma cada nutriente definido y lo deja
+ * `undefined` si ningun contribuyente lo trae. `kcalDerived` es `true` si hay
+ * kcal y al menos un contribuyente derivado, `false` si hay kcal y ninguno lo
+ * es, y `undefined` si no hay kcal.
+ */
+function aggregateMacros(parts: readonly Macros[]): Macros {
+  const macros: Macros = {};
+  const protein = sumDefined(parts.map((part) => part.protein));
+  const fat = sumDefined(parts.map((part) => part.fat));
+  const fiber = sumDefined(parts.map((part) => part.fiber));
+  const sugars = sumDefined(parts.map((part) => part.sugars));
+  const kcal = sumDefined(parts.map((part) => part.kcal));
+  if (protein !== undefined) macros.protein = protein;
+  if (fat !== undefined) macros.fat = fat;
+  if (fiber !== undefined) macros.fiber = fiber;
+  if (sugars !== undefined) macros.sugars = sugars;
+  if (kcal !== undefined) {
+    macros.kcal = kcal;
+    macros.kcalDerived = parts.some((part) => part.kcal !== undefined && part.kcalDerived === true);
+  }
+  return macros;
+}
+
+export function mealMacros(meal: Meal): Macros {
+  return aggregateMacros(meal.items.map(itemMacros));
+}
+
+export function dayMacros(meals: readonly Meal[], date: string): Macros {
+  return aggregateMacros(mealsForDate(meals, date).map(mealMacros));
+}
+
+/** Hay macros si algun nutriente numerico esta definido (kcalDerived no cuenta). */
+export function hasMacros(macros: Macros): boolean {
+  return (
+    macros.protein !== undefined ||
+    macros.fat !== undefined ||
+    macros.kcal !== undefined ||
+    macros.fiber !== undefined ||
+    macros.sugars !== undefined
+  );
+}
+
 export function mealsForDate(meals: readonly Meal[], date: string): Meal[] {
   return meals.filter((meal) => meal.date === date);
 }
