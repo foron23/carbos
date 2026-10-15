@@ -1357,7 +1357,9 @@ function repeatMeal(meal: Meal): void {
   repeatPending = true;
   draft = { origin: meal.origin, items: meal.items.map((item) => ({ ...item, id: uid() })) };
   // Una repeticion no hereda detecciones ni la foto pendiente de otra captura:
-  // evita emparejar una imagen ajena con esta comida al registrar.
+  // cancela una deteccion **en vuelo** (como pushBarcodeItem) para que al resolver
+  // no reinyecte alimentos de una foto ajena, y limpia detecciones/foto.
+  detectAbort?.abort();
   clearDetections();
   capture = null;
   photoStatusKey = null;

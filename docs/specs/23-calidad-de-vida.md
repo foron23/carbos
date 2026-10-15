@@ -155,7 +155,8 @@ aplican. Sin dependencias nuevas y sin cambios de esquema.
 - **F1e.** **Favoritos** = `localStorage` `carbos.favorites` (array de ids de catalogo).
   Lectura tolerante a fallos (localStorage no disponible → lista vacia).
 - **F1f.** El bloque se **oculta** si no hay ni favoritos ni recientes (identidad calmada:
-  nada de contenedores vacios). No hay estado vacio con CTA aqui (D58 es del Diario).
+  nada de contenedores vacios). No es un estado vacio con CTA: el bloque simplemente no se
+  renderiza (D58, la regla de salida, es de las secciones con contenido — el Diario).
 - **F1g.** Los atajos respetan el **objetivo tactil >= 44 px**.
 
 ### F2. Objetivo diario de carbohidratos

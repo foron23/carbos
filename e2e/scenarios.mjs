@@ -1769,10 +1769,8 @@ export const scenarios = [
       );
       assert(metrics.bar.includes('Restante'), `el topbar muestra el restante (${metrics.bar})`);
       assert(metrics.valuetext.includes('Restante'), 'aria-valuetext describe el restante');
-      assert(
-        metrics.summary.includes('/ 180') && metrics.summary.includes('Restante'),
-        `el resumen cuadra con el topbar (${metrics.summary})`,
-      );
+      // C6: el resumen del Diario muestra exactamente los mismos numeros que el topbar.
+      assertEqual(metrics.summary, metrics.bar, 'el resumen cuadra con el topbar (C6)');
 
       // C8: el objetivo 0 equivale a "sin objetivo".
       await setValue(page, '#daily-target', '0');
@@ -1832,6 +1830,7 @@ export const scenarios = [
         repeated.items[0]?.id !== original.items[0]?.id,
         'la repeticion usa ids de item nuevos',
       );
+      assertEqual(repeated.date, original.date, 'la repeticion queda en el dia en vista');
       await screenshot(page, 'repetir-comida');
     },
   },
