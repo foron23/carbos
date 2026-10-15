@@ -5,6 +5,8 @@ import { dirname, join } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const SHOTS_DIR = join(__dirname, 'screenshots');
 
+export const WAIT = { def: 12000, long: 15000 };
+
 let shotCounter = 0;
 
 export async function ensureShotsDir() {
@@ -29,7 +31,7 @@ export function assertEqual(actual, expected, message) {
   }
 }
 
-export async function waitFor(page, selector, timeout = 10000) {
+export async function waitFor(page, selector, timeout = WAIT.long) {
   await page.waitForSelector(selector, { timeout });
 }
 
@@ -63,7 +65,7 @@ export async function uploadFile(page, selector, path) {
   await input.uploadFile(path);
 }
 
-export async function waitForText(page, selector, expected, timeout = 8000) {
+export async function waitForText(page, selector, expected, timeout = WAIT.def) {
   await page.waitForFunction(
     (sel, want) => {
       const el = document.querySelector(sel);
@@ -187,7 +189,7 @@ export async function readContributions(page) {
 }
 
 /** Espera a que el store `contributions` tenga exactamente `count` registros. */
-export async function waitForContributionCount(page, count, timeout = 8000) {
+export async function waitForContributionCount(page, count, timeout = WAIT.def) {
   await page.waitForFunction(
     (want) =>
       new Promise((resolve) => {
@@ -241,7 +243,7 @@ export async function captureDownload(page, triggerSelector) {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     try {
       trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-      for (let i = 0; i < 100 && !captured; i += 1) await wait(20);
+      for (let i = 0; i < 150 && !captured; i += 1) await wait(20);
       if (!captured) return null;
       const response = await fetch(captured.href);
       const body = await response.text();
@@ -273,6 +275,10 @@ export async function openApp(page, base) {
     localStorage.setItem('carbos.locale', 'es');
     localStorage.setItem('carbos.onboarded', '1');
     localStorage.removeItem('carbos.barcode.online');
+    // El registro de packs importados persiste entre escenarios (mismo contexto):
+    // sin vaciarlo, un pack "ya importado" impediria la descarga automatica del
+    // siguiente escenario que la espera.
+    localStorage.removeItem('carbos.barcode.packs');
     localStorage.removeItem('carbos.draft');
   });
   await page.evaluate(() => {

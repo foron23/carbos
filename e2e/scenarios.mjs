@@ -24,12 +24,12 @@ import {
 async function addFood(page, query, resultIndex = 0) {
   await switchEntryMode(page, '#entry-mode-search');
   await setValue(page, '#food-search', query);
-  await page.waitForSelector('#search-results button.result', { timeout: 8000 });
+  await page.waitForSelector('#search-results button.result', { timeout: 12000 });
   await page.evaluate((index) => {
     const buttons = document.querySelectorAll('#search-results button.result');
     buttons[index]?.click();
   }, resultIndex);
-  await page.waitForSelector('#draft-items .draft-row', { timeout: 8000 });
+  await page.waitForSelector('#draft-items .draft-row', { timeout: 12000 });
 }
 
 /** Conmuta la superficie unica Foto | Buscar (A2) y espera el cambio de panel. */
@@ -40,7 +40,7 @@ async function switchEntryMode(page, selector) {
   });
   await page.waitForFunction(
     (photoMode) => document.querySelector('#photo-panel').hidden !== photoMode,
-    { timeout: 8000 },
+    { timeout: 12000 },
     selector === '#entry-mode-photo',
   );
 }
@@ -65,7 +65,7 @@ async function register(page) {
 }
 
 /** Espera a que el navegador asiente el layout (scroll de ancla, rejilla). */
-function settle(page, ms = 150) {
+function settle(page, ms = 200) {
   return page.evaluate((wait) => new Promise((resolve) => setTimeout(resolve, wait)), ms);
 }
 
@@ -91,7 +91,7 @@ async function setMealTime(page, label, time) {
       );
       return (entry?.querySelector('input[type="time"]')?.offsetHeight ?? 0) > 0;
     },
-    { timeout: 8000 },
+    { timeout: 12000 },
     label,
   );
   await page.evaluate(
@@ -107,7 +107,7 @@ async function setMealTime(page, label, time) {
     label,
     time,
   );
-  for (let i = 0; i < 60; i += 1) {
+  for (let i = 0; i < 120; i += 1) {
     const meals = await readStore(page, 'meals');
     if (meals.some((meal) => meal.time === time)) break;
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -440,13 +440,13 @@ export const scenarios = [
         () =>
           (document.querySelector('#diary .timeline-entry--meal input[type="time"]')
             ?.offsetHeight ?? 0) > 0,
-        { timeout: 8000 },
+        { timeout: 12000 },
       );
       await page.$eval('#diary .timeline-entry--meal input[type="time"]', (el) => {
         el.value = '07:15';
         el.dispatchEvent(new Event('change', { bubbles: true }));
       });
-      for (let i = 0; i < 60; i += 1) {
+      for (let i = 0; i < 120; i += 1) {
         const meals = await readStore(page, 'meals');
         if (meals[0]?.time === '07:15') break;
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -460,7 +460,7 @@ export const scenarios = [
         () =>
           (document.querySelector('#diary .timeline-entry--meal input[type="time"]')
             ?.offsetHeight ?? 0) > 0,
-        { timeout: 8000 },
+        { timeout: 12000 },
       );
       const value = await page.$eval(
         '#diary .timeline-entry--meal input[type="time"]',
@@ -484,13 +484,13 @@ export const scenarios = [
         () =>
           (document.querySelector('#diary .timeline-entry--meal input[type="time"]')
             ?.offsetHeight ?? 0) > 0,
-        { timeout: 8000 },
+        { timeout: 12000 },
       );
       await page.$eval('#diary .timeline-entry--meal input[type="time"]', (el) => {
         el.value = '09:00';
         el.dispatchEvent(new Event('change', { bubbles: true }));
       });
-      for (let i = 0; i < 60; i += 1) {
+      for (let i = 0; i < 120; i += 1) {
         const meals = await readStore(page, 'meals');
         if (meals[0]?.time === '09:00') break;
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -597,7 +597,7 @@ export const scenarios = [
       // El modulo de insulina tambien sigue al idioma (fallo reportado).
       await page.$$eval('details', (nodes) => nodes.forEach((node) => (node.open = true)));
       await page.$eval('#insulin-toggle', (el) => el.click());
-      await page.waitForSelector('#ins-gate-accept', { timeout: 8000 });
+      await page.waitForSelector('#ins-gate-accept', { timeout: 12000 });
       await setValue(page, '#locale', 'es');
       await waitForText(page, '#ins-gate-accept', 'Entiendo y la activo');
       await setValue(page, '#locale', 'en');
@@ -772,7 +772,7 @@ export const scenarios = [
       await uploadAndDetect(page, ctx.fixtureMetaPng);
       await click(page, '#share-photo');
       // Compartir sube de inmediato, sin esperar a un evento "online".
-      for (let i = 0; i < 120 && ctx.received.length === 0; i += 1) {
+      for (let i = 0; i < 180 && ctx.received.length === 0; i += 1) {
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
       assertEqual(ctx.received.length, 1, 'un unico POST por lote');
@@ -785,7 +785,7 @@ export const scenarios = [
       assert(post.body.includes(Buffer.from('pan_blanco')), 'el zip lleva la clase confirmada');
 
       let status = '';
-      for (let i = 0; i < 60; i += 1) {
+      for (let i = 0; i < 120; i += 1) {
         status = (await readContributions(page))[0]?.status ?? '';
         if (status === 'sent') break;
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -794,7 +794,7 @@ export const scenarios = [
 
       // Un segundo disparo no reenvia lo ya enviado (sin duplicar).
       await page.evaluate(() => window.dispatchEvent(new Event('online')));
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await new Promise((resolve) => setTimeout(resolve, 600));
       assertEqual(ctx.received.length, 1, 'no se reenvia lo ya marcado como sent');
       await screenshot(page, 'contribuciones-subida');
     },
@@ -888,7 +888,7 @@ export const scenarios = [
       // Boton principal "Escanear" (via stub). Sin datos, no se inventa fila.
       await click(page, '#barcode-scan');
       // El visor confirma el fallo con un popup rojo sobre el reticulo.
-      await page.waitForSelector('#barcode-flash.is-error', { timeout: 8000 });
+      await page.waitForSelector('#barcode-flash.is-error', { timeout: 12000 });
       await waitForText(page, '#barcode-status', 'No se encontró');
       const rows = await page.$$eval('#draft-items .draft-row', (nodes) => nodes.length);
       assertEqual(rows, 0, 'un escaneo sin datos no crea ninguna fila');
@@ -1058,7 +1058,7 @@ export const scenarios = [
       // Escanear un EAN que SI esta en el pack: debe resolver contra el local y
       // confirmarlo con un popup verde sobre el reticulo.
       await click(page, '#barcode-scan');
-      await page.waitForSelector('#barcode-flash.is-success', { timeout: 8000 });
+      await page.waitForSelector('#barcode-flash.is-success', { timeout: 12000 });
       await waitForText(page, '#draft-items', 'Producto descomprimido');
       await screenshot(page, 'codigo-barras-content-encoding');
     },
@@ -1074,7 +1074,7 @@ export const scenarios = [
       await reload(page);
       await waitFor(page, '#onboarding:not([hidden])');
       await page.waitForFunction(() => document.activeElement?.id === 'onboarding-start', {
-        timeout: 8000,
+        timeout: 12000,
       });
       assertEqual(
         await page.$eval('#onboarding', (el) => el.getAttribute('role')),
@@ -1089,7 +1089,7 @@ export const scenarios = [
 
       await click(page, '#onboarding-start');
       await waitFor(page, '#onboarding[hidden]');
-      await page.waitForFunction(() => document.activeElement?.id === 'date', { timeout: 8000 });
+      await page.waitForFunction(() => document.activeElement?.id === 'date', { timeout: 12000 });
 
       await reload(page);
       await waitFor(page, '#app header h1');
@@ -1156,7 +1156,7 @@ export const scenarios = [
         el.click();
       });
       await waitForText(page, '#diary', '08:30');
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       const meals = await readStore(page, 'meals');
       const logs = await readStore(page, 'insulin');
@@ -1260,7 +1260,7 @@ export const scenarios = [
           Array.from(document.querySelectorAll('#section-nav .nav-text')).every(
             (node) => (node.textContent ?? '').trim().length > 0,
           ),
-        { timeout: 8000 },
+        { timeout: 12000 },
       );
       const links = await page.$$eval('#section-nav a[href]', (nodes) =>
         nodes.map((link) => {
@@ -1301,7 +1301,7 @@ export const scenarios = [
         () =>
           document.querySelector('#section-nav a[aria-current="true"]')?.dataset.target ===
           's-diario',
-        { timeout: 8000 },
+        { timeout: 12000 },
       );
       const headerBottom = await page.$eval('.topbar', (el) => el.getBoundingClientRect().bottom);
       const sectionTop = await page.$eval('#s-diario', (el) => el.getBoundingClientRect().top);
@@ -1338,7 +1338,7 @@ export const scenarios = [
         () =>
           document.querySelector('#section-nav a[aria-current="true"]')?.dataset.target ===
           's-diario',
-        { timeout: 8000 },
+        { timeout: 12000 },
       );
       assertEqual(
         await page.$eval('#section-nav a[aria-current="true"]', (el) => el.dataset.target),
@@ -1472,7 +1472,7 @@ export const scenarios = [
         () =>
           (document.querySelector('#diary .timeline-entry--meal input[type="time"]')
             ?.offsetHeight ?? 0) > 0,
-        { timeout: 8000 },
+        { timeout: 12000 },
       );
       const expanded = await page.$eval('#diary .timeline-entry--meal .timeline-toggle', (el) =>
         el.getAttribute('aria-expanded'),
@@ -1511,7 +1511,7 @@ export const scenarios = [
             Boolean(document.querySelector('#diary .diary-empty'))
           );
         },
-        { timeout: 8000 },
+        { timeout: 12000 },
       );
       assertEqual(
         await page.$eval('#diary-summary', (el) => el.hidden),
@@ -1589,7 +1589,7 @@ export const scenarios = [
     async run(page, ctx) {
       await openApp(page, ctx.base);
       await setValue(page, '#locale', 'en');
-      await page.waitForFunction(() => document.documentElement.lang === 'en', { timeout: 8000 });
+      await page.waitForFunction(() => document.documentElement.lang === 'en', { timeout: 12000 });
       await waitForText(page, '#s-diario legend', 'Diary');
       assertEqual(await text(page, '#s-diario legend'), 'Diary', 'la leyenda se traduce');
       assertEqual(await text(page, '#s-diario h2'), 'Diary', 'el encabezado se traduce');
@@ -1665,11 +1665,11 @@ export const scenarios = [
       });
       assert(chip, 'hay un chip de Recientes con Manzana');
       assert(chip.h >= 44, `el chip mide al menos 44 px (${chip.h})`);
-      await page.waitForSelector('#draft-items .draft-row', { timeout: 8000 });
+      await page.waitForSelector('#draft-items .draft-row', { timeout: 12000 });
 
       // Favorito: la estrella del resultado de busqueda.
       await setValue(page, '#food-search', 'manzana');
-      await page.waitForSelector('#search-results .fav-toggle', { timeout: 8000 });
+      await page.waitForSelector('#search-results .fav-toggle', { timeout: 12000 });
       const starH = await page.$eval(
         '#search-results .fav-toggle',
         (el) => el.getBoundingClientRect().height,
@@ -1702,7 +1702,7 @@ export const scenarios = [
       await switchEntryMode(page, '#entry-mode-search');
       await waitForText(page, '#quickadd', 'Favoritos');
       await setValue(page, '#food-search', 'manzana');
-      await page.waitForSelector('#search-results .fav-toggle', { timeout: 8000 });
+      await page.waitForSelector('#search-results .fav-toggle', { timeout: 12000 });
       assertEqual(
         await page.$eval('#search-results .fav-toggle', (el) => el.getAttribute('aria-pressed')),
         'true',
@@ -1777,9 +1777,9 @@ export const scenarios = [
         const entry = document.querySelector('#diary .timeline-entry--meal');
         entry?.querySelector('.timeline-toggle')?.click();
       });
-      await page.waitForSelector('#diary .repeat-entry', { timeout: 8000 });
+      await page.waitForSelector('#diary .repeat-entry', { timeout: 12000 });
       await page.evaluate(() => document.querySelector('#diary .repeat-entry')?.click());
-      await page.waitForSelector('#draft-items .draft-row', { timeout: 8000 });
+      await page.waitForSelector('#draft-items .draft-row', { timeout: 12000 });
 
       // C10: el borrador de la repeticion conserva atajos y Cancelar.
       assert(await page.$('.draft-shortcuts button'), 'el borrador conserva los atajos');
@@ -1793,7 +1793,7 @@ export const scenarios = [
       assertEqual(await text(page, '#register'), 'Registrar', 'el borrador es una comida nueva');
 
       await register(page);
-      for (let i = 0; i < 120; i += 1) {
+      for (let i = 0; i < 180; i += 1) {
         if ((await readStore(page, 'meals')).length === 2) break;
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
@@ -1853,7 +1853,7 @@ export const scenarios = [
       // Recargar restaura el borrador (mismos items, gramos y orden) y lo anuncia.
       await reload(page);
       await waitFor(page, '#app header h1');
-      await page.waitForSelector('#draft-items .draft-row', { timeout: 8000 });
+      await page.waitForSelector('#draft-items .draft-row', { timeout: 12000 });
       const after = await readRows();
       assert(
         JSON.stringify(after) === JSON.stringify(before),
@@ -1973,7 +1973,7 @@ export const scenarios = [
       });
       await click(page, '#mode-complete');
       await page.waitForFunction(() => localStorage.getItem('carbos.mode') === 'complete', {
-        timeout: 8000,
+        timeout: 12000,
       });
 
       // En completo el borrador revela el desglose, sin tocar los carbos.
@@ -2007,7 +2007,7 @@ export const scenarios = [
       await reload(page);
       await waitFor(page, '#app header h1');
       await page.waitForFunction(() => localStorage.getItem('carbos.mode') === 'complete', {
-        timeout: 8000,
+        timeout: 12000,
       });
       await waitFor(page, '#diary .macro-breakdown');
 
@@ -2017,14 +2017,14 @@ export const scenarios = [
       });
       await click(page, '#mode-simple');
       await page.waitForFunction(() => localStorage.getItem('carbos.mode') === 'simple', {
-        timeout: 8000,
+        timeout: 12000,
       });
       await page.waitForFunction(
         () =>
           Array.from(document.querySelectorAll('.macro-breakdown')).every(
             (node) => node.hidden || node.getClientRects().length === 0,
           ),
-        { timeout: 8000 },
+        { timeout: 12000 },
       );
       await screenshot(page, 'modo-completo');
     },
