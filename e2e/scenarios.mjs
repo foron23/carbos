@@ -21,7 +21,7 @@ import {
   waitForText,
 } from './helpers.mjs';
 
-async function openApp(page, base) {
+export async function openApp(page, base) {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
   await unregisterServiceWorkers(page);
   await clearDatabase(page);
@@ -1911,6 +1911,61 @@ export const scenarios = [
         'un borrador vacio no se restaura',
       );
       await screenshot(page, 'borrador-persistente');
+    },
+  },
+  {
+    name: 'explora el catalogo por categoria (F3/D64)',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await switchEntryMode(page, '#entry-mode-search');
+      // Sin texto, se ofrecen las categorias para explorar (F3c).
+      await waitFor(page, '#explore .explore-chip');
+      const chips = await page.$$eval('#explore .explore-chip', (els) =>
+        els.map((el) => el.textContent),
+      );
+      assert(chips.includes('Frutas'), 'hay chip de Frutas');
+      const chipH = await page.$eval(
+        '#explore .explore-chip',
+        (el) => el.getBoundingClientRect().height,
+      );
+      assert(chipH >= 44, `el chip mide al menos 44 px (${chipH})`);
+
+      // Pulsar una categoria lista solo sus alimentos y la marca activa (F3b/F3e).
+      await page.evaluate(() => {
+        const chip = Array.from(document.querySelectorAll('#explore .explore-chip')).find(
+          (el) => el.textContent === 'Frutas',
+        );
+        chip?.click();
+      });
+      await page.waitForSelector('#search-results .result');
+      const results = await page.$$eval('#search-results .result', (els) =>
+        els.map((el) => el.textContent ?? ''),
+      );
+      assert(
+        results.some((t) => t.includes('Manzana')),
+        'Frutas lista la manzana',
+      );
+      assert(!results.some((t) => t.includes('Pechuga')), 'no lista alimentos de otra categoria');
+      assertEqual(
+        await page.$eval('#explore .explore-chip[aria-pressed="true"]', (el) => el.textContent),
+        'Frutas',
+        'el chip activo queda marcado',
+      );
+
+      // Un toque anade al borrador con la porcion por defecto (F3b).
+      await page.evaluate(() => {
+        const button = Array.from(document.querySelectorAll('#search-results .result')).find((el) =>
+          (el.textContent ?? '').includes('Manzana'),
+        );
+        button?.click();
+      });
+      await page.waitForSelector('#draft-items .draft-row');
+      assert((await text(page, '#draft-items')).includes('Manzana'), 'anade desde la categoria');
+
+      // Al teclear, las categorias se ocultan (busqueda normal).
+      await setValue(page, '#food-search', 'manzana');
+      await page.waitForFunction(() => document.querySelector('#explore').hidden);
+      await screenshot(page, 'explorar-categoria');
     },
   },
 ];

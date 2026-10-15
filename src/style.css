@@ -701,6 +701,34 @@ button.result {
   font-size: 0.9rem;
 }
 
+/* Explorar el catalogo por categorias (D64). */
+.explore-title {
+  margin: 0.55rem 0 0.15rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.explore {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.explore-chip {
+  min-height: 2.75rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.9rem;
+  border-radius: 999px;
+}
+
+.explore-chip[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .draft-row {
   display: flex;
   flex-wrap: wrap;

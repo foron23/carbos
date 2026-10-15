@@ -1,27 +1,9 @@
 // Escenarios del registro diario: editar y quitar una comida ya registrada.
 // Van en su propio fichero para no tocar scenarios.mjs (spec 17 en curso).
-import {
-  assertEqual,
-  clearDatabase,
-  click,
-  readStore,
-  reload,
-  setValue,
-  unregisterServiceWorkers,
-  waitFor,
-} from './helpers.mjs';
-
-async function openApp(page, base) {
-  await page.goto(base, { waitUntil: 'domcontentloaded' });
-  await unregisterServiceWorkers(page);
-  await clearDatabase(page);
-  await page.evaluate(() => {
-    localStorage.setItem('carbos.locale', 'es');
-    localStorage.setItem('carbos.onboarded', '1');
-  });
-  await reload(page);
-  await waitFor(page, '#app header h1');
-}
+import { assertEqual, click, readStore, setValue } from './helpers.mjs';
+// `openApp` vive en scenarios.mjs: aisla el estado (incluido el borrador
+// persistente, D62) entre escenarios; aqui se reutiliza para no duplicarlo.
+import { openApp } from './scenarios.mjs';
 
 /** Anade el primer resultado del catalogo al borrador (modo Buscar). */
 async function addFood(page, query) {

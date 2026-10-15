@@ -32,8 +32,8 @@ import {
   weekBreakdown,
 } from './core';
 import type { FoodItem, InsulinKind, InsulinLog, Meal, PortionSize, Vault, WeekDay } from './core';
-import { CATALOG, searchFoods } from './catalog';
-import type { Food } from './catalog';
+import { CATALOG, CATEGORIES, foodsByCategory, searchFoods } from './catalog';
+import type { Category, Food } from './catalog';
 import { detectLocale, isLocale, isStringKey, storeLocale, t } from './i18n';
 import type { Locale, StringKey } from './i18n';
 import { prepareImage } from './capture/image';
@@ -439,6 +439,8 @@ app.innerHTML = `
       <div class="row">
         <input id="food-search" type="search" autocomplete="off" />
       </div>
+      <p id="explore-title" class="explore-title muted" data-i18n="search.explore" hidden></p>
+      <div id="explore" class="explore" role="group" aria-labelledby="explore-title" hidden></div>
       <ul id="search-results" class="results"></ul>
     </div>
     <div id="barcode-panel" class="entry-panel" hidden></div>
@@ -637,21 +639,14 @@ function favoriteStar(food: Food): HTMLButtonElement {
   return star;
 }
 
-function renderSearch(): void {
-  const query = byId<HTMLInputElement>('food-search').value;
+/** Categoria activa en "explorar" (D64); `null` = sin filtro. */
+let activeCategory: Category | null = null;
+
+/** Resultados clicables (busqueda o categoria): un toque anade al borrador. */
+function renderResultList(foods: readonly Food[]): void {
   const list = byId('search-results');
-  if (query.trim().length < 2) {
-    list.innerHTML = `<li class="muted">${tr('search.hint')}</li>`;
-    return;
-  }
-  // D63: a igualdad de relevancia, primero lo que la persona mas usa.
-  const results = searchFoods(query, 8, CATALOG, usageCounts(vault.meals));
-  if (results.length === 0) {
-    list.innerHTML = `<li class="muted" data-i18n="search.noResults">${tr('search.noResults')}</li>`;
-    return;
-  }
   list.innerHTML = '';
-  for (const food of results) {
+  for (const food of foods) {
     const item = document.createElement('li');
     item.className = 'result-row';
     const button = document.createElement('button');
@@ -662,10 +657,60 @@ function renderSearch(): void {
       addFoodToDraft(food);
       byId<HTMLInputElement>('food-search').value = '';
       list.innerHTML = '';
+      activeCategory = null;
+      renderExploreChips();
     });
     item.append(button, favoriteStar(food));
     list.appendChild(item);
   }
+}
+
+/** Chips de categoria (D64): visibles sin texto (explorar) o con una activa. */
+function renderExploreChips(): void {
+  const query = byId<HTMLInputElement>('food-search').value;
+  const show = query.trim().length < 2;
+  const title = byId('explore-title');
+  const host = byId('explore');
+  title.hidden = !show;
+  host.hidden = !show;
+  if (!show) return;
+  host.innerHTML = '';
+  for (const category of CATEGORIES) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'explore-chip';
+    button.textContent = tr(`category.${category}`);
+    button.setAttribute('aria-pressed', String(category === activeCategory));
+    button.addEventListener('click', () => {
+      activeCategory = activeCategory === category ? null : category;
+      byId<HTMLInputElement>('food-search').value = '';
+      renderSearch();
+    });
+    host.appendChild(button);
+  }
+}
+
+function renderSearch(): void {
+  const query = byId<HTMLInputElement>('food-search').value;
+  const list = byId('search-results');
+  const typing = query.trim().length >= 2;
+  if (typing) activeCategory = null;
+  renderExploreChips();
+  if (typing) {
+    // D63: a igualdad de relevancia, primero lo que la persona mas usa.
+    const results = searchFoods(query, 8, CATALOG, usageCounts(vault.meals));
+    if (results.length === 0) {
+      list.innerHTML = `<li class="muted" data-i18n="search.noResults">${tr('search.noResults')}</li>`;
+      return;
+    }
+    renderResultList(results);
+    return;
+  }
+  if (activeCategory) {
+    renderResultList(foodsByCategory(activeCategory));
+    return;
+  }
+  list.innerHTML = `<li class="muted">${tr('search.hint')}</li>`;
 }
 
 /** Un grupo de atajos (titulo + chips) del bloque de quick-add (D59). */

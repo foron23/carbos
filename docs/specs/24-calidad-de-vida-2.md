@@ -125,13 +125,13 @@ calmado (una fila de chips), sin red.
 
 ## Decisiones nuevas (D62-D64)
 
-| #   | Decision                                | Detalle                                                                                                                                                                            | Estado    |
-| --- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| D62 | **Borrador persistente**                | El borrador en curso se guarda en `localStorage` (`carbos.draft`, versionado y tolerante) y se restaura al abrir; se descarta al registrar/cancelar/vaciar. Sin foto, sin esquema. | propuesta |
-| D63 | **Busqueda priorizada por uso**         | Entre resultados de igual relevancia, primero los alimentos mas usados; la frecuencia se **deriva** del diario (patron D57), no se almacena. Relevancia manda.                     | propuesta |
-| D64 | **Explorar el catalogo por categorias** | Chips de categoria curada que listan alimentos sin exigir texto; con busqueda vacia se ofrece explorar. Catalogo generado intacto.                                                 | propuesta |
+| #   | Decision                                | Detalle                                                                                                                                                                            | Estado  |
+| --- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| D62 | **Borrador persistente**                | El borrador en curso se guarda en `localStorage` (`carbos.draft`, versionado y tolerante) y se restaura al abrir; se descarta al registrar/cancelar/vaciar. Sin foto, sin esquema. | cerrada |
+| D63 | **Busqueda priorizada por uso**         | Entre resultados de igual relevancia, primero los alimentos mas usados; la frecuencia se **deriva** del diario (patron D57), no se almacena. Relevancia manda.                     | cerrada |
+| D64 | **Explorar el catalogo por categorias** | Chips de categoria curada que listan alimentos sin exigir texto; con busqueda vacia se ofrece explorar. Catalogo generado intacto.                                                 | cerrada |
 
-Estas decisiones quedan **propuestas** hasta implementarse SPEC 24.
+Estas decisiones quedan **cerradas** con la implementacion de SPEC 24.
 
 ## Alcance
 
@@ -185,22 +185,22 @@ aserciones del auditor si aplican. Sin dependencias nuevas y sin cambios de esqu
 Claves nuevas en **es** y **en** (el tipo `StringKey` y la guarda de paridad lo
 imponen):
 
-| Clave                         | ES                   | EN                |
-| ----------------------------- | -------------------- | ----------------- |
-| `search.explore`              | Explorar             | Explore           |
-| `category.cereals`            | Cereales y pan       | Cereals & bread   |
-| `category.potatoes`           | Patatas y tuberculos | Potatoes & tubers |
-| `category.legumes`            | Legumbres            | Legumes           |
-| `category.vegetables`         | Verduras             | Vegetables        |
-| `category.fruits`             | Frutas               | Fruits            |
-| `category.dairy`              | Lacteos y postres    | Dairy & desserts  |
-| `category.protein`            | Proteinas            | Protein           |
-| `category.dishes`             | Platos cocinados     | Cooked dishes     |
-| `category.sweets`             | Dulces y reposteria  | Sweets & bakery   |
-| `category.nuts`               | Frutos secos         | Nuts              |
-| `category.sauces`             | Salsas y grasas      | Sauces & fats     |
-| `category.drinks`             | Bebidas              | Drinks            |
-| `search.draftRestored` (aria) | Borrador restaurado  | Draft restored    |
+| Clave                   | ES                   | EN                |
+| ----------------------- | -------------------- | ----------------- |
+| `search.explore`        | Explorar             | Explore           |
+| `category.cereals`      | Cereales y pan       | Cereals & bread   |
+| `category.potatoes`     | Patatas y tuberculos | Potatoes & tubers |
+| `category.legumes`      | Legumbres            | Legumes           |
+| `category.vegetables`   | Verduras             | Vegetables        |
+| `category.fruits`       | Frutas               | Fruits            |
+| `category.dairy`        | Lacteos y postres    | Dairy & desserts  |
+| `category.protein`      | Proteinas            | Protein           |
+| `category.dishes`       | Platos cocinados     | Cooked dishes     |
+| `category.sweets`       | Dulces y reposteria  | Sweets & bakery   |
+| `category.nuts`         | Frutos secos         | Nuts              |
+| `category.sauces`       | Salsas y grasas      | Sauces & fats     |
+| `category.drinks`       | Bebidas              | Drinks            |
+| `draft.restored` (aria) | Borrador restaurado  | Draft restored    |
 
 ## Criterios de aceptacion
 
