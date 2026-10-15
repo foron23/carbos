@@ -209,7 +209,16 @@ const CATEGORY_IDS: Record<Category, readonly string[]> = {
     'mermelada',
     'turron',
   ],
-  nuts: ['nueces', 'almendras', 'avellanas', 'cacahuetes'],
+  nuts: [
+    'nueces',
+    'almendras',
+    'avellanas',
+    'cacahuetes',
+    'anacardos',
+    'pistachos',
+    'pipas',
+    'castanas',
+  ],
   sauces: ['tomate_frito', 'mayonesa', 'ketchup', 'aceite_oliva', 'aceite_girasol'],
   drinks: ['zumo_naranja', 'zumo_manzana', 'zumo_pina', 'limonada', 'refresco_cola', 'cerveza'],
 };

@@ -1,7 +1,7 @@
-# Catalogo de alimentos (186 clases)
+# Catalogo de alimentos (190 clases)
 
 > [!abstract] TL;DR
-> Catalogo curado (**186 clases**) generado con `make catalog`
+> Catalogo curado (**190 clases**) generado con `make catalog`
 > (`tools/catalog/build_catalog.py`) desde **Ciqual 2020** y, para las ampliaciones, desde **USDA
 > FoodData Central (CC0)** y **recetas propias**. Esta es la **tabla por grupos** con las imagenes de
 > entrenamiento disponibles (`data/images`) por clase. **negrita = hueco de datos** (<8 imagenes).
@@ -163,7 +163,7 @@ ingredientes, cifra publicada como **rango**) para las ampliaciones de platos co
 | Galleta de chocolate | `galleta_chocolate` | 21   |     | Azucar         | `azucar`      | 8    |
 | Miel                 | `miel`              | 21   |     | Mermelada      | `mermelada`   | 21   |
 
-## J. Frutos secos (4) — hueco estructural
+## J. Frutos secos (8)
 
 | Clase      | id           | imgs  |
 | ---------- | ------------ | ----- |
@@ -171,6 +171,10 @@ ingredientes, cifra publicada como **rango**) para las ampliaciones de platos co
 | Almendras  | `almendras`  | 20    |
 | Avellanas  | `avellanas`  | **4** |
 | Cacahuetes | `cacahuetes` | 21    |
+| Anacardos  | `anacardos`  | 0     |
+| Pistachos  | `pistachos`  | 0     |
+| Pipas      | `pipas`      | 0     |
+| Castanas   | `castanas`   | 0     |
 
 ## K. Aceites, salsas y condimentos (6)
 
@@ -202,7 +206,7 @@ ingredientes, cifra publicada como **rango**) para las ampliaciones de platos co
 | -------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | **Pescados y mariscos** (solo 4) | merluza, bacalao, lubina, dorada, trucha, calamares, pulpo, mejillones, boquerones, anchoas, atun fresco |
 | **Bebidas** (solo 6)             | vino, cafe / cafe con leche, batidos, refrescos no-cola, bebidas vegetales                               |
-| **Frutos secos** (solo 4)        | pistachos, anacardos, pinones, castanas, pipas                                                           |
+| **Frutos secos** (8)             | faltan imagenes de anacardos, pistachos, pipas y castanas (ya en el catalogo, sin dataset)               |
 | **Cereales**                     | cuscus, palomitas, tortitas de arroz/maiz, cebada, bulgur                                                |
 | **Carnes**                       | cordero, conejo, morcilla, salchichas/fuet, costillas                                                    |
 | **Platos cocinados**             | kebab, gyozas, burrito, tacos, ramen                                                                     |
@@ -210,7 +214,7 @@ ingredientes, cifra publicada como **rango**) para las ampliaciones de platos co
 | **Lacteos**                      | bebidas vegetales (avena, soja, almendra), kefir, cuajada, queso azul                                    |
 | **Verduras**                     | rucula, rabano, endivia/escarola, canonigos, berza/grelos                                                |
 
-### 2. Huecos de datos (<8 imagenes, 58 de 186 clases)
+### 2. Huecos de datos (<8 imagenes, 58 de 190 clases)
 
 Criticos: `pasta_integral` (2), `fabada` (2), `mango` (3), `crema_verduras` (3),
 `arroz_basmati` / `coliflor` / `espinacas` / `tomate_cherry` / `jamon_serrano` / `chorizo` /

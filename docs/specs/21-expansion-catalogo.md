@@ -137,3 +137,21 @@ make data-review && make data-confirm
 # 3) re-destilado + bench
 make distill-clip && make candidate-manifest CAND_CLASSIFIER=... && make eval && make identify
 ```
+
+## Estado (2026-10-15): frutos secos ampliados
+
+Hueco estructural de la seccion J cerrado con 4 alimentos de **Ciqual directo** (sin `usda`/`own`):
+`anacardos` (15054), `pistachos` (15044), `pipas` (15011) y `castanas` (15024). El catalogo pasa de
+**186 a 190** alimentos; `CATALOG_VERSION` **no** cambia (2), porque no se anade ningun campo al
+esquema (solo contenido). Se anaden alias en `src/catalog/classmap.ts` (`cashew`, `pistachio`,
+`sunflower_seed`, `chestnut`) para modelos publicos.
+
+**El modelo NO reconoce todavia estas clases por foto.** La lista de clases del clasificador se deriva
+del catalogo (`training/distill_clip.py`, `class_order = ids + __unknown__`), pero el clasificador
+publicado es anterior (155 clases). Se verifico el pipeline con `--smoke` sobre el catalogo ampliado:
+emite **191 clases** (190 + `__unknown__`), incluida `anacardos`. **Nada se ha publicado**: para que la
+foto las reconozca hace falta (a) imagenes revisadas por clase nueva, (b) `make distill-clip`,
+(c) `make weights-manifest` y **publicar los pesos** (viven fuera del repo, D18/D24), (d) apuntar
+`public/model-manifest.json` a la version nueva. Hasta entonces, los 4 frutos secos se encuentran por
+**busqueda, manual y codigo de barras**, no por foto. Obs.: 21 imagenes por clase ya descargadas en
+`data/images/` (Wikimedia; gitignored), pendientes de revision/confirmacion.

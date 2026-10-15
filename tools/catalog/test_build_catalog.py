@@ -409,9 +409,9 @@ class BuildCatalogTest(unittest.TestCase):
         # Integracion sobre el catalog.ts generado y commiteado (no requiere el XML).
         catalog = (REPO / "src/catalog/catalog.ts").read_text(encoding="utf-8")
         entries = re.findall(r"\n    \{", catalog)
-        self.assertEqual(len(entries), 186)
-        self.assertEqual(catalog.count("proteinPer100g:"), 186)
-        self.assertEqual(catalog.count("fatPer100g:"), 186)
+        self.assertEqual(len(entries), 190)
+        self.assertEqual(catalog.count("proteinPer100g:"), 190)
+        self.assertEqual(catalog.count("fatPer100g:"), 190)
         self.assertGreater(catalog.count("kcalDerived: true"), 0)
         types = (REPO / "src/catalog/types.ts").read_text(encoding="utf-8")
         self.assertIn("CATALOG_VERSION = 2", types)
