@@ -49,6 +49,13 @@ const productLineSchema = z.object({
   brand: z.string().min(1).optional(),
   // Opcional: los packs de solo identificacion no traen carbohidratos.
   carbsPer100g: z.number().nonnegative().optional(),
+  // Macros opcionales; `kcalDerived` marca la kcal calculada con 4/4/9.
+  proteinPer100g: z.number().nonnegative().optional(),
+  fatPer100g: z.number().nonnegative().optional(),
+  kcalPer100g: z.number().nonnegative().optional(),
+  kcalDerived: z.boolean().optional(),
+  fiberPer100g: z.number().nonnegative().optional(),
+  sugarsPer100g: z.number().nonnegative().optional(),
   defaultPortionGrams: z.number().positive().optional(),
   source: z.string().min(1).optional(),
   savedAt: z.number().optional(),
@@ -73,6 +80,12 @@ function toProduct(line: unknown): ScannedProduct {
     savedAt: raw.savedAt ?? Date.now(),
   };
   if (raw.carbsPer100g !== undefined) product.carbsPer100g = raw.carbsPer100g;
+  if (raw.proteinPer100g !== undefined) product.proteinPer100g = raw.proteinPer100g;
+  if (raw.fatPer100g !== undefined) product.fatPer100g = raw.fatPer100g;
+  if (raw.kcalPer100g !== undefined) product.kcalPer100g = raw.kcalPer100g;
+  if (raw.kcalDerived !== undefined) product.kcalDerived = raw.kcalDerived;
+  if (raw.fiberPer100g !== undefined) product.fiberPer100g = raw.fiberPer100g;
+  if (raw.sugarsPer100g !== undefined) product.sugarsPer100g = raw.sugarsPer100g;
   if (raw.brand !== undefined) product.brand = raw.brand;
   if (raw.defaultPortionGrams !== undefined) product.defaultPortionGrams = raw.defaultPortionGrams;
   return product;

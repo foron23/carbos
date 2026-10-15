@@ -30,6 +30,12 @@ export interface BarcodeAdd {
   carbsPer100g: number;
   barcode: string;
   brand?: string | undefined;
+  proteinPer100g?: number | undefined;
+  fatPer100g?: number | undefined;
+  kcalPer100g?: number | undefined;
+  kcalDerived?: boolean | undefined;
+  fiberPer100g?: number | undefined;
+  sugarsPer100g?: number | undefined;
 }
 
 export interface BarcodeDeps {
@@ -122,6 +128,13 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
         barcode: product.barcode,
       };
       if (product.brand !== undefined) add.brand = product.brand;
+      // Macros opcionales: se copian solo los definidos en el producto.
+      if (product.proteinPer100g !== undefined) add.proteinPer100g = product.proteinPer100g;
+      if (product.fatPer100g !== undefined) add.fatPer100g = product.fatPer100g;
+      if (product.kcalPer100g !== undefined) add.kcalPer100g = product.kcalPer100g;
+      if (product.kcalDerived !== undefined) add.kcalDerived = product.kcalDerived;
+      if (product.fiberPer100g !== undefined) add.fiberPer100g = product.fiberPer100g;
+      if (product.sugarsPer100g !== undefined) add.sugarsPer100g = product.sugarsPer100g;
       deps.onAdd(add);
       // Sin carbohidratos conocidos: identificado, pero el usuario los ajusta.
       setStatus(hasCarbs ? 'barcode.ready' : 'barcode.identified');

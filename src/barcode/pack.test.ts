@@ -211,6 +211,36 @@ describe('importPack', () => {
     await expect(importPack({ manifest, blob: new Blob([bytes]) })).rejects.toThrow();
   });
 
+  it('round-trip de los macros opcionales y kcalDerived', async () => {
+    const withMacros = [
+      {
+        barcode: '4006381333931',
+        name: 'Crema',
+        carbsPer100g: 10,
+        proteinPer100g: 5,
+        fatPer100g: 2,
+        kcalPer100g: 78,
+        kcalDerived: true,
+        fiberPer100g: 6,
+        sugarsPer100g: 4,
+      },
+    ];
+    const bytes = await gzipText(jsonl(withMacros));
+    const manifest = await manifestFor(bytes, withMacros.length);
+
+    expect(await importPack({ manifest, blob: new Blob([bytes]) })).toEqual({ imported: 1 });
+    const inserted = mocks.putProducts.mock.calls[0]?.[0] ?? [];
+    expect(inserted[0]).toMatchObject({
+      barcode: '4006381333931',
+      proteinPer100g: 5,
+      fatPer100g: 2,
+      kcalPer100g: 78,
+      kcalDerived: true,
+      fiberPer100g: 6,
+      sugarsPer100g: 4,
+    });
+  });
+
   it('acepta un producto sin carbohidratos (pack resto)', async () => {
     const rest = [{ barcode: '4006381333931', name: 'Solo nombre', brand: 'Marca' }];
     const bytes = await gzipText(jsonl(rest));

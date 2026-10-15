@@ -11,6 +11,14 @@ export interface ScannedProduct {
   brand?: string;
   /** Carbohidratos por 100 g; ausente en los packs de solo identificacion. */
   carbsPer100g?: number;
+  /** Macros por 100 g; ausentes si la fuente no los trae. */
+  proteinPer100g?: number;
+  fatPer100g?: number;
+  kcalPer100g?: number;
+  /** `true` si la kcal se derivo con 4p+4c+9f al faltar en la fuente. */
+  kcalDerived?: boolean;
+  fiberPer100g?: number;
+  sugarsPer100g?: number;
   defaultPortionGrams?: number;
   source: string;
   savedAt: number;

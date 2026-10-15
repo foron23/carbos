@@ -21,6 +21,11 @@ export const offProductSchema = z.object({
   nutriments: z
     .object({
       carbohydrates_100g: numberLikeSchema.nullish(),
+      proteins_100g: numberLikeSchema.nullish(),
+      fat_100g: numberLikeSchema.nullish(),
+      'energy-kcal_100g': numberLikeSchema.nullish(),
+      fiber_100g: numberLikeSchema.nullish(),
+      sugars_100g: numberLikeSchema.nullish(),
     })
     .nullish(),
 });

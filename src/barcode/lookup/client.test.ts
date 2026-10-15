@@ -6,7 +6,9 @@ const EAN = '4006381333931';
 const EXPECTED_URL =
   'https://world.openfoodfacts.org/api/v3/product/4006381333931.json' +
   '?fields=code,product_name,product_name_es,product_name_en,brands,serving_quantity,' +
-  'nutrition_data_per,nutriments.carbohydrates_100g';
+  'nutrition_data_per,nutriments.carbohydrates_100g,nutriments.proteins_100g,' +
+  'nutriments.fat_100g,nutriments.energy-kcal_100g,nutriments.fiber_100g,' +
+  'nutriments.sugars_100g';
 
 function successBody(): unknown {
   return {
@@ -103,6 +105,79 @@ describe('lookupOnline', () => {
       },
     });
     expect(await lookupOnline(EAN, { fetcher })).toBeNull();
+  });
+
+  it('mapea los macros de nutriments y usa energy-kcal_100g como kcal', async () => {
+    const fetcher = fetcherFor({
+      status: 'success',
+      product: {
+        product_name_es: 'Crema',
+        nutrition_data_per: '100g',
+        nutriments: {
+          carbohydrates_100g: 12.5,
+          proteins_100g: '25',
+          fat_100g: 50,
+          'energy-kcal_100g': 600,
+          fiber_100g: 6,
+          sugars_100g: 4,
+        },
+      },
+    });
+
+    const result = await lookupOnline(EAN, { fetcher });
+
+    expect(result).toMatchObject({
+      proteinPer100g: 25,
+      fatPer100g: 50,
+      kcalPer100g: 600,
+      fiberPer100g: 6,
+      sugarsPer100g: 4,
+    });
+    expect(result?.kcalDerived).toBeUndefined();
+  });
+
+  it('deriva kcal 4p+4c+9f con kcalDerived si falta energy-kcal_100g', async () => {
+    const fetcher = fetcherFor({
+      status: 'success',
+      product: {
+        product_name_es: 'Crema',
+        nutrition_data_per: '100g',
+        nutriments: {
+          carbohydrates_100g: 10,
+          proteins_100g: 5,
+          fat_100g: 2,
+        },
+      },
+    });
+
+    const result = await lookupOnline(EAN, { fetcher });
+
+    // 4*10 + 4*5 + 9*2 = 78
+    expect(result?.kcalPer100g).toBe(78);
+    expect(result?.kcalDerived).toBe(true);
+  });
+
+  it('descarta macros negativos o no finitos', async () => {
+    const fetcher = fetcherFor({
+      status: 'success',
+      product: {
+        product_name_es: 'Crema',
+        nutrition_data_per: '100g',
+        nutriments: {
+          carbohydrates_100g: 12.5,
+          proteins_100g: -3,
+          fat_100g: 'no-numero',
+        },
+      },
+    });
+
+    const result = await lookupOnline(EAN, { fetcher });
+
+    expect(result?.proteinPer100g).toBeUndefined();
+    expect(result?.fatPer100g).toBeUndefined();
+    // Sin proteina ni grasa validas no hay kcal derivable.
+    expect(result?.kcalPer100g).toBeUndefined();
+    expect(result?.kcalDerived).toBeUndefined();
   });
 
   it('devuelve null si la respuesta no es JSON valido', async () => {

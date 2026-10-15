@@ -23,6 +23,11 @@ const FIELDS = [
   'serving_quantity',
   'nutrition_data_per',
   'nutriments.carbohydrates_100g',
+  'nutriments.proteins_100g',
+  'nutriments.fat_100g',
+  'nutriments.energy-kcal_100g',
+  'nutriments.fiber_100g',
+  'nutriments.sugars_100g',
 ].join(',');
 
 function urlFor(ean: string): string {
@@ -38,6 +43,12 @@ function toNumber(value: number | string | null | undefined): number | null {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
+}
+
+/** Macro opcional: solo se conserva si es finito y no negativo. */
+function toMacro(value: number | string | null | undefined): number | undefined {
+  const parsed = toNumber(value);
+  return parsed !== null && parsed >= 0 ? parsed : undefined;
 }
 
 /** Nombre por locale; si falta uno se cae al otro o a `product_name` como cadena. */
@@ -73,6 +84,22 @@ function mapProduct(ean: string, response: OffResponse): ScannedProduct | null {
   };
   const brand = product.brands?.split(',')[0]?.trim();
   if (brand) result.brand = brand;
+  const protein = toMacro(product.nutriments?.proteins_100g);
+  const fat = toMacro(product.nutriments?.fat_100g);
+  const fiber = toMacro(product.nutriments?.fiber_100g);
+  const sugars = toMacro(product.nutriments?.sugars_100g);
+  if (protein !== undefined) result.proteinPer100g = protein;
+  if (fat !== undefined) result.fatPer100g = fat;
+  if (fiber !== undefined) result.fiberPer100g = fiber;
+  if (sugars !== undefined) result.sugarsPer100g = sugars;
+  // kcal de la fuente; si falta pero hay proteina+grasa+carbos, se deriva 4/4/9.
+  const kcal = toMacro(product.nutriments?.['energy-kcal_100g']);
+  if (kcal !== undefined) {
+    result.kcalPer100g = kcal;
+  } else if (protein !== undefined && fat !== undefined) {
+    result.kcalPer100g = 4 * carbs + 4 * protein + 9 * fat;
+    result.kcalDerived = true;
+  }
   return result;
 }
 
