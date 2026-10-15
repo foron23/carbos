@@ -3,6 +3,7 @@ import {
   applyAlternative,
   carbsByMoment,
   dayCarbs,
+  dayMacros,
   dayTimeline,
   DRAFT_KEY,
   deleteGroup,
@@ -12,9 +13,12 @@ import {
   fromJson,
   groupCarbs,
   groupMeals,
+  hasMacros,
   itemCarbs,
+  itemMacros,
   loadVault,
   mealCarbs,
+  mealMacros,
   mealsForDate,
   mergeDetections,
   MOMENTS,
@@ -40,6 +44,7 @@ import type {
   FoodItem,
   InsulinKind,
   InsulinLog,
+  Macros,
   Meal,
   MealGroup,
   PersistedDraft,
@@ -188,6 +193,34 @@ function writeDailyTarget(value: number): void {
     /* almacenamiento no disponible */
   }
 }
+
+/**
+ * Modo de pantalla (SPEC 26 / D67): ajuste global de UI persistido en
+ * `localStorage`. `simple` es exactamente lo de hoy (solo carbohidratos);
+ * `complete` revela el desglose (proteinas, grasas, kcal, fibra, azucares) sin
+ * tocar la aritmetica de carbos ni el camino de la dosis.
+ */
+type ScreenMode = 'simple' | 'complete';
+
+const MODE_KEY = 'carbos.mode';
+
+function readMode(): ScreenMode {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'complete' ? 'complete' : 'simple';
+  } catch {
+    return 'simple';
+  }
+}
+
+function writeMode(mode: ScreenMode): void {
+  try {
+    localStorage.setItem(MODE_KEY, mode);
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
+let screenMode: ScreenMode = readMode();
 
 function readViewDate(): string | null {
   try {
@@ -509,6 +542,7 @@ app.innerHTML = `
     <h3 data-i18n="draft.items"></h3>
     <ul id="draft-items" class="draft"></ul>
     <p><span data-i18n="label.total"></span>: <output id="draft-total" aria-live="polite"></output></p>
+    <div id="draft-macros-host" class="draft-macros-host"></div>
     <div class="row">
       <button id="register" type="button" class="primary" data-i18n="button.register"></button>
       <button id="register-cancel" type="button" data-i18n="button.cancel" hidden></button>
@@ -525,6 +559,8 @@ app.innerHTML = `
       <p class="summary-row summary-target" id="summary-target-row" hidden><span data-i18n="summary.target"></span><output id="summary-target" class="summary-count"></output></p>
       <p class="summary-row"><output id="summary-meals" class="summary-count"></output><span data-i18n="summary.meals"></span></p>
       <p class="summary-row"><output id="summary-insulin" class="summary-count"></output><span data-i18n="summary.insulin"></span></p>
+      <p class="summary-row" id="summary-macros-row" hidden><span data-i18n="macro.breakdown"></span><span id="summary-macros" class="macro-breakdown"></span></p>
+      <p id="summary-macro-note" class="muted macro-note" data-i18n="macro.estimateNote" hidden></p>
       <ul class="moment-breakdown">
         <li class="moment"><span data-i18n="moment.morning"></span><output class="moment-carbs" data-moment="morning"></output></li>
         <li class="moment"><span data-i18n="moment.afternoon"></span><output class="moment-carbs" data-moment="afternoon"></output></li>
@@ -581,6 +617,18 @@ app.innerHTML = `
   <details class="card" id="settings">
     <summary data-i18n="section.settings"></summary>
     <h2 class="sr-only" data-i18n="section.settings"></h2>
+    <p class="mode-title" id="mode-label" data-i18n="settings.modeLabel"></p>
+    <div class="segmented" role="radiogroup" aria-labelledby="mode-label">
+      <label class="seg">
+        <input type="radio" name="screen-mode" id="mode-simple" value="simple" />
+        <span data-i18n="settings.modeSimple"></span>
+      </label>
+      <label class="seg">
+        <input type="radio" name="screen-mode" id="mode-complete" value="complete" />
+        <span data-i18n="settings.modeComplete"></span>
+      </label>
+    </div>
+    <p id="mode-hint" class="muted" aria-live="polite"></p>
     <label class="field daily-target-field"><span data-i18n="settings.dailyTarget"></span><input id="daily-target" type="number" min="0" step="1" inputmode="numeric" /></label>
     <p><button id="persist" type="button" data-i18n="button.persist"></button></p>
     <p id="persist-status" class="muted" aria-live="polite"></p>
@@ -647,6 +695,7 @@ function addFoodToDraft(food: Food): void {
     grams: food.defaultPortionGrams,
     carbsPer100g: food.carbsPer100g,
     classId: food.id,
+    ...macroFields(food),
   });
   renderDraft();
 }
@@ -667,6 +716,7 @@ function pushBarcodeItem(product: BarcodeAdd): void {
     carbsPer100g: product.carbsPer100g,
     barcode: product.barcode,
     brand: product.brand,
+    ...macroFields(product),
   });
   draft.origin = 'manual';
   clearDetections();
@@ -933,11 +983,17 @@ function renderDraft(): void {
       });
       remove.className = 'remove';
       row.appendChild(remove);
+
+      if (screenMode === 'complete') {
+        const breakdown = macroBreakdown(macroItem(item));
+        if (breakdown) row.appendChild(breakdown);
+      }
       list.appendChild(row);
     });
   }
   const total = draft.items.reduce((sum, item) => sum + itemCarbs(item), 0);
   byId('draft-total').textContent = `${roundCarbs(total)} ${tr('unit.grams')}`;
+  renderDraftMacros();
   const editing = editingMeal !== null;
   byId<HTMLButtonElement>('register').textContent = tr(editing ? 'button.save' : 'button.register');
   byId<HTMLButtonElement>('register-cancel').hidden = !(editing || repeatPending);
@@ -945,6 +1001,24 @@ function renderDraft(): void {
   renderOverlay();
   // D62: toda mutacion del borrador pasa por aqui; se persiste con debounce.
   persistDraft();
+}
+
+function renderDraftMacros(): void {
+  const host = byId('draft-macros-host');
+  host.textContent = '';
+  if (screenMode !== 'complete' || draft.items.length === 0) return;
+  const synthetic: Meal = {
+    id: 'draft',
+    date: currentDate,
+    time: '',
+    items: draft.items.map(resolveItem),
+    confidence: null,
+    origin: draft.origin,
+  };
+  const breakdown = macroBreakdown(mealMacros(synthetic));
+  if (!breakdown) return;
+  breakdown.id = 'draft-macros';
+  host.appendChild(breakdown);
 }
 
 function setPhotoStatus(key: StringKey | null): void {
@@ -1116,6 +1190,116 @@ function foodById(id: string | null | undefined): Food | undefined {
   return CATALOG.foods.find((food) => food.id === id);
 }
 
+/** Campos del desglose en orden de pintado; kcal se redondea a entero. */
+type MacroField = 'protein' | 'fat' | 'kcal' | 'fiber' | 'sugars';
+const MACRO_FIELDS: readonly { field: MacroField; labelKey: StringKey; kcal: boolean }[] = [
+  { field: 'protein', labelKey: 'macro.protein', kcal: false },
+  { field: 'fat', labelKey: 'macro.fat', kcal: false },
+  { field: 'kcal', labelKey: 'macro.kcal', kcal: true },
+  { field: 'fiber', labelKey: 'macro.fiber', kcal: false },
+  { field: 'sugars', labelKey: 'macro.sugars', kcal: false },
+];
+
+function roundGrams(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+/**
+ * Resuelve un item contra el catalogo (fuente de verdad): si tiene `classId`
+ * conocido, sus macros y carbos son los del alimento, con los gramos del item.
+ * Un item de codigo de barras o sin clase usa sus propios campos. Asi los vault
+ * migrados sin macros se resuelven por `classId`.
+ */
+function resolveItem(item: FoodItem): FoodItem {
+  const food = foodById(item.classId);
+  if (!food) return item;
+  return {
+    ...item,
+    carbsPer100g: food.carbsPer100g,
+    proteinPer100g: food.proteinPer100g,
+    fatPer100g: food.fatPer100g,
+    kcalPer100g: food.kcalPer100g,
+    kcalDerived: food.kcalDerived,
+    fiberPer100g: food.fiberPer100g,
+    sugarsPer100g: food.sugarsPer100g,
+  };
+}
+
+function macroItem(item: FoodItem): Macros {
+  return itemMacros(resolveItem(item));
+}
+
+interface MacroFields {
+  proteinPer100g?: number | undefined;
+  fatPer100g?: number | undefined;
+  kcalPer100g?: number | undefined;
+  kcalDerived?: boolean | undefined;
+  fiberPer100g?: number | undefined;
+  sugarsPer100g?: number | undefined;
+}
+
+/** Copia solo los macros definidos del origen (Food o BarcodeAdd) a un item nuevo. */
+function macroFields(source: MacroFields): MacroFields {
+  const fields: MacroFields = {};
+  if (source.proteinPer100g !== undefined) fields.proteinPer100g = source.proteinPer100g;
+  if (source.fatPer100g !== undefined) fields.fatPer100g = source.fatPer100g;
+  if (source.kcalPer100g !== undefined) fields.kcalPer100g = source.kcalPer100g;
+  if (source.kcalDerived !== undefined) fields.kcalDerived = source.kcalDerived;
+  if (source.fiberPer100g !== undefined) fields.fiberPer100g = source.fiberPer100g;
+  if (source.sugarsPer100g !== undefined) fields.sugarsPer100g = source.sugarsPer100g;
+  return fields;
+}
+
+function resolvedMeals(): Meal[] {
+  return vault.meals.map((meal) => ({ ...meal, items: meal.items.map(resolveItem) }));
+}
+
+/** Vacia el nodo y pinta las celdas presentes; `false` si no hay nada que pintar. */
+function fillMacroBreakdown(host: HTMLElement, macros: Macros): boolean {
+  host.textContent = '';
+  if (!hasMacros(macros)) return false;
+  for (const entry of MACRO_FIELDS) {
+    const value = macros[entry.field];
+    if (value === undefined) continue;
+    const cell = document.createElement('span');
+    cell.className = 'macro-cell';
+    cell.dataset.macro = entry.field;
+    const label = document.createElement('span');
+    label.className = 'macro-label';
+    label.textContent = tr(entry.labelKey);
+    const amount = document.createElement('span');
+    amount.className = 'macro-value';
+    amount.textContent = `${entry.kcal ? Math.round(value) : roundGrams(value)} ${tr(entry.kcal ? 'macro.kcal' : 'unit.grams')}`;
+    if (entry.field === 'kcal' && macros.kcalDerived === true) {
+      const derived = document.createElement('span');
+      derived.className = 'macro-derived';
+      derived.textContent = ` (${tr('macro.derived')})`;
+      amount.appendChild(derived);
+    }
+    cell.append(label, amount);
+    host.appendChild(cell);
+  }
+  return true;
+}
+
+/** Desglose reutilizable; `null` si el item/comida no tiene ningun macro. */
+function macroBreakdown(macros: Macros): HTMLElement | null {
+  if (!hasMacros(macros)) return null;
+  const wrap = document.createElement('div');
+  wrap.className = 'macro-breakdown';
+  fillMacroBreakdown(wrap, macros);
+  return wrap;
+}
+
+/** Sincroniza el control segmentado de Ajustes con `screenMode`. */
+function renderModeControl(): void {
+  byId<HTMLInputElement>('mode-simple').checked = screenMode === 'simple';
+  byId<HTMLInputElement>('mode-complete').checked = screenMode === 'complete';
+  byId('mode-hint').textContent = tr(
+    screenMode === 'complete' ? 'settings.modeCompleteHint' : 'settings.modeSimpleHint',
+  );
+}
+
 function pushFood(food: Food, grams = food.defaultPortionGrams): string {
   const id = uid();
   draft.items.push({
@@ -1124,6 +1308,7 @@ function pushFood(food: Food, grams = food.defaultPortionGrams): string {
     grams,
     carbsPer100g: food.carbsPer100g,
     classId: food.id,
+    ...macroFields(food),
   });
   return id;
 }
@@ -1346,7 +1531,12 @@ function renderWeekBars(days: WeekDay[]): void {
 
 function renderToday(): void {
   const consumed = roundCarbs(dayCarbs(vault.meals, currentDate));
-  byId('day-total').textContent = `${consumed} ${tr('unit.grams')}`;
+  // En completo la cabecera anade kcal (D69); en simple queda solo el carbos.
+  const kcal = screenMode === 'complete' ? dayMacros(resolvedMeals(), currentDate).kcal : undefined;
+  byId('day-total').textContent =
+    kcal !== undefined
+      ? `${consumed} ${tr('unit.grams')} · ${Math.round(kcal)} ${tr('macro.kcal')}`
+      : `${consumed} ${tr('unit.grams')}`;
   const days = weekBreakdown(vault.meals, currentDate);
   const weekTotal = days.reduce((sum, day) => sum + day.carbs, 0);
   byId('week-total').textContent = `${roundCarbs(weekTotal)} ${tr('unit.grams')}`;
@@ -1722,6 +1912,11 @@ function mealEntry(meal: Meal): HTMLLIElement {
   }
   detail.appendChild(chips);
 
+  if (screenMode === 'complete') {
+    const breakdown = macroBreakdown(mealMacros({ ...meal, items: meal.items.map(resolveItem) }));
+    if (breakdown) detail.appendChild(breakdown);
+  }
+
   if (meal.confidence !== null) {
     const pct = Math.round(meal.confidence * 100);
     const conf = document.createElement('p');
@@ -1884,6 +2079,16 @@ function renderDiary(): void {
   byId('summary-carbs').textContent = `${total} ${tr('unit.grams')}`;
   byId('summary-meals').textContent = String(dayMeals.length);
   byId('summary-insulin').textContent = `${insulinTotal} ${tr('unit.units')}`;
+  // Desglose del dia (SPEC 26): solo en completo; el total de carbos no cambia.
+  const macrosRow = byId('summary-macros-row');
+  const macrosCell = byId('summary-macros');
+  if (screenMode === 'complete') {
+    macrosRow.hidden = !fillMacroBreakdown(macrosCell, dayMacros(resolvedMeals(), currentDate));
+  } else {
+    macrosCell.textContent = '';
+    macrosRow.hidden = true;
+  }
+  byId('summary-macro-note').hidden = screenMode !== 'complete';
   for (const moment of MOMENTS) {
     const cell = document.querySelector<HTMLOutputElement>(
       `.moment-carbs[data-moment="${moment}"]`,
@@ -1944,6 +2149,7 @@ function renderExportReminder(): void {
 
 function render(): void {
   applyI18n();
+  renderModeControl();
   localeSelect.value = locale;
   renderToday();
   renderPhoto();
@@ -2105,6 +2311,16 @@ function wire(): void {
     writeDailyTarget(Number.isFinite(value) && value > 0 ? value : 0);
     render();
   });
+
+  for (const radio of app.querySelectorAll<HTMLInputElement>('input[name="screen-mode"]')) {
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      screenMode = radio.value === 'complete' ? 'complete' : 'simple';
+      writeMode(screenMode);
+      render();
+    });
+  }
+  renderModeControl();
 
   localeSelect.addEventListener('change', () => {
     const value = localeSelect.value;
