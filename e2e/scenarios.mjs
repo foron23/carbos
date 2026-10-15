@@ -867,6 +867,62 @@ export const scenarios = [
     },
   },
   {
+    name: 'una deteccion sin clase no finge alimentos y ofrece buscar en el catalogo',
+    async run(page, ctx) {
+      // Caja detectada pero SIN clase del catalogo (p. ej. un alimento que el
+      // modelo no cubre, como unos anacardos): no es un alimento reconocido.
+      await installDetectionStub(page, [
+        {
+          box: { x: 0.3, y: 0.3, w: 0.4, h: 0.4 },
+          score: 0.55,
+          label: 'desconocido',
+          classId: null,
+          topk: [{ label: 'desconocido', classId: null, p: 0.55 }],
+        },
+      ]);
+      await openApp(page, ctx.base);
+      // No se usa uploadAndDetect: sin clase resuelta no aparece "compartir".
+      await page.$eval('#file-input', (el) => {
+        el.value = '';
+      });
+      await uploadFile(page, '#file-input', ctx.fixturePng);
+      await waitFor(page, '#detect-panel:not([hidden])');
+
+      const status = await text(page, '#photo-status');
+      assert(
+        status.includes('No se ha detectado') && !status.includes('Alimentos detectados'),
+        `el estado no finge alimentos detectados: "${status}"`,
+      );
+
+      const summary = await text(page, '#detect-summary');
+      assert(
+        !summary.includes('Alimentos detectados'),
+        `el resumen no finge alimentos detectados: "${summary}"`,
+      );
+
+      const boxes = await page.$$eval('#detect-overlay .detect-box--unknown', (n) => n.length);
+      assertEqual(boxes, 1, 'la caja sin clase se marca como desconocida');
+      const labels = await page.$$eval('#detect-overlay .detect-box-label', (nodes) =>
+        nodes.map((node) => (node.textContent ?? '').trim()),
+      );
+      assert(
+        labels.some((text) => text.includes('Desconocido') && /\d+%/.test(text)),
+        `la etiqueta dice Desconocido con su confianza: ${labels.join(' | ')}`,
+      );
+
+      const draftRows = await page.$$eval('#draft-items .draft-row', (nodes) => nodes.length);
+      assertEqual(draftRows, 0, 'una deteccion sin clase no crea ninguna fila en el borrador');
+
+      assert(
+        await page.$('.detect-row--unknown .detect-cta'),
+        'la fila desconocida ofrece un boton para buscar en el catalogo',
+      );
+      await click(page, '.detect-row--unknown .detect-cta');
+      await page.waitForFunction(() => !document.querySelector('#search-panel').hidden);
+      await screenshot(page, 'deteccion-desconocida-cta');
+    },
+  },
+  {
     name: 'escanea un codigo de barras y no inventa fila si no hay datos',
     async run(page, ctx) {
       const ean = '4006381333931';

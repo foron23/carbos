@@ -35,6 +35,7 @@ import {
   scaleGrams,
   selectableTopk,
   serializeDraft,
+  summarizeDetections,
   targetProgress,
   toJson,
   usageCounts,
@@ -1082,6 +1083,9 @@ function renderOverlay(): void {
     el.style.setProperty('--i', String(index));
     if (entering) el.classList.add('detect-box--enter');
     if (box.y < 0.12) el.classList.add('detect-box--flip');
+    // Sin clase del catalogo la caja no representa un alimento reconocido:
+    // se marca para que el contorno lo diga (borde discontinuo) sin inventar nada.
+    if (!food) el.classList.add('detect-box--unknown');
     const boxColor = BOX_COLORS[index % BOX_COLORS.length] ?? '#16a34a';
     el.style.setProperty('--box-color', boxColor);
     el.style.left = `${box.x * 100}%`;
@@ -1093,7 +1097,8 @@ function renderOverlay(): void {
     label.classList.toggle('ink', boxLabelInk(boxColor) === '#000000');
     const name = item?.name ?? (food ? food.name[locale] : tr('unknown.food'));
     const grams = item ? ` · ${Math.round(item.grams)} ${tr('unit.grams')}` : '';
-    label.textContent = `${name}${grams}`;
+    const confidence = ` · ${Math.round(result.score * 100)}%`;
+    label.textContent = `${name}${grams}${confidence}`;
     el.appendChild(label);
     overlay.appendChild(el);
   });
@@ -1381,9 +1386,21 @@ function renderDetect(): void {
   }
   panel.hidden = false;
   const engine = detectionEngine ? ` · ${tr('detect.engine')}: ${detectionEngine}` : '';
-  summary.textContent = `${detections.length} · ${tr('photo.detected')}${engine}`;
+  // Honestidad (SPEC 19): una caja sin clase no es un alimento reconocido. Solo
+  // se anuncia "alimentos detectados" si algo se ha resuelto; si no, se dice que
+  // no se ha reconocido y se ofrece buscar en el catalogo.
+  const { resolved } = summarizeDetections(detections);
+  summary.textContent =
+    resolved > 0
+      ? `${resolved} · ${tr('photo.detected')}${engine}`
+      : `${tr('photo.unknownOnly')}${engine}`;
   list.innerHTML = '';
   detections.forEach((result, index) => {
+    // La fila comparte la MISMA definicion de "resuelto" que el resumen, el
+    // estado, el overlay y el borrador: la clase top-1 (`result.classId`). Asi
+    // nunca se muestra un alimento distinto del que anuncia el estado.
+    const resolved = Boolean(result.classId);
+    const alternatives = selectableTopk(result.topk);
     const best: TopKEntry = result.topk[0] ?? {
       label: result.label,
       classId: result.classId,
@@ -1401,7 +1418,25 @@ function renderDetect(): void {
     const grams = draftItem ? ` · ${Math.round(draftItem.grams)} ${tr('unit.grams')}` : '';
     name.textContent = `${topkLabel(best)} · ${Math.round(best.p * 100)}%${grams}`;
     row.appendChild(name);
-    const alternatives = selectableTopk(result.topk);
+    if (!resolved) {
+      // Sin clase top-1 del catalogo: no se inventa una fila; se avisa y se
+      // ofrece el camino honesto (buscar/anadir a mano).
+      row.classList.add('detect-row--unknown');
+      const note = document.createElement('span');
+      note.className = 'muted detect-unknown-note';
+      note.textContent = tr('unknown.note');
+      const cta = document.createElement('button');
+      cta.type = 'button';
+      cta.className = 'detect-cta';
+      cta.textContent = tr('unknown.pickFromCatalog');
+      cta.addEventListener('click', () => {
+        byId<HTMLInputElement>('entry-mode-search').click();
+        byId<HTMLInputElement>('food-search').focus();
+      });
+      row.append(note, cta);
+      list.appendChild(row);
+      return;
+    }
     if (alternatives.length > 1) {
       const select = document.createElement('select');
       select.className = 'detect-alt';
@@ -1448,7 +1483,12 @@ async function startDetection(image: CapturedImage): Promise<void> {
     detectionEngine = outcome.engine;
     detectionMeta = { detector: outcome.detector, classifier: outcome.classifier };
     applyDetections(merged);
-    setPhotoStatus(merged.length > 0 ? 'photo.detected' : 'photo.noItems');
+    // El estado habla de lo RECONOCIDO, no de las cajas: una foto sin clases del
+    // catalogo (p. ej. un alimento que el modelo no cubre) no es "alimento detectado".
+    const { resolved } = summarizeDetections(merged);
+    setPhotoStatus(
+      resolved > 0 ? 'photo.detected' : merged.length > 0 ? 'photo.unknownOnly' : 'photo.noItems',
+    );
   } catch (error) {
     if (
       controller.signal.aborted ||

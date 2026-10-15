@@ -1439,6 +1439,30 @@ input.select-meal {
   transform: translateY(100%);
 }
 
+/* Caja sin clase del catalogo: NO representa un alimento reconocido. El borde
+   discontinuo y la ausencia de relleno solido lo distinguen de una deteccion
+   resuelta; la etiqueta mantiene su color (contraste ya auditado). */
+.detect-box--unknown {
+  border-style: dashed;
+  border-color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+  box-shadow: none;
+}
+
+/* Fila de deteccion sin clase resuelta: aviso honesto + salida al catalogo. */
+.detect-row--unknown {
+  border-block-end: 1px dashed var(--line-strong);
+}
+
+.detect-unknown-note {
+  flex: 1 1 auto;
+  font-size: 0.9rem;
+}
+
+.detect-cta {
+  flex: 0 0 auto;
+}
+
 /* --- Avisos -------------------------------------------------------------- */
 
 .notice {

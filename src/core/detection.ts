@@ -14,6 +14,23 @@ export function selectableTopk<T extends { classId: string | null }>(
   return result;
 }
 
+/**
+ * Cuenta cuantas detecciones resuelven a una clase del catalogo (`classId`
+ * verdadero) y cuantas quedan sin clase resuelta. Permite hablar con honestidad
+ * de lo que la foto ha reconocido: una caja sin clase no es un alimento.
+ */
+export function summarizeDetections<T extends { classId: string | null }>(
+  results: readonly T[],
+): { resolved: number; unknown: number } {
+  let resolved = 0;
+  let unknown = 0;
+  for (const entry of results) {
+    if (entry.classId) resolved += 1;
+    else unknown += 1;
+  }
+  return { resolved, unknown };
+}
+
 export interface DetectionBox {
   x: number;
   y: number;

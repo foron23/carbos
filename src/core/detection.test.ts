@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { applyAlternative, mergeDetections, selectableTopk } from './detection';
+import {
+  applyAlternative,
+  mergeDetections,
+  selectableTopk,
+  summarizeDetections,
+} from './detection';
 
 describe('alternativas del detector', () => {
   it('selectableTopk descarta las entradas sin clase resuelta', () => {
@@ -78,5 +83,35 @@ describe('mergeDetections', () => {
     mergeDetections(input);
     expect(input).toEqual(copy);
     expect(mergeDetections([])).toEqual([]);
+  });
+});
+
+describe('summarizeDetections', () => {
+  it('separa resueltas y desconocidas en una lista mixta', () => {
+    const summary = summarizeDetections([
+      { classId: 'apple' },
+      { classId: null },
+      { classId: 'bread' },
+      { classId: null },
+    ]);
+    expect(summary).toEqual({ resolved: 2, unknown: 2 });
+  });
+
+  it('cuenta todo como desconocido si no hay ninguna clase', () => {
+    expect(summarizeDetections([{ classId: null }, { classId: null }])).toEqual({
+      resolved: 0,
+      unknown: 2,
+    });
+  });
+
+  it('cuenta todo como resuelto si hay clase en todas', () => {
+    expect(summarizeDetections([{ classId: 'a' }, { classId: 'b' }])).toEqual({
+      resolved: 2,
+      unknown: 0,
+    });
+  });
+
+  it('con lista vacia no cuenta ninguna', () => {
+    expect(summarizeDetections([])).toEqual({ resolved: 0, unknown: 0 });
   });
 });
