@@ -239,7 +239,7 @@ que persistir; por eso **no** hay bump de `CATALOG_VERSION`/`SCHEMA_VERSION`.
 | D70 | **Indicador propio de calidad del carbohidrato (fibra), en modo completo** | Banda **Baja/Media/Alta** derivada **solo de la fibra** (umbrales UE, Reglamento 1924/2006: fuente >=3 g, alta >=6 g por 100 g); con **forma + texto** redundantes (no solo color) y `aria-label`; se **oculta** si el alimento no es fuente de carbohidratos (>=5 g) o no hay dato de fibra. **No es el IG**. En el desglose del borrador y las detecciones; **nunca** en filas de resultado ni en el diario. No toca D10/D12 | 27   | cerrada |
 | D71 | **Sin tablas de IG propietarias; enlace externo**                          | El IG **ni se calcula ni se embebe**: es una respuesta medida (ISO 26642) y las tablas publicas (Atkinson/Sydney/FAO) no son redistribuibles; un derivado seria obra derivada. La via es un **enlace a fuente externa** (o, en el futuro, una tabla propia con licencia compatible documentada)                                                                                                                                | 27   | cerrada |
 | D72 | **Guardarrail de frontera IG -> dosis**                                    | Sin ranking ni orden por IG, sin IG en el diario, sin `objetivo de IG`, sin conversion IG->unidades; el indicador es de **fibra**, no de IG; cero claims de manejo de DM1                                                                                                                                                                                                                                                      | 27   | cerrada |
-| D73 | **Enlace externo al IG, siempre visible**                                  | Enlace a la **base de datos de indice glucemico** (glycemicindex.com, Univ. de Sidney) en el borrador y las detecciones, en **cualquier modo** (no es un ajuste). Un alimento sin carbohidratos no lo muestra. No embebe datos: nada sale del dispositivo hasta que la persona toca el enlace                                                                                                                                  | 27   | cerrada |
+| D73 | **Enlace externo al IG, siempre visible**                                  | **Icono de sitio externo** (con nombre accesible "Ver referencia (índice glucémico)") junto al nombre del alimento, en el borrador y las detecciones, en **cualquier modo** (no es un ajuste); enlaza a la **base de datos de indice glucemico** (glycemicindex.com, Univ. de Sidney). Un alimento sin carbohidratos no lo muestra. No embebe datos                                                                            | 27   | cerrada |
 
 ## Implementación (2026-10-15)
 
@@ -252,12 +252,12 @@ fiberPer100g)`: `high` >=6 g fibra, `medium` >=3 g, `low` por debajo; `null` si 
   `carbquality.test.ts` + `carbquality.boundary.test.ts` (frontera D72).
 - **UI (`src/main.ts`):** en **modo completo** cada fila del desglose (borrador y
   detecciones) anade la **banda** (`carbQualityBadge`: 1-3 segmentos rellenos + texto; el
-  color **no** distingue el nivel). El **enlace** al IG (`giExternalLink`, con `aria-label`
-  y objetivo 44 px) se anade en **cualquier modo** si el alimento es fuente de carbohidratos,
-  y apunta a `https://glycemicindex.com/?s=<nombre en ingles>`. La nota `carbquality.note`
-  acompana a la banda (borrador y detecciones).
-- **i18n:** `carbquality.label/low/medium/high/note`, `gi.external` (ES/EN, paridad y
-  tildes).
+  color **no** distingue el nivel). El **enlace** al IG es un **icono de sitio externo**
+  (`giExternalLink`, 44x44 px, junto al nombre, en **cualquier modo** si el alimento es
+  fuente de carbohidratos) que apunta a `https://glycemicindex.com/?s=<nombre en ingles>`.
+  La nota `carbquality.note` acompana a la banda (borrador y detecciones).
+- **i18n:** `carbquality.label/low/medium/high/note`, `gi.external` (nombre accesible del
+  icono, no texto visible; ES/EN, paridad y tildes).
 - **Estilos:** `src/style.css` (banda neutra con tokens, enlace de 44 px, `forced-colors`).
 - **Tests:** unitarios (`carbquality.test.ts`, `carbquality.boundary.test.ts`) + E2E nuevo
   ("calidad del carbohidrato (fibra) y enlace externo al IG"). Gate:
@@ -330,9 +330,10 @@ Los criterios marcados _(m)_ se comprueban con una formula concreta (Tests).
    indicador. _(m)_
 6. La **nota** ("no es el índice glucémico ni consejo dietético") es visible junto al
    indicador, en el borrador y en las detecciones. _(m)_
-7. El **enlace externo** al IG **aparece directamente** (en cualquier modo, sin ajuste),
-   apunta a la base de datos de IG, no embebe datos, tiene nombre accesible y objetivo
-   tactil >= 44 px; un alimento sin carbohidratos no lo muestra. _(m)_
+7. El **enlace externo** al IG es un **icono de sitio externo** que **aparece
+   directamente** (en cualquier modo, sin ajuste), apunta a la base de datos de IG, no
+   embebe datos, tiene nombre accesible y objetivo tactil >= 44 px; un alimento sin
+   carbohidratos no lo muestra. _(m)_
 8. **Sin tablas propietarias embebidas:** ningun artefacto versionado contiene valores
    copiados de Atkinson/Sydney/FAO.
 9. **Sin cruce regulatorio** (estructural): ningun modulo de `src/insulin/*` ni el camino

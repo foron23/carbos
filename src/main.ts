@@ -990,18 +990,15 @@ function renderDraft(): void {
       row.appendChild(remove);
 
       const resolved = resolveItem(item);
+      const carbFood = foodById(resolved.classId);
+      if (carbFood && isCarbSource(resolved.carbsPer100g)) {
+        name.after(giExternalLink(resolved.name, carbFood.name.en));
+      }
       if (screenMode === 'complete') {
         const breakdown = macroBreakdown(macroItem(item));
         if (breakdown) row.appendChild(breakdown);
       }
-      const carbFood = foodById(resolved.classId);
-      appendCarbQuality(
-        row,
-        resolved.name,
-        carbFood?.name.en ?? resolved.name,
-        resolved.carbsPer100g,
-        resolved.fiberPer100g,
-      );
+      appendCarbQuality(row, resolved.carbsPer100g, resolved.fiberPer100g);
       list.appendChild(row);
     });
   }
@@ -1353,10 +1350,10 @@ function carbQualityBadge(band: CarbQualityBand): HTMLElement {
 }
 
 /**
- * Enlace a la base de datos de indice glucemico (Universidad de Sidney). La app
- * **no** embebe ni calcula el IG: ofrece un enlace directo; nada sale del
- * dispositivo hasta que la persona lo toca. `query` suele ser el nombre en ingles
- * (la base esta en ingles); `name` es el nombre visible (para el texto accesible).
+ * Enlace a la base de datos de indice glucemico (Universidad de Sidney), como
+ * **icono de sitio externo** (conciso). La app **no** embebe ni calcula el IG:
+ * ofrece una referencia; nada sale del dispositivo hasta el toque. `query` suele
+ * ser el nombre en ingles (la base esta en ingles); `name` da el nombre accesible.
  */
 function giExternalLink(name: string, query: string): HTMLAnchorElement {
   const anchor = document.createElement('a');
@@ -1364,33 +1361,32 @@ function giExternalLink(name: string, query: string): HTMLAnchorElement {
   anchor.href = `https://glycemicindex.com/?s=${encodeURIComponent(query)}`;
   anchor.target = '_blank';
   anchor.rel = 'noopener noreferrer';
-  anchor.setAttribute('aria-label', `${tr('gi.external')}: ${name}`);
-  const text = document.createElement('span');
-  text.textContent = tr('gi.external');
-  const arrow = document.createElement('span');
-  arrow.setAttribute('aria-hidden', 'true');
-  arrow.textContent = ' ↗';
-  anchor.append(text, arrow);
+  const label = `${tr('gi.external')}: ${name}`;
+  anchor.setAttribute('aria-label', label);
+  anchor.title = label;
+  anchor.innerHTML =
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+    '<path d="M15 3h6v6"/><path d="M10 14 21 3"/>' +
+    '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>';
   return anchor;
 }
 
 /**
- * Anexa a una fila la banda de calidad (solo en modo completo) y el enlace al IG
- * (en cualquier modo, si el alimento es fuente de carbohidratos). Devuelve `true`
- * si pinto la banda. El enlace abarca tambien el modo simple: es informacion de
- * composicion, no un ajuste que ocultar, y no envia nada hasta el toque.
+ * Anexa a una fila la banda de calidad del carbohidrato (solo en modo completo).
+ * Devuelve `true` si la pinto. El enlace al IG va aparte (junto al nombre), para
+ * que sea un icono conciso.
  */
 function appendCarbQuality(
   row: HTMLElement,
-  name: string,
-  query: string,
   carbsPer100g: number,
   fiberPer100g: number | undefined,
 ): boolean {
-  const band = screenMode === 'complete' ? carbQualityBand(carbsPer100g, fiberPer100g) : null;
-  if (band) row.appendChild(carbQualityBadge(band));
-  if (isCarbSource(carbsPer100g)) row.appendChild(giExternalLink(name, query));
-  return band !== null;
+  if (screenMode !== 'complete') return false;
+  const band = carbQualityBand(carbsPer100g, fiberPer100g);
+  if (!band) return false;
+  row.appendChild(carbQualityBadge(band));
+  return true;
 }
 
 /** Sincroniza el control segmentado de Ajustes con `screenMode`. */
@@ -1537,14 +1533,11 @@ function renderDetect(): void {
     }
     const qualityFood = foodById(best.classId);
     if (qualityFood) {
+      if (isCarbSource(qualityFood.carbsPer100g)) {
+        name.after(giExternalLink(qualityFood.name[locale], qualityFood.name.en));
+      }
       qualityShown =
-        appendCarbQuality(
-          row,
-          qualityFood.name[locale],
-          qualityFood.name.en,
-          qualityFood.carbsPer100g,
-          qualityFood.fiberPer100g,
-        ) || qualityShown;
+        appendCarbQuality(row, qualityFood.carbsPer100g, qualityFood.fiberPer100g) || qualityShown;
     }
     if (alternatives.length > 1) {
       const select = document.createElement('select');

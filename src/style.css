@@ -1318,12 +1318,16 @@ input.select-meal {
 .gi-link {
   display: inline-flex;
   align-items: center;
-  flex: 1 1 100%;
-  min-block-size: 2.75rem;
-  margin-block-start: 0.1rem;
+  justify-content: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  margin-inline-start: 0.1rem;
+  border-radius: var(--radius-sm);
   color: var(--accent);
-  font-size: var(--text-sm);
-  font-weight: 600;
+  vertical-align: middle;
+}
+.gi-link:hover {
+  background: var(--accent-soft);
 }
 @media (forced-colors: active) {
   .carbquality-band {

@@ -2102,19 +2102,26 @@ export const scenarios = [
       );
       await waitFor(page, '#draft-items .gi-link');
       const simpleCarbs = await text(page, '#draft-total');
-      const link = await page.$eval('.gi-link', (a) => ({
-        href: a.getAttribute('href') || '',
-        aria: a.getAttribute('aria-label') || '',
-        text: (a.textContent || '').trim(),
-        height: a.getBoundingClientRect().height,
-      }));
+      const link = await page.$eval('.gi-link', (a) => {
+        const rect = a.getBoundingClientRect();
+        return {
+          href: a.getAttribute('href') || '',
+          aria: a.getAttribute('aria-label') || '',
+          icon: Boolean(a.querySelector('svg')),
+          width: rect.width,
+          height: rect.height,
+        };
+      });
       assert(
         link.href.startsWith('https://glycemicindex.com/?s='),
         'el enlace apunta a la base de datos de IG',
       );
-      assert(/referencia|reference/i.test(link.text), 'el enlace se lee como una referencia');
-      assert(link.aria.length > 0, 'el enlace tiene nombre accesible');
-      assert(link.height >= 44, `el enlace mide al menos 44 px (${link.height})`);
+      assert(/referencia|reference/i.test(link.aria), 'el enlace se lee como una referencia');
+      assert(link.icon, 'el enlace usa un icono de sitio externo');
+      assert(
+        link.width >= 44 && link.height >= 44,
+        `objetivo tactil >= 44 px (${link.width}x${link.height})`,
+      );
 
       // Completo: se anade la banda de fibra (garbanzos = alta) con texto + forma.
       await page.$eval('#settings', (el) => {
