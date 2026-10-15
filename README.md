@@ -73,6 +73,8 @@ intenciones queda como **gate con pesos** (D8/D12).
 
 **Indice glucemico (SPEC 27, D70-D73; implementado):** investigacion de producto (2026-10-15) y **via de minima friccion ya en la app**: un **indicador propio de calidad del carbohidrato (fibra)** en modo completo (banda Baja/Media/Alta, con texto y forma redundantes; oculta si el alimento no es fuente de carbohidratos o no hay fibra) y, en **cualquier modo**, un **icono de enlace externo** junto al alimento que lleva a la **base de datos de indice glucemico** (glycemicindex.com, Univ. de Sidney). El IG **ni se calcula ni se embebe**: es una respuesta medida (ISO 26642) y las tablas publicas (Atkinson/Sydney/FAO) no son redistribuibles bajo AGPL-3.0; el icono no envia nada hasta que se toca. Prototipos desechables en `prototypes/ig/`.
 
+**Pulido de interaccion (2026-10-15, D74 + D65/D66 revisadas):** el pack de **codigos de barras** se descarga **por defecto al arrancar**, en segundo plano y siempre que haya red (flag `carbos.barcode.autopack`, opt-out), para escanear **sin conexion desde el primer uso**. Y **agrupar comidas** abandona las checkboxes: cada comida lleva un **asa de arrastre** de 6 puntos; se **arrastra a la bandeja de grupo** para juntarlas (soltarla sobre un grupo existente anade; arrastrar una hija fuera la separa, con cascada), y tocar el asa (o Enter/Espacio) acopia/desacopia como **alternativa accesible** (WCAG 2.5.1).
+
 Detalle por entregable: [`docs/specs/02-fase1.md`](docs/specs/02-fase1.md).
 
 ## Arranque

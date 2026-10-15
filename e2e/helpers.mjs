@@ -279,6 +279,11 @@ export async function openApp(page, base) {
     // sin vaciarlo, un pack "ya importado" impediria la descarga automatica del
     // siguiente escenario que la espera.
     localStorage.removeItem('carbos.barcode.packs');
+    // Por defecto, la app descarga el pack de codigos de barras al arrancar
+    // (SPEC 17): en E2E eso bajaria ~6 MB en cada carga y meteria trabajo de
+    // fondo en todos los escenarios. Se apaga aqui y solo el escenario de
+    // arranque lo reactiva a proposito.
+    localStorage.setItem('carbos.barcode.autopack', 'false');
     localStorage.removeItem('carbos.draft');
   });
   await page.evaluate(() => {

@@ -56,29 +56,63 @@ async function addMeals(page, count, query = 'pan') {
 
 const parseGrams = (value) => Number.parseFloat(String(value).replace(',', '.'));
 
-/** Marca el checkbox de seleccion en la posicion `index` (re-consulta cada vez). */
-async function selectMealAt(page, index) {
+/**
+ * Acopia la comida en la posicion `index` tocando el asa de arrastre
+ * (re-consulta cada vez). El toque es el fallback accesible del gesto (WCAG 2.5.1).
+ */
+async function stageMealAt(page, index) {
   await page.evaluate((i) => {
-    const boxes = Array.from(
-      document.querySelectorAll('#diary .select-meal input[type="checkbox"]'),
+    const handles = Array.from(
+      document.querySelectorAll('#diary .timeline-entry--meal .drag-handle'),
     );
-    const box = boxes[i];
-    if (!box) throw new Error(`no hay checkbox de seleccion en la posicion ${i}`);
-    box.click();
+    const handle = handles[i];
+    if (!handle) throw new Error(`no hay asa de arrastre en la posicion ${i}`);
+    handle.click();
   }, index);
 }
 
-/** Entra en modo seleccion (entrada visible `Seleccionar`). */
-async function enterSelection(page) {
-  await click(page, '#select-meals');
-  await page.waitForSelector('#diary .select-meal input[type="checkbox"]', { timeout: 8000 });
+/**
+ * Arrastra (con punteros reales) el asa `fromIndex` que case con `fromSelector`
+ * hasta el centro de `toSelector`. Mide AMBAS posiciones tras un unico
+ * `scrollIntoView` (hacerlo por separado invalida la primera).
+ * Firefox emite `pointerdown/move/up` a partir de `page.mouse`.
+ */
+async function dragTo(page, fromSelector, fromIndex, toSelector) {
+  const pos = await page.evaluate(
+    (fSel, i, tSel) => {
+      const f = document.querySelectorAll(fSel)[i];
+      const t = document.querySelector(tSel);
+      if (!f) throw new Error(`no existe ${fSel}[${i}]`);
+      if (!t) throw new Error(`no existe ${tSel}`);
+      // Centra el DESTINO (elemento inferior): asi el origen queda por encima y
+      // ambos visibles con el contenido corto de la prueba.
+      t.scrollIntoView({ block: 'center' });
+      const fr = f.getBoundingClientRect();
+      const tr = t.getBoundingClientRect();
+      return {
+        from: { x: Math.round(fr.left + fr.width / 2), y: Math.round(fr.top + fr.height / 2) },
+        to: { x: Math.round(tr.left + tr.width / 2), y: Math.round(tr.top + tr.height / 2) },
+      };
+    },
+    fromSelector,
+    fromIndex,
+    toSelector,
+  );
+  await page.mouse.move(pos.from.x, pos.from.y);
+  await page.mouse.down();
+  await page.mouse.move(
+    Math.round((pos.from.x + pos.to.x) / 2),
+    Math.round((pos.from.y + pos.to.y) / 2),
+    { steps: 6 },
+  );
+  await page.mouse.move(pos.to.x, pos.to.y, { steps: 6 });
+  await page.mouse.up();
 }
 
 /** Junta las dos primeras comidas del dia y espera la entrada de grupo. */
 async function groupFirstTwo(page) {
-  await enterSelection(page);
-  await selectMealAt(page, 0);
-  await selectMealAt(page, 1);
+  await stageMealAt(page, 0);
+  await stageMealAt(page, 1);
   await page.waitForFunction(() => document.getElementById('group-meals')?.disabled === false, {
     timeout: 8000,
   });
@@ -290,14 +324,13 @@ export const scenarios = [
     async run(page, ctx) {
       await openApp(page, ctx.base);
       await addMeals(page, 2);
-      await enterSelection(page);
 
       const disabled = () => page.$eval('#group-meals', (el) => el.disabled);
-      assert(await disabled(), 'Juntar empieza deshabilitado con 0 seleccionadas');
-      await selectMealAt(page, 0);
-      assert(await disabled(), 'Juntar sigue deshabilitado con 1 seleccionada');
-      await selectMealAt(page, 1);
-      assert(!(await disabled()), 'Juntar se habilita con 2 seleccionadas');
+      assert(await disabled(), 'Juntar empieza deshabilitado con 0 acopiadas');
+      await stageMealAt(page, 0);
+      assert(await disabled(), 'Juntar sigue deshabilitado con 1 acopiada');
+      await stageMealAt(page, 1);
+      assert(!(await disabled()), 'Juntar se habilita con 2 acopiadas');
       await screenshot(page, 'grupo-minimo');
     },
   },
@@ -362,74 +395,91 @@ export const scenarios = [
     },
   },
   {
-    name: 'Seleccionar es visible y el checkbox mide al menos 44 px',
+    name: 'el asa de arrastre mide al menos 44 px y acopia al tocarla',
     async run(page, ctx) {
       await openApp(page, ctx.base);
       await addMeals(page, 2);
 
-      const visible = await page.$eval('#select-meals', (el) => {
+      const handle = await page.$eval('#diary .timeline-entry--meal .drag-handle', (el) => {
         const rect = el.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0 && getComputedStyle(el).visibility !== 'hidden';
+        return {
+          width: rect.width,
+          height: rect.height,
+          tag: el.tagName,
+          type: el.getAttribute('type'),
+          tabIndex: el.tabIndex,
+          label: (el.getAttribute('aria-label') || '').trim(),
+        };
       });
-      assert(visible, 'existe una entrada visible Seleccionar');
-      assertEqual(await text(page, '#select-meals'), 'Seleccionar', 'el boton dice Seleccionar');
-
-      await enterSelection(page);
-      const hit = await page.$eval('#diary label.select-meal', (el) => {
-        const rect = el.getBoundingClientRect();
-        return { width: rect.width, height: rect.height };
-      });
+      assertEqual(handle.tag, 'BUTTON', 'el asa es un boton real');
+      assertEqual(handle.type, 'button', 'el asa no envia formularios');
+      assert(handle.tabIndex >= 0, 'el asa es enfocable por teclado');
+      assert(handle.label.length > 0, 'el asa tiene nombre accesible');
       assert(
-        hit.width >= 44 && hit.height >= 44,
-        `el area del checkbox mide >= 44 px (${hit.width}x${hit.height})`,
+        handle.width >= 44 && handle.height >= 44,
+        `el asa mide >= 44 px (${handle.width}x${handle.height})`,
       );
-      const focusable = await page.$eval(
-        '#diary .select-meal input[type="checkbox"]',
-        (el) => el.tagName === 'INPUT' && el.type === 'checkbox' && el.tabIndex >= 0,
+
+      await stageMealAt(page, 0);
+      assertEqual(
+        await page.$$eval('#group-staged .group-staged-chip', (nodes) => nodes.length),
+        1,
+        'tocar el asa acopia la comida en la bandeja',
       );
-      assert(focusable, 'el checkbox es enfocable por teclado');
+      assert(
+        await page.$eval(
+          '#diary .timeline-entry--meal .drag-handle',
+          (el) => el.getAttribute('aria-pressed') === 'true',
+        ),
+        'el asa acopiada queda marcada (aria-pressed)',
+      );
       await screenshot(page, 'grupo-accesibilidad');
     },
   },
   {
-    name: 'la pulsacion larga entra en modo seleccion',
+    name: 'arrastrar un asa a la bandeja acopia la comida',
     async run(page, ctx) {
       await openApp(page, ctx.base);
       await addMeals(page, 2);
 
-      // Pulsacion larga sobre la tarjeta (no sobre un control): dispara el
-      // temporizador (~500 ms) y entra en modo seleccion marcando esa comida.
-      await page.$eval('#diary .timeline-entry--meal .timeline-card', (card) => {
-        const rect = card.getBoundingClientRect();
-        card.dispatchEvent(
-          new window.PointerEvent('pointerdown', {
-            bubbles: true,
-            pointerType: 'touch',
-            button: 0,
-            clientX: rect.left + 20,
-            clientY: rect.top + 20,
-          }),
-        );
-      });
-      await page.waitForSelector('#diary .select-meal input[type="checkbox"]', { timeout: 4000 });
-
-      const checked = await page.$$eval(
-        '#diary .select-meal input[type="checkbox"]',
-        (boxes) => boxes.filter((box) => box.checked).length,
+      await dragTo(page, '#diary .timeline-entry--meal .drag-handle', 0, '#group-tray');
+      await page.waitForFunction(
+        () => document.querySelectorAll('#group-staged .group-staged-chip').length === 1,
+        { timeout: 8000 },
       );
-      assert(checked === 1, 'la pulsacion larga marca exactamente la comida pulsada');
-
-      // Levantar el puntero no tumba el modo seleccion ni la marca.
-      await page.$eval('#diary .timeline-entry--meal .timeline-card', (card) => {
-        card.dispatchEvent(
-          new window.PointerEvent('pointerup', { bubbles: true, pointerType: 'touch', button: 0 }),
-        );
-      });
-      assert(
-        await page.$eval('#group-controls', (el) => !el.hidden),
-        'el modo seleccion sigue activo tras levantar el puntero',
+      assertEqual(
+        await page.$$eval('#group-staged .group-staged-chip', (nodes) => nodes.length),
+        1,
+        'soltar el asa sobre la bandeja acopia esa comida',
       );
-      await screenshot(page, 'seleccion-larga');
+      await screenshot(page, 'grupo-arrastre');
+    },
+  },
+  {
+    name: 'arrastrar una hija fuera del grupo la separa (cascada)',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await addMeals(page, 2);
+      await groupFirstTwo(page);
+      await click(page, '#diary .timeline-entry--group .timeline-toggle');
+      await page.waitForSelector('#diary .timeline-group-item .drag-handle', { timeout: 8000 });
+
+      await dragTo(page, '#diary .timeline-group-item .drag-handle', 0, '#group-tray');
+
+      await page.waitForFunction(
+        () => document.querySelectorAll('#diary .timeline-entry--group').length === 0,
+        { timeout: 8000 },
+      );
+      await page.waitForFunction(
+        () => document.querySelectorAll('#diary .timeline-entry--meal').length === 2,
+        { timeout: 8000 },
+      );
+      assertEqual(
+        (await readStore(page, 'groups')).length,
+        0,
+        'el grupo se deshace al quedarse con <2 hijas (cascada)',
+      );
+      await screenshot(page, 'grupo-arrastre-hija');
     },
   },
 ];

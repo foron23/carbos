@@ -5,14 +5,15 @@
 > con su hora. Cuando lo que era **una sola comida** se registro en **momentos
 > distintos** (la tostada a las 8:05, el cafe a las 8:20), hoy no hay forma de
 > **reagruparlas**. Esta spec anade **juntar comidas** como un **contenedor nombrado,
-> no destructivo y persistente**: la persona multi-selecciona dos o mas comidas del
-> dia y las pliega bajo una entrada con **total derivado**; **Separar** deshace el
-> contenedor y deja las hijas **intactas**. El grupo **no tiene hora ni slot** (respeta
-> **D36** y **D57**), es **reversible** (D33) y **no alimenta ninguna dosis** (D10/D12).
-> El gesto principal es la **pulsacion larga**, con una **alternativa visible**
-> (`Seleccionar`) y teclado por accesibilidad (D16/WCAG 2.5.1). Introduce
-> `Vault.groups` -> **SCHEMA_VERSION 3 -> 4** con migracion tolerante. Sin backend, sin
-> analitica, sin dependencias nuevas (D11).
+> no destructivo y persistente**: la persona **arrastra** dos o mas comidas del dia a una
+> **bandeja de grupo** y las pliega bajo una entrada con **total derivado**; **Separar**
+> deshace el contenedor y deja las hijas **intactas**. El grupo **no tiene hora ni slot**
+> (respeta **D36** y **D57**), es **reversible** (D33) y **no alimenta ninguna dosis**
+> (D10/D12). El gesto principal es **arrastrar el asa de 6 puntos** (_drag handle_) a la
+> bandeja; tocar el asa (o Enter/Espacio) es la **alternativa accesible** (D16/WCAG
+> 2.5.1): **sin checkboxes ni modo seleccion**. Introduce `Vault.groups` ->
+> **SCHEMA_VERSION 3 -> 4** con migracion tolerante. Sin backend, sin analitica, sin
+> dependencias nuevas (D11).
 
 ## Contexto
 
@@ -61,8 +62,8 @@ de insulina (D10).
 | C6  | Mover items entre comidas                                       | 2       | 1     | 2     | 2      | 7     | no         | Superficie de edicion de dominio; baja frecuencia; se cubre con Editar (borrador)      |
 | C7  | Multi-seleccion en el Diario                                    | 2       | 2     | 3     | 3      | 10    | (parte F1) | Es el **gesto** de F1, no una feature suelta                                           |
 
-**Elegida: C2 (contenedor reversible)**, tomando de C7 el gesto (multi-seleccion) y de
-C5 el nombre del grupo.
+**Elegida: C2 (contenedor reversible)**, tomando de C7 el gesto (**arrastrar a la
+bandeja**, no multi-seleccion) y de C5 el nombre del grupo.
 
 > **Cautela (deuda declarada).** Registrar varios alimentos **juntos** ya produce
 > **una** `Meal`; "juntar" aporta cuando la misma comida se registro en momentos
@@ -71,12 +72,15 @@ C5 el nombre del grupo.
 
 ## La elegida: contenedor reversible
 
-**Que.** En el Diario, la persona **multi-selecciona** dos o mas comidas del dia y
-pulsa **Juntar**. Las comidas se **pliegan bajo una entrada contenedora** con nombre
+**Que.** En el Diario, la persona **arrastra** dos o mas comidas del dia a la
+**bandeja de grupo** (o toca sus asas de 6 puntos como alternativa accesible) y pulsa
+**Juntar**. Las comidas se **pliegan bajo una entrada contenedora** con nombre
 opcional (p. ej. "Desayuno", "Post-entreno"); el contenedor muestra el **total derivado**
 (suma de los carbos de las hijas) y el recuento ("3 comidas"). **Separar** (_explode_)
 deshace el contenedor y deja las comidas hijas **intactas**. No se registra ninguna
-comida nueva ni se reescribe ninguna hija.
+comida nueva ni se reescribe ninguna hija. **Sin checkboxes ni modo seleccion**: el
+gesto es arrastrar-y-soltar (asa), con el toque/teclado sobre el asa como fallback
+accesible (WCAG 2.5.1).
 
 **Definicion.**
 
@@ -111,10 +115,10 @@ comidas; sus totales son **suma de hijos**, nunca almacenados.
 
 ## Decisiones nuevas (propuesta D65-D66)
 
-| #   | Decision                                                       | Detalle                                                                                                                                                                                                                                                                                                                                                            | Estado    |
-| --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------- |
-| D65 | **Juntar comidas = contenedor reversible, persistido por IDs** | Multi-seleccion de comidas registradas -> `MealGroup { id, date, name?, mealIds[] }` con nombre opcional; total **derivado**; **Separar** deshace el contenedor y deja las hijas intactas. Sin hora ni slot propios; el grupo se coloca en la hija mas temprana. **Amplia D36 y respeta D57**; reversible por D33. `SCHEMA_VERSION 3 -> 4` con migracion tolerante | propuesta |
-| D66 | **Gesto de agrupar: pulsacion larga con alternativa visible**  | El gesto primario es la **pulsacion larga** sobre una comida (tactil); existe ademas una entrada visible (`Seleccionar`) y soporte de teclado, para cumplir D16 y WCAG 2.5.1. Checkbox de seleccion >= 44 px                                                                                                                                                       | propuesta |
+| #   | Decision                                                       | Detalle                                                                                                                                                                                                                                                                                                                                                                            | Estado    |
+| --- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| D65 | **Juntar comidas = contenedor reversible, persistido por IDs** | Arrastrar comidas registradas a una **bandeja** -> `MealGroup { id, date, name?, mealIds[] }` con nombre opcional; total **derivado**; **Separar** deshace el contenedor y deja las hijas intactas. Sin hora ni slot propios; el grupo se coloca en la hija mas temprana. **Amplia D36 y respeta D57**; reversible por D33. `SCHEMA_VERSION 3 -> 4` con migracion tolerante        | propuesta |
+| D66 | **Gesto de agrupar: asa de arrastre con fallback accesible**   | El gesto primario es **arrastrar el asa de 6 puntos** de una comida a la **bandeja de grupo** (tactil y raton, punteros propios); arrastrar a un grupo existente anade la comida y arrastrar una hija fuera la separa. Tocar el asa (o Enter/Espacio) **acopia/desacopia** como alternativa accesible (D16/WCAG 2.5.1); el asa mide **>= 44 px**. Sin checkboxes ni modo seleccion | propuesta |
 
 ## Alcance
 
@@ -123,10 +127,10 @@ comidas; sus totales son **suma de hijos**, nunca almacenados.
   `src/core/schema.ts` (esquema del grupo); `src/core/migrate.ts` (v3 -> v4, tolerante
   y aceptando explicitamente `version === 3`); `src/core/timeline.ts` (plegado por
   grupo); `src/core/export.ts` (los grupos viajan en el export/import).
-- **UI:** `src/main.ts` (`renderDiary` 1655 y `mealEntry` 1520 para seleccion y
-  contenedor; `entryActions` 1437 para _Juntar/Separar_; boton `Seleccionar` y
-  long-press en la tarjeta de comida); `src/style.css` (fila de grupo, checkbox de
-  seleccion, >=44 px, reduced-motion).
+- **UI:** `src/main.ts` (`renderDiary`/`mealEntry` con el **asa de arrastre** y la
+  **bandeja de grupo**; `groupEntry` con las asas de las hijas; `entryActions` para
+  _Juntar/Separar_; DnD propio por punteros); `src/style.css` (bandeja, asa >= 44 px,
+  fantasma de arrastre, `forced-colors`, reduced-motion).
 - **i18n:** `src/i18n/index.ts` (claves ES/EN, guarda de paridad).
 - **E2E:** `e2e/scenarios.mjs`, `e2e/scenarios-records.mjs`, `e2e/helpers.mjs`.
 - Sin dependencias nuevas; sin red; sin backend/analitica (D11).
@@ -137,9 +141,12 @@ comidas; sus totales son **suma de hijos**, nunca almacenados.
   > =2 y pertenencia al dia), `groupCarbs(group, meals)` (derivado), `ungroup` ->
   > devuelve las comidas intactas, `pruneGroups(groups, meals)` -> deshace los grupos con
   > <2 hijas. Sin I/O.
-- **F1b.** En el Diario, una entrada visible `Seleccionar` (boton) y **pulsacion larga**
-  sobre una comida entran en modo seleccion (checkbox >= 44 px sobre las comidas del
-  dia); con >=2 elegidas, _Juntar_ crea el contenedor y anuncia (`diary.grouped`).
+- **F1b.** En el Diario, cada comida (y cada hija de un grupo) lleva un **asa de
+  arrastre** de 6 puntos (>= 44 px, boton real). **Arrastrarla** a la **bandeja de
+  grupo** la acopia; con >=2 acopiadas, _Juntar_ crea el contenedor y anuncia
+  (`diary.grouped`). Arrastrarla sobre un grupo existente la anade; arrastrar una hija
+  fuera de su grupo la separa (cascada si <2). Tocar el asa (o Enter/Espacio) es el
+  fallback accesible: acopia/desacopia.
 - **F1c.** El contenedor se muestra como una entrada con **nombre** (o "N comidas" si no
   se nombra) y **total derivado**; al expandir, lista las comidas hijas (mismo
   `createToggle`, SPEC 22 B5).
@@ -154,26 +161,28 @@ comidas; sus totales son **suma de hijos**, nunca almacenados.
 
 ### i18n
 
-| Clave                    | ES                                | EN                        |
-| ------------------------ | --------------------------------- | ------------------------- |
-| `button.group`           | Juntar                            | Group                     |
-| `button.ungroup`         | Separar                           | Ungroup                   |
-| `button.select`          | Seleccionar                       | Select                    |
-| `button.cancelSelect`    | Cancelar seleccion                | Cancel selection          |
-| `diary.group`            | Comida agrupada                   | Grouped meal              |
-| `diary.groupName`        | Nombre del grupo (opcional)       | Group name (optional)     |
-| `diary.groupCount`       | {n} comidas                       | {n} meals                 |
-| `diary.groupSelect`      | Elige las comidas a juntar        | Pick the meals to group   |
-| `diary.groupSelectHint`  | Manten pulsado o usa Seleccionar. | Long-press or use Select. |
-| `diary.grouped` (aria)   | Comidas agrupadas.                | Meals grouped.            |
-| `diary.ungrouped` (aria) | Comidas separadas.                | Meals split apart.        |
+| Clave                    | ES                                                           | EN                                                            |
+| ------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------- |
+| `button.group`           | Juntar                                                       | Group                                                         |
+| `button.ungroup`         | Separar                                                      | Ungroup                                                       |
+| `diary.group`            | Comida agrupada                                              | Grouped meal                                                  |
+| `diary.groupName`        | Nombre del grupo (opcional)                                  | Group name (optional)                                         |
+| `diary.groupCount`       | {n} comidas                                                  | {n} meals                                                     |
+| `diary.groupTray`        | Grupo                                                        | Group                                                         |
+| `diary.groupTrayHint`    | Arrastra comidas aquí para agruparlas.                       | Drag meals here to group them.                                |
+| `diary.dragHandle`       | Mover comida                                                 | Move meal                                                     |
+| `diary.dropHere`         | Suelta para agrupar                                          | Drop to group                                                 |
+| `diary.staged`           | En el grupo                                                  | In the group                                                  |
+| `diary.groupSelectHint`  | Toca el asa de una comida para ponerla o quitarla del grupo. | Tap a meal's handle to add it to or remove it from the group. |
+| `diary.grouped` (aria)   | Comidas agrupadas.                                           | Meals grouped.                                                |
+| `diary.ungrouped` (aria) | Comidas separadas.                                           | Meals split apart.                                            |
 
 ## Criterios de aceptacion
 
 Los criterios marcados _(m)_ se comprueban con una formula concreta (Tests).
 
-1. Con >=2 comidas en el dia, multi-seleccionar y _Juntar_ las muestra como **una**
-   entrada con el total = **suma** de los carbos de las hijas. _(m)_
+1. Con >=2 comidas en el dia, **arrastrar** dos asas a la **bandeja** y _Juntar_ las
+   muestra como **una** entrada con el total = **suma** de los carbos de las hijas. _(m)_
 2. _Separar_ deshace el contenedor y deja las comidas hijas **intactas** (mismos `id`,
    hora, items, origen, confianza); una hija editada conserva su edicion. _(m)_
 3. El grupo **no** introduce `slot`; las hijas conservan su hora; el reparto por momento
@@ -185,8 +194,9 @@ Los criterios marcados _(m)_ se comprueban con una formula concreta (Tests).
    deshace solo. _(m)_
 7. **Persistencia:** un grupo sobrevive a la recarga; un `Vault` **v3** migra a **v4**
    sin perdida y sin romper (se acepta `version === 3`). _(m)_
-8. **Accesibilidad:** hay una entrada visible (`Seleccionar`) y las comidas se pueden
-   seleccionar por teclado; los checkbox miden **>= 44 px**. _(m)_
+8. **Accesibilidad:** el asa de arrastre es un **boton real** de **>= 44 px** con nombre
+   accesible; tocarla (o Enter/Espacio) acopia/desacopia la comida (WCAG 2.5.1), sin
+   checkboxes ni modo seleccion. _(m)_
 9. **i18n:** toda clave nueva existe en **es** y **en**; guarda de paridad intacta.
 10. **Sin regresiones:** SPEC 22 (nav, linea de tiempo, resumen), 23 (quick-add,
     objetivo, repetir) y 24 (borrador, busqueda, categorias) siguen verdes.

@@ -13,6 +13,7 @@ import {
   emptyVault,
   fromJson,
   groupCarbs,
+  groupChildren,
   groupMeals,
   hasMacros,
   isCarbSource,
@@ -274,13 +275,11 @@ let capture: CapturedImage | null = null;
 let vault: Vault = emptyVault();
 
 /**
- * Seleccion multiple de comidas (SPEC 25 / D65-D66). Es estado de UI: no toca el
- * dominio. `selectedMealIds` solo vive mientras `selectingMeals` esta activo.
+ * Acopio de comidas para juntarlas (SPEC 25 / D65-D66). Es estado de UI: no toca
+ * el dominio. `selectedMealIds` es el conjunto de comidas acopiadas en la bandeja.
  */
-let selectingMeals = false;
 const selectedMealIds = new Set<string>();
-const LONG_PRESS_MS = 500;
-const LONG_PRESS_MOVE_PX = 10;
+const DRAG_THRESHOLD_PX = 6;
 
 /**
  * Borrador persistente (D62): se guarda con `debounce` en cada mutacion y se
@@ -573,12 +572,15 @@ app.innerHTML = `
       </ul>
     </div>
     <ul id="diary"></ul>
-    <div id="diary-tools" class="diary-tools" hidden>
-      <button id="select-meals" type="button" class="select-meals" data-i18n="button.select"></button>
-      <div id="group-controls" class="group-controls" role="group" data-i18n-aria="diary.groupSelect" hidden>
-        <button id="group-meals" type="button" class="group-meals primary" data-i18n="button.group" disabled></button>
+    <div id="group-tray" class="group-tray" role="group" data-i18n-aria="diary.groupTray" aria-describedby="group-tray-desc" hidden>
+      <p class="group-tray-title" data-i18n="diary.groupTray"></p>
+      <p class="group-tray-hint muted" data-i18n="diary.groupTrayHint"></p>
+      <p class="group-tray-drop" data-i18n="diary.dropHere"></p>
+      <p id="group-tray-desc" class="sr-only" data-i18n="diary.groupSelectHint"></p>
+      <ul id="group-staged" class="group-staged" data-i18n-aria="diary.staged"></ul>
+      <div class="group-controls">
         <input id="group-name" type="text" data-i18n-ph="diary.groupName" data-i18n-aria="diary.groupName" />
-        <p class="muted" data-i18n="diary.groupSelectHint"></p>
+        <button id="group-meals" type="button" class="group-meals primary" data-i18n="button.group" disabled></button>
       </div>
     </div>
     <p id="diary-status" class="sr-only" role="status" aria-live="polite"></p>
@@ -1730,6 +1732,8 @@ const SVG_UTENSILS = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
 const SVG_DROPLET = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>`;
 /** Marcador del grupo (D65): capas apiladas, distinto del plato y de la gota. */
 const SVG_LAYERS = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`;
+/** Asa de arrastre (D65/D66): rejilla de 6 puntos (grip). */
+const SVG_GRIP = `<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>`;
 
 /**
  * Entradas del diario expandidas en esta sesion (B5): la revelacion progresiva
@@ -1816,8 +1820,7 @@ function resetEdit(): void {
   editingMeal = null;
   repeatPending = false;
   draft = { origin: 'manual', items: [] };
-  // Al cambiar de contexto se abandona el modo seleccion (D66).
-  selectingMeals = false;
+  // Al cambiar de contexto se abandona el grupo a medio armar (D65).
   selectedMealIds.clear();
   // D62: registrar o cancelar descarta el borrador persistido.
   eraseStoredDraft();
@@ -1878,67 +1881,326 @@ function removeInsulin(log: InsulinLog): void {
   void deleteInsulin(log.id).then(refresh);
 }
 
-/** Sincroniza los controles de agrupar con el estado de seleccion (D65/D66). */
-function syncGroupControls(): void {
-  const selectButton = byId('select-meals');
-  selectButton.dataset.i18n = selectingMeals ? 'button.cancelSelect' : 'button.select';
-  selectButton.textContent = tr(selectingMeals ? 'button.cancelSelect' : 'button.select');
-  byId('group-controls').hidden = !selectingMeals;
-  byId<HTMLButtonElement>('group-meals').disabled = selectedMealIds.size < 2;
+/** Comida acopiada por id, dentro del dia en vista. */
+function stagedMeal(mealId: string): Meal | undefined {
+  return mealsForDate(vault.meals, currentDate).find((meal) => meal.id === mealId);
 }
 
-/** Sale del modo seleccion y limpia la seleccion y el nombre a medias (D65). */
-function exitSelectionMode(): void {
-  selectingMeals = false;
-  selectedMealIds.clear();
-  byId<HTMLInputElement>('group-name').value = '';
-  renderDiary();
+/** Grupo por id (o `undefined` si no existe). */
+function groupById(groupId: string): MealGroup | undefined {
+  return (vault.groups ?? []).find((group) => group.id === groupId);
+}
+
+/** Ids de las hijas existentes de `group` (lectura tolerante del dominio). */
+function childIds(group: MealGroup): string[] {
+  return groupChildren(group, vault.meals).map((meal) => meal.id);
 }
 
 /**
- * Pulsacion larga (D66): tras ~500 ms sin cancelar (pointerup/cancel/leave o un
- * movimiento grande) entra en modo seleccion y marca esa comida. No secuestra
- * pulsaciones sobre controles (toggle, checkbox, enlaces).
+ * Sincroniza la bandeja de grupo (SPEC 25 / D65-D66) con el acopio: pinta los
+ * chips de las comidas acopiadas, habilita _Juntar_ con >= 2 y marca cada asa
+ * como pulsada. No reconstruye la lista del diario (no pierde el foco, D16).
  */
-function attachLongPress(el: HTMLElement, mealId: string): void {
-  let timer: number | null = null;
+function syncGroupControls(): void {
+  const staged = byId<HTMLUListElement>('group-staged');
+  staged.innerHTML = '';
+  for (const mealId of selectedMealIds) {
+    const meal = stagedMeal(mealId);
+    if (!meal) continue;
+    const name = mealName(meal);
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'group-staged-chip';
+    chip.setAttribute('aria-label', `${tr('button.remove')}: ${name}`);
+    chip.textContent = `${name} \u00d7`;
+    chip.addEventListener('click', () => toggleStaged(mealId));
+    const item = document.createElement('li');
+    item.className = 'group-staged-item';
+    item.appendChild(chip);
+    staged.appendChild(item);
+  }
+  byId<HTMLButtonElement>('group-meals').disabled = selectedMealIds.size < 2;
+  for (const handle of app.querySelectorAll<HTMLButtonElement>('.drag-handle')) {
+    const mealId = handle.dataset.mealId;
+    handle.setAttribute(
+      'aria-pressed',
+      String(mealId !== undefined && selectedMealIds.has(mealId)),
+    );
+  }
+}
+
+/**
+ * Acopia/desacopia una comida para el grupo. Es el fallback accesible del
+ * arrastre (WCAG 2.5.1): toque sobre el asa o Enter/Espacio.
+ */
+function toggleStaged(mealId: string): void {
+  if (selectedMealIds.has(mealId)) {
+    selectedMealIds.delete(mealId);
+    clearStatus('diary-status');
+  } else {
+    selectedMealIds.add(mealId);
+    setStatus('diary-status', 'diary.staged');
+  }
+  syncGroupControls();
+}
+
+/**
+ * Fallback accesible de un asa (toque sin arrastre, o Enter/Espacio). Coincide
+ * con el gesto de arrastre: un asa suelta acopia/desacopia de la bandeja; un asa
+ * de hija separa esa comida de su grupo (no la acopia, que seria incoherente).
+ */
+function activateHandle(payload: DragPayload): void {
+  if (payload.fromGroupId !== undefined) {
+    const group = groupById(payload.fromGroupId);
+    if (group) void separateChild(group, payload.mealId);
+    return;
+  }
+  toggleStaged(payload.mealId);
+}
+
+/** Payload de un asa arrastrable: la comida y, si es hija, su grupo de origen. */
+interface DragPayload {
+  mealId: string;
+  fromGroupId?: string;
+}
+
+/** Asa de arrastre (SPEC 25 / D65-D66): boton real con el icono de 6 puntos. */
+function dragHandle(
+  mealId: string,
+  fromGroupId: string | undefined,
+  label: string,
+): HTMLButtonElement {
+  const handle = document.createElement('button');
+  handle.type = 'button';
+  handle.className = 'drag-handle';
+  handle.dataset.mealId = mealId;
+  if (fromGroupId !== undefined) handle.dataset.fromGroupId = fromGroupId;
+  handle.setAttribute('aria-label', `${tr('diary.dragHandle')}: ${label}`);
+  handle.setAttribute('aria-pressed', String(selectedMealIds.has(mealId)));
+  handle.innerHTML = SVG_GRIP;
+  // `exactOptionalPropertyTypes`: se omite `fromGroupId` cuando no procede.
+  attachDragHandle(handle, fromGroupId !== undefined ? { mealId, fromGroupId } : { mealId });
+  return handle;
+}
+
+/**
+ * Arrastrar y soltar propio (SPEC 25 / D65-D66): `pointerdown` + captura de
+ * puntero, umbral de ~6 px, fantasma que sigue al puntero y hit-test con
+ * `elementFromPoint`. Funciona con dedo y raton, sin `draggable` HTML5.
+ *
+ * Un toque sin arrastre (o Enter/Espacio en el asa) acopia/desacopia la comida:
+ * es la alternativa accesible al gesto de arrastre (WCAG 2.5.1).
+ */
+function attachDragHandle(handle: HTMLButtonElement, payload: DragPayload): void {
   let start: { x: number; y: number } | null = null;
-  const cancel = (): void => {
-    if (timer !== null) {
-      window.clearTimeout(timer);
-      timer = null;
-    }
-    start = null;
+  let dragging = false;
+  let ghost: HTMLElement | null = null;
+  let over: HTMLElement | null = null;
+  let pointerId: number | null = null;
+  const label = handle.getAttribute('aria-label') ?? '';
+
+  const source = (): HTMLElement | null => handle.closest<HTMLElement>('.timeline-entry');
+
+  const moveGhost = (x: number, y: number): void => {
+    if (!ghost) return;
+    ghost.style.left = `${x}px`;
+    ghost.style.top = `${y}px`;
   };
-  el.addEventListener('pointerdown', (event) => {
-    if (selectingMeals) return;
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    const target = event.target as HTMLElement | null;
-    if (target?.closest('button, a, input, label, select, textarea')) return;
-    start = { x: event.clientX, y: event.clientY };
-    if (timer !== null) window.clearTimeout(timer);
-    timer = window.setTimeout(() => {
-      timer = null;
-      start = null;
-      selectingMeals = true;
-      selectedMealIds.add(mealId);
-      renderDiary();
-    }, LONG_PRESS_MS);
-  });
-  el.addEventListener('pointerup', cancel);
-  el.addEventListener('pointercancel', cancel);
-  el.addEventListener('pointerleave', cancel);
-  el.addEventListener('pointermove', (event) => {
-    if (timer === null || start === null) return;
-    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > LONG_PRESS_MOVE_PX) {
-      cancel();
+
+  const clearOver = (): void => {
+    if (over) over.classList.remove('is-dragover');
+    over = null;
+  };
+
+  const onKey = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') cleanup();
+  };
+
+  const cleanup = (): void => {
+    if (pointerId !== null) {
+      try {
+        handle.releasePointerCapture(pointerId);
+      } catch {
+        /* sin captura activa */
+      }
     }
+    pointerId = null;
+    start = null;
+    dragging = false;
+    clearOver();
+    source()?.classList.remove('is-dragging');
+    ghost?.remove();
+    ghost = null;
+    document.body.classList.remove('dnd-active');
+    window.removeEventListener('keydown', onKey);
+  };
+
+  const begin = (event: PointerEvent): void => {
+    dragging = true;
+    source()?.classList.add('is-dragging');
+    document.body.classList.add('dnd-active');
+    ghost = document.createElement('div');
+    ghost.className = 'drag-ghost';
+    ghost.textContent = label;
+    document.body.appendChild(ghost);
+    moveGhost(event.clientX, event.clientY);
+    window.addEventListener('keydown', onKey);
+  };
+
+  const hitTest = (x: number, y: number): void => {
+    const under = document.elementFromPoint(x, y) as HTMLElement | null;
+    const next =
+      under?.closest<HTMLElement>('#group-tray') ??
+      under?.closest<HTMLElement>('.timeline-card--group') ??
+      null;
+    if (next === over) return;
+    clearOver();
+    if (next) {
+      next.classList.add('is-dragover');
+      over = next;
+    }
+  };
+
+  handle.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    start = { x: event.clientX, y: event.clientY };
+    pointerId = event.pointerId;
+    try {
+      handle.setPointerCapture(event.pointerId);
+    } catch {
+      /* captura de puntero no disponible */
+    }
+  });
+
+  handle.addEventListener('pointermove', (event) => {
+    if (start === null) return;
+    if (!dragging) {
+      if (Math.hypot(event.clientX - start.x, event.clientY - start.y) < DRAG_THRESHOLD_PX) {
+        return;
+      }
+      begin(event);
+    }
+    moveGhost(event.clientX, event.clientY);
+    hitTest(event.clientX, event.clientY);
+  });
+
+  handle.addEventListener('pointerup', (event) => {
+    if (!dragging) {
+      // Un toque sin arrastre: fallback accesible (como Enter/Espacio).
+      cleanup();
+      activateHandle(payload);
+      return;
+    }
+    const under = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
+    const overTray = Boolean(under?.closest('#group-tray'));
+    const card = under?.closest<HTMLElement>('.timeline-card--group') ?? null;
+    const targetGroup = card ? groupById(card.dataset.groupId ?? '') : undefined;
+    cleanup();
+    void applyDrop(payload, overTray, targetGroup ?? null);
+  });
+
+  handle.addEventListener('pointercancel', cleanup);
+  // Solo llegan clics de teclado (detail 0): raton/tactil ya se resolvieron en
+  // `pointerup`. Asi no hay doble alternancia entre toque y teclado.
+  handle.addEventListener('click', (event) => {
+    if (event.detail !== 0) return;
+    activateHandle(payload);
   });
 }
 
 /**
- * Juntar las comidas seleccionadas del dia (D65). Pasa el nombre opcional y un id
- * fresco; persiste el contenedor, anuncia y sale del modo seleccion.
+ * Resuelve un soltado (SPEC 25 / D65-D66). Reutiliza `putGroup`/`deleteGroup` y
+ * `groupMeals` para persistir; cualquier caso no contemplado no cambia nada.
+ */
+async function applyDrop(
+  payload: DragPayload,
+  overTray: boolean,
+  targetGroup: MealGroup | null,
+): Promise<void> {
+  const origin = payload.fromGroupId ? groupById(payload.fromGroupId) : undefined;
+
+  // Hija soltada sobre su propio grupo: sin cambios.
+  if (origin && targetGroup && targetGroup.id === origin.id) return;
+
+  // Hija soltada en otro grupo: se mueve.
+  if (origin && targetGroup) {
+    await moveChildToGroup(origin, targetGroup, payload.mealId);
+    return;
+  }
+
+  // Hija soltada fuera de su grupo (bandeja o fuera): se separa (cascada si <2).
+  if (origin) {
+    await separateChild(origin, payload.mealId);
+    return;
+  }
+
+  // Comida suelta: a la bandeja (acopiar) o a un grupo concreto.
+  if (overTray) {
+    if (!selectedMealIds.has(payload.mealId)) {
+      selectedMealIds.add(payload.mealId);
+      setStatus('diary-status', 'diary.staged');
+      syncGroupControls();
+    }
+    return;
+  }
+  if (targetGroup) await addMealToGroup(targetGroup, payload.mealId);
+}
+
+/** Persiste `group` con `ids`; lo borra si quedan < 2 hijas (cascada, F1f). */
+async function persistGroupIds(group: MealGroup, ids: string[]): Promise<void> {
+  if (ids.length >= 2) {
+    await putGroup(groupMeals(vault.meals, ids, group.name, group.id));
+  } else {
+    await deleteGroup(group.id);
+  }
+}
+
+/** Anade una comida suelta a un grupo existente (D65). */
+async function addMealToGroup(group: MealGroup, mealId: string): Promise<void> {
+  try {
+    await putGroup(groupMeals(vault.meals, [...childIds(group), mealId], group.name, group.id));
+  } catch {
+    return;
+  }
+  setStatus('diary-status', 'diary.grouped');
+  await refresh();
+}
+
+/** Separa una hija de su grupo; si quedan < 2 hijas, deshace el contenedor. */
+async function separateChild(group: MealGroup, mealId: string): Promise<void> {
+  try {
+    await persistGroupIds(
+      group,
+      childIds(group).filter((id) => id !== mealId),
+    );
+  } catch {
+    return;
+  }
+  setStatus('diary-status', 'diary.ungrouped');
+  await refresh();
+}
+
+/** Mueve una hija de `origin` a `target` (separando y agrupando a la vez). */
+async function moveChildToGroup(
+  origin: MealGroup,
+  target: MealGroup,
+  mealId: string,
+): Promise<void> {
+  const targetIds = [...childIds(target), mealId];
+  const originIds = childIds(origin).filter((id) => id !== mealId);
+  try {
+    await putGroup(groupMeals(vault.meals, targetIds, target.name, target.id));
+    await persistGroupIds(origin, originIds);
+  } catch {
+    return;
+  }
+  setStatus('diary-status', 'diary.grouped');
+  await refresh();
+}
+
+/**
+ * Juntar las comidas acopiadas del dia (D65). Pasa el nombre opcional y un id
+ * fresco; persiste el contenedor, anuncia y vacia el acopio.
  */
 function groupSelectedMeals(): void {
   const dayMeals = mealsForDate(vault.meals, currentDate);
@@ -1948,13 +2210,12 @@ function groupSelectedMeals(): void {
   try {
     group = groupMeals(dayMeals, [...selectedMealIds], name || undefined, uid());
   } catch {
-    // Seleccion invalida (p. ej. cambia la fecha): no se agrupa.
+    // Acopio invalido (p. ej. cambia la fecha): no se agrupa.
     return;
   }
   void putGroup(group)
     .then(() => {
       input.value = '';
-      selectingMeals = false;
       selectedMealIds.clear();
       setStatus('diary-status', 'diary.grouped');
       return refresh();
@@ -1991,27 +2252,13 @@ function mealEntry(meal: Meal): HTMLLIElement {
   card.className = 'timeline-card';
 
   const head = document.createElement('div');
-  head.className = 'timeline-head';
+  head.className = 'timeline-head has-handle';
 
-  // Modo seleccion (D65/D66): checkbox >= 44 px por comida, con nombre accesible.
-  if (selectingMeals) {
-    const label = document.createElement('label');
-    label.className = 'select-meal';
-    const box = document.createElement('input');
-    box.type = 'checkbox';
-    box.className = 'select-meal';
-    box.checked = selectedMealIds.has(meal.id);
-    box.setAttribute('aria-label', mealName(meal));
-    box.addEventListener('change', () => {
-      if (box.checked) selectedMealIds.add(meal.id);
-      else selectedMealIds.delete(meal.id);
-      // Actualiza los controles en el sitio: reconstruir la lista perderia el
-      // foco del teclado tras cada casilla (D16).
-      syncGroupControls();
-    });
-    label.appendChild(box);
-    head.appendChild(label);
-  }
+  // Asa de arrastre (D65/D66): arrastra a la bandeja o a un grupo; un toque
+  // acopia/desacopia (alternativa accesible, WCAG 2.5.1). El CSS la saca de
+  // flujo (anclada a la tarjeta) para que NO engorde la fila: el presupuesto de
+  // alto (SPEC 22, criterio 14) no debe pagar por el asa.
+  head.appendChild(dragHandle(meal.id, undefined, mealName(meal)));
 
   head.appendChild(i18nEl('span', 'diary.meal', 'timeline-kind'));
   head.appendChild(
@@ -2093,7 +2340,6 @@ function mealEntry(meal: Meal): HTMLLIElement {
   main.appendChild(createToggle(`meal:${meal.id}`, mealName(meal), detail));
   card.append(head, main, detail);
   item.appendChild(card);
-  attachLongPress(card, meal.id);
   return item;
 }
 
@@ -2114,6 +2360,8 @@ function groupEntry(group: MealGroup, meals: Meal[]): HTMLLIElement {
 
   const card = document.createElement('div');
   card.className = 'timeline-card timeline-card--group';
+  // Destino de soltado (D65/D66): una comida suelta se anade a este grupo.
+  card.dataset.groupId = group.id;
 
   const detailName =
     group.name?.trim() || tr('diary.groupCount').replace('{n}', String(meals.length));
@@ -2148,7 +2396,8 @@ function groupEntry(group: MealGroup, meals: Meal[]): HTMLLIElement {
     const childCarbs = document.createElement('span');
     childCarbs.className = 'chip-carbs';
     childCarbs.textContent = `${roundCarbs(mealCarbs(child))} ${tr('unit.grams')}`;
-    childItem.append(name, childCarbs);
+    // Asa de la hija: arrastrarla fuera la separa; soltarla en otro grupo la mueve.
+    childItem.append(dragHandle(child.id, group.id, mealName(child)), name, childCarbs);
     children.appendChild(childItem);
   }
   detail.appendChild(children);
@@ -2239,13 +2488,14 @@ function renderDiary(): void {
     if (cell) cell.textContent = `${roundCarbs(moments[moment])} ${tr('unit.grams')}`;
   }
   summary.hidden = entries.length === 0;
-  // Los controles de agrupar viven bajo la lista (no empujan las entradas en
-  // pantallas de 320 px, criterio 14 de SPEC 22) y solo aparecen con comidas.
-  byId('diary-tools').hidden = dayMeals.length === 0;
+  // La bandeja de grupo vive bajo la lista (no empuja las entradas en pantallas
+  // de 320 px, criterio 14 de SPEC 22) y solo aparece con >= 2 comidas: un grupo
+  // necesita dos hijas (D65).
+  byId('group-tray').hidden = dayMeals.length < 2;
 
-  // D65: la seleccion solo puede apuntar a comidas del dia en vista; se
-  // reconcilia en cada render (p. ej. si una elegida se borra estando en modo
-  // seleccion) para que Juntar no quede habilitado sin efecto.
+  // D65: el acopio solo puede apuntar a comidas del dia en vista; se reconcilia
+  // en cada render (p. ej. si una acopiada se borra) para que Juntar no quede
+  // habilitado sin efecto.
   for (const mealId of [...selectedMealIds]) {
     if (!dayMeals.some((meal) => meal.id === mealId)) selectedMealIds.delete(mealId);
   }
@@ -2498,15 +2748,7 @@ function wire(): void {
   byId('day-next').addEventListener('click', () => shiftDay(1));
   byId('day-today').addEventListener('click', () => setDay(today()));
 
-  // Agrupar (D65/D66): el boton visible alterna el modo seleccion; Juntar crea el
-  // contenedor con las comidas elegidas del dia en vista.
-  byId('select-meals').addEventListener('click', () => {
-    if (selectingMeals) exitSelectionMode();
-    else {
-      selectingMeals = true;
-      renderDiary();
-    }
-  });
+  // Juntar (D65/D66): crea el contenedor con las comidas acopiadas en la bandeja.
   byId('group-meals').addEventListener('click', groupSelectedMeals);
 
   const onFile = (event: Event): void => {

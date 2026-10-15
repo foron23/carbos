@@ -1010,8 +1010,9 @@ export const scenarios = [
       });
       await waitFor(page, '#barcode-panel:not([hidden]) #barcode-scan');
 
-      // 1) El pack se descarga SOLO al abrir la pestana (auto-preparacion:
-      //    manifest -> sha256 -> IndexedDB), sin pulsar nada; sigue offline.
+      // 1) Con autopack apagado en el arnes, el pack se descarga al abrir la
+      //    pestana (auto-preparacion: manifest -> sha256 -> IndexedDB), sin
+      //    pulsar nada; sigue offline.
       await waitForText(page, '#barcode-status', 'Pack descargado');
       // El manual/online viven en "Mas opciones" (details): abrirlo.
       await page.$eval('#barcode-panel details', (el) => {
@@ -1044,6 +1045,88 @@ export const scenarios = [
       const products = await readStore(page, 'products');
       assertEqual(products.length, 2, 'la resolucion en linea cachea el producto');
       await screenshot(page, 'codigo-barras-online');
+    },
+  },
+  {
+    // El pack se descarga SOLO, al ARRANCAR (en segundo plano), para tener
+    // escaneo offline "de primeras" (SPEC 17). El resto de escenarios lo apaga
+    // (openApp deja carbos.barcode.autopack en false) para no bajar ~6 MB en cada
+    // carga; aqui se reactiva y se comprueba que el store queda poblado SIN abrir
+    // la pestana "Codigo".
+    name: 'el pack de codigos de barras se descarga solo al arrancar',
+    async run(page, ctx) {
+      const packBarcode = '4006381333931';
+      const packLine =
+        JSON.stringify({
+          barcode: packBarcode,
+          name: { es: 'Producto de arranque', en: 'Startup product' },
+          carbsPer100g: 20,
+          source: 'test',
+          savedAt: 0,
+        }) + '\n';
+      const packRaw = Buffer.from(packLine, 'utf8');
+      const packGz = gzipSync(packRaw, { mtime: 0 });
+      const sha256 = createHash('sha256').update(packGz).digest('hex');
+      const sha256Raw = createHash('sha256').update(packRaw).digest('hex');
+      const packUrl = 'https://packs.test/es.jsonl.gz';
+      await installBarcodeFetchStub(page, {
+        manifest: {
+          format: 'carbos-barcode-packs',
+          version: 1,
+          packs: [
+            {
+              id: 'es',
+              locale: 'es',
+              url: packUrl,
+              sha256,
+              bytes: packGz.byteLength,
+              sha256_raw: sha256Raw,
+              raw_bytes: packRaw.byteLength,
+              product_count: 1,
+              generated_at: '2026-01-01T00:00:00Z',
+            },
+          ],
+        },
+        packUrl,
+        packBase64: packGz.toString('base64'),
+      });
+      await openApp(page, ctx.base);
+      // Reactiva la descarga automatica y recarga (es el arranque real).
+      await page.evaluate(() => localStorage.setItem('carbos.barcode.autopack', 'true'));
+      await reload(page);
+      await waitFor(page, '#app header h1');
+
+      // La pestana "Codigo" NUNCA se abre en este escenario.
+      assert(
+        await page.$eval('#barcode-panel', (el) => el.hidden),
+        'no se abre la pestana Codigo: la provision es de fondo',
+      );
+      // El pack se importa en segundo plano: se espera al store `products`.
+      await page.waitForFunction(
+        () =>
+          new Promise((resolve) => {
+            const request = indexedDB.open('carbos');
+            request.onerror = () => resolve(false);
+            request.onsuccess = () => {
+              const db = request.result;
+              const count = db.transaction('products', 'readonly').objectStore('products').count();
+              count.onsuccess = () => {
+                const n = count.result;
+                db.close();
+                resolve(n >= 1);
+              };
+              count.onerror = () => {
+                db.close();
+                resolve(false);
+              };
+            };
+          }),
+        { timeout: 8000 },
+      );
+      const imported = await readStore(page, 'products');
+      assertEqual(imported.length, 1, 'el pack se importa al arrancar, sin abrir la pestana');
+      assertEqual(imported[0]?.barcode, packBarcode, 'el producto del pack queda en el store');
+      await screenshot(page, 'codigo-barras-arranque');
     },
   },
   {

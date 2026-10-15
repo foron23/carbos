@@ -61,8 +61,8 @@ const PASSES = [
     height: 844,
     detections: true,
   },
-  // Pasada de agrupacion (SPEC 25): registra comidas y entra en seleccion para
-  // que la regla de objetivo tactil (MIN_HIT) cubra Seleccionar/Juntar/casilla.
+  // Pasada de agrupacion (SPEC 25): registra comidas y acopia dos para que la
+  // regla de objetivo tactil (MIN_HIT) cubra las asas de arrastre y Juntar.
   { id: 'grupo-390x844', width: 390, height: 844, grouping: true },
   // Pasada de escritorio (>= 64rem) imprescindible para verificar el rail.
   { id: 'desktop-1280x800', width: 1280, height: 800 },
@@ -327,9 +327,9 @@ async function launchBrowser(pass) {
 }
 
 /**
- * Pasada de agrupacion (SPEC 25): registra 2 comidas y entra en modo seleccion
- * para que `collect()` aplique la regla de objetivo tactil y nombre accesible a
- * `Seleccionar`, `Juntar`, la casilla (via su etiqueta) y el nombre del grupo.
+ * Pasada de agrupacion (SPEC 25): registra 2 comidas y las acopia tocando sus
+ * asas de arrastre, para que `collect()` aplique la regla de objetivo tactil y
+ * nombre accesible a asas, chips acopiados, Juntar y el nombre del grupo.
  */
 async function seedGrouping(page) {
   for (const query of ['pan', 'manzana']) {
@@ -350,20 +350,16 @@ async function seedGrouping(page) {
     await page.$eval('#register', (el) => el.click());
     await wait(250);
   }
-  await page.$eval('#select-meals', (el) => el.click());
-  await page.waitForSelector('#diary .select-meal input[type="checkbox"]', { timeout: 8000 });
-}
-
-/** Agrupa las comidas sembradas y comprueba que Separar es tactil y se nombra. */
-async function assertGroupingControls(page, fatal, prefix) {
-  await page.evaluate(() => {
-    document.querySelectorAll('#diary .select-meal input[type="checkbox"]').forEach((box) => {
-      if (!box.checked) box.click();
-    });
+  await page.$$eval('#diary .timeline-entry--meal .drag-handle', (handles) => {
+    handles.forEach((handle) => handle.click());
   });
   await page.waitForFunction(() => document.getElementById('group-meals')?.disabled === false, {
     timeout: 8000,
   });
+}
+
+/** Agrupa las comidas sembradas y comprueba que las asas y Separar son tactiles. */
+async function assertGroupingControls(page, fatal, prefix) {
   await page.$eval('#group-meals', (el) => el.click());
   await page.waitForSelector('#diary .timeline-entry--group .timeline-toggle', { timeout: 8000 });
   await page.$eval('#diary .timeline-entry--group .timeline-toggle', (el) => el.click());
@@ -385,6 +381,45 @@ async function assertGroupingControls(page, fatal, prefix) {
   }
   if (!info.label) fatal.push(`${prefix} Separar sin nombre accesible`);
   console.log(`  grupo: Separar ${info.width}x${info.height}px, nombre "${info.label}"`);
+
+  const targets = await page.evaluate(() => {
+    const report = {};
+    const handle = document.querySelector(
+      '#diary .timeline-entry--group .timeline-group-item .drag-handle',
+    );
+    if (handle) {
+      const rect = handle.getBoundingClientRect();
+      report.handle = {
+        h: Math.round(rect.height),
+        label: (handle.getAttribute('aria-label') || '').trim(),
+      };
+    }
+    const button = document.getElementById('group-meals');
+    if (button) {
+      const rect = button.getBoundingClientRect();
+      report.group = {
+        h: Math.round(rect.height),
+        label: (button.getAttribute('aria-label') || button.textContent || '').trim(),
+      };
+    }
+    return report;
+  });
+  if (!targets.handle) {
+    fatal.push(`${prefix} no hay asa de arrastre en las hijas del grupo`);
+  } else {
+    if (targets.handle.h < MIN_HIT) {
+      fatal.push(`${prefix} el asa de arrastre mide ${targets.handle.h}px < ${MIN_HIT}`);
+    }
+    if (!targets.handle.label) fatal.push(`${prefix} el asa de arrastre no tiene nombre`);
+  }
+  if (!targets.group) {
+    fatal.push(`${prefix} no hay boton Juntar visible`);
+  } else if (targets.group.h < MIN_HIT) {
+    fatal.push(`${prefix} Juntar mide ${targets.group.h}px < ${MIN_HIT}`);
+  }
+  if (targets.handle) {
+    console.log(`  grupo: asa ${targets.handle.h}px, Juntar ${targets.group?.h ?? '?'}px`);
+  }
 }
 
 async function runPass(browser, base, fixture, pass, fatal) {

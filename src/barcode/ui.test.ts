@@ -1,5 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { importedPackIds, needsPackProvision, rememberPackIds } from './ui';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setBarcodeAutoDownloadEnabled } from './flag';
+import {
+  importedPackIds,
+  needsPackProvision,
+  rememberPackIds,
+  runProvision,
+  shouldAutoProvision,
+} from './ui';
 
 /**
  * El bug corregido: el escaneo decidia "ya tengo pack" por `countProducts() > 0`,
@@ -24,6 +31,7 @@ describe('provision de packs de codigo de barras', () => {
 
   afterEach(() => {
     delete (globalThis as { localStorage?: Storage }).localStorage;
+    vi.unstubAllGlobals();
   });
 
   it('pide provisionar el pack mientras no se haya importado ninguno', () => {
@@ -41,5 +49,44 @@ describe('provision de packs de codigo de barras', () => {
     rememberPackIds(['es', 'es-rest']);
     rememberPackIds(['es']);
     expect(importedPackIds().sort()).toEqual(['es', 'es-rest']);
+  });
+
+  it('activa la provision automatica al arranque por defecto', () => {
+    expect(shouldAutoProvision()).toBe(true);
+  });
+
+  it('no provisiona al arranque si el autopack esta desactivado', () => {
+    setBarcodeAutoDownloadEnabled(false);
+    expect(shouldAutoProvision()).toBe(false);
+  });
+
+  it('no vuelve a provisionar al arranque si ya hay pack importado', () => {
+    rememberPackIds(['es']);
+    expect(shouldAutoProvision()).toBe(false);
+  });
+
+  it('no provisiona al arranque sin red', () => {
+    vi.stubGlobal('navigator', { onLine: false });
+    expect(shouldAutoProvision()).toBe(false);
+  });
+
+  it('no re-descarga si ya esta provisionado (runProvision)', async () => {
+    const download = vi.fn(async () => {});
+    await runProvision({ imported: ['es'], count: async () => 0, download });
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it('descarga cuando no hay pack (runProvision)', async () => {
+    const download = vi.fn(async () => {});
+    await runProvision({ imported: [], count: async () => 0, download });
+    expect(download).toHaveBeenCalledTimes(1);
+  });
+
+  it('sin almacen persistente cae al contador de productos (runProvision)', async () => {
+    const download = vi.fn(async () => {});
+    await runProvision({ imported: null, count: async () => 5, download });
+    expect(download).not.toHaveBeenCalled();
+    await runProvision({ imported: null, count: async () => 0, download });
+    expect(download).toHaveBeenCalledTimes(1);
   });
 });

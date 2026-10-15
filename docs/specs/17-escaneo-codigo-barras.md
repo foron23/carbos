@@ -333,12 +333,25 @@ a la guarda de acentos del test. No renderizar `origin` si no se pinta en el dia
   disponible, cae a la **foto** o a la entrada manual. Las opciones secundarias
   (escribir el EAN, foto, descargar/importar pack, consulta en linea) viven en
   **"Mas opciones"**.
+- **Provision automatica al arranque (autopack)**: el pack del idioma se descarga
+  **por defecto al iniciar la app**, en segundo plano, siempre que haya red
+  (`navigator.onLine !== false`), para que el escaneo funcione **sin conexion desde
+  el primer uso**. Flag `carbos.barcode.autopack` (por defecto **activado**; solo se
+  apaga con el valor exacto `"false"`), independiente del opt-in de resolucion en
+  linea: un usuario en linea tambien recibe el pack. Idempotente (no re-descarga si
+  ya esta provisionado) y con reintento al evento `online` si el arranque fue
+  offline. **Privacidad**: es una descarga silenciosa (~6 MB comprimido por idioma)
+  desde el **mismo origen**; solo revela _que pack_ se pide, nunca que productos ni
+  datos del usuario. El boton **"Descargar pack"** sigue disponible como reintento
+  manual. Abrir la pestana "Codigo" (`prepare()`) y el primer escaneo siguen
+  asegurando el pack.
 - **Descarga automatizada**: manifest hospedado (`public/barcode-manifest.json`,
-  mismo origen; URL relativa `./barcode/es.jsonl.gz`) que la app consulta al pulsar
-  "Descargar pack"; descarga con progreso, **verifica sha256** e importa en IndexedDB.
-  Despues, offline. `make barcode-pack` genera el pack + el manifest y el pack viaja en
-  `dist/` junto con la app (mismo origen, sin CDN). El pack no se versiona
-  (`public/barcode/` ignorado; ODbL-1.0).
+  mismo origen; URL relativa `./barcode/es.jsonl.gz`) que la app consulta sola al
+  arrancar (provision automatica, arriba) y tambien al pulsar "Descargar pack"
+  (reintento manual); descarga con progreso, **verifica sha256** e importa en
+  IndexedDB. Despues, offline. `make barcode-pack` genera el pack + el manifest y el
+  pack viaja en `dist/` junto con la app (mismo origen, sin CDN). El pack no se
+  versiona (`public/barcode/` ignorado; ODbL-1.0).
 - **Fase B (opt-in)**: `src/barcode/lookup/` (cliente Open Food Facts v3), flag
   `carbos.barcode.online` (por defecto **off**), y en la UI un checkbox con **aviso**
   de que el codigo sale del dispositivo. Con el flag apagado no hay ninguna peticion;

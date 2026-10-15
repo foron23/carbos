@@ -2,7 +2,11 @@ import { isStringKey, t } from '../i18n';
 import type { Locale, StringKey } from '../i18n';
 import { decodeBarcodeFromFile } from './decode';
 import { downloadPack, fetchPacksManifest } from './download';
-import { isBarcodeOnlineEnabled, setBarcodeOnlineEnabled } from './flag';
+import {
+  isBarcodeAutoDownloadEnabled,
+  isBarcodeOnlineEnabled,
+  setBarcodeOnlineEnabled,
+} from './flag';
 import type { BarcodeFetcher } from './lookup/client';
 import { importPack, parseManifest } from './pack';
 import { resolveBarcode } from './resolve';
@@ -110,6 +114,38 @@ export function rememberPackIds(ids: readonly string[]): void {
  */
 export function needsPackProvision(imported: readonly string[]): boolean {
   return imported.length === 0;
+}
+
+/**
+ * Puerta de provision automatica al arranque (segundo plano). Respeta el flag de
+ * autopack (`carbos.barcode.autopack`, por defecto activo) y el estado de
+ * provision existente, pero **no** el flag de resolucion en linea: un usuario en
+ * linea tambien quiere el pack para escanear sin conexion. `navigator.onLine`
+ * solo bloquea si es exactamente `false`. Funcion pura y exportada para probarla.
+ */
+export function shouldAutoProvision(): boolean {
+  if (!isBarcodeAutoDownloadEnabled()) return false;
+  if (globalThis.navigator?.onLine === false) return false;
+  const imported = storedPackIds();
+  return imported === null || needsPackProvision(imported);
+}
+
+/**
+ * Logica pura de provision: descarga solo si no se ha importado ningun pack. Sin
+ * almacen persistente (`imported === null`) cae al contador de productos. Es el
+ * unico camino de descarga automatica; exportada para probarla sin DOM.
+ */
+export async function runProvision(input: {
+  imported: readonly string[] | null;
+  count: () => Promise<number>;
+  download: () => Promise<void>;
+}): Promise<void> {
+  if (input.imported === null) {
+    if ((await input.count()) > 0) return;
+  } else if (!needsPackProvision(input.imported)) {
+    return;
+  }
+  await input.download();
 }
 
 /**
@@ -260,25 +296,19 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
     void updatePackHint();
   }
 
-  // Descarga perezosa y automatica del pack: se lanza al abrir la pestana o en
-  // el primer escaneo, y el escaneo espera a que termine. No hay que pulsar nada.
+  // Provision unica del pack: descarga solo si no esta ya provisionado. La
+  // comparten el arranque (autopack) y el primer escaneo; el escaneo espera a
+  // que termine. Idempotente y sin promesas sin manejar.
   let packPrep: Promise<void> | null = null;
-  function ensurePack(): Promise<void> {
-    if (isBarcodeOnlineEnabled()) return Promise.resolve();
+  function provision(): Promise<void> {
     if (packPrep) return packPrep;
     packPrep = (async () => {
       try {
-        // La presencia de pack se mide por los packs IMPORTADOS, no por el store
-        // `products`: la consulta en linea cachea productos ahi mismo, asi que un
-        // store con datos no implica tener pack (regresion corregida).
-        const stored = storedPackIds();
-        if (stored === null) {
-          // Sin almacen persistente no se puede recordar: ultimo recurso, el store.
-          if ((await countProducts()) > 0) return;
-        } else if (!needsPackProvision(stored)) {
-          return;
-        }
-        await download();
+        await runProvision({
+          imported: storedPackIds(),
+          count: () => countProducts(),
+          download: () => download(),
+        });
       } catch {
         /* sin datos: el escaneo caera a "no encontrado" */
       } finally {
@@ -286,6 +316,13 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
       }
     })();
     return packPrep;
+  }
+
+  // Escaneo / apertura de la pestana: con la resolucion en linea activa no se
+  // descarga (camino en linea); en local se espera al pack.
+  function ensurePack(): Promise<void> {
+    if (isBarcodeOnlineEnabled()) return Promise.resolve();
+    return provision();
   }
 
   /** Muestra el aviso de "sin datos" mientras el store local este vacio. */
@@ -502,6 +539,21 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
     }
     paint();
     void updatePackHint();
+
+    // Provision automatica en segundo plano al construir el panel: el pack queda
+    // listo para escanear sin conexion desde el primer uso. Respeta el flag de
+    // autopack (`carbos.barcode.autopack`, por defecto activo), pero no el de
+    // resolucion en linea. Nunca se espera aqui: no bloquea la app.
+    if (shouldAutoProvision()) void provision();
+
+    // Reintento: si el arranque fue offline, el primer "online" lo intenta una
+    // vez. `provision` es idempotente (no re-descarga si ya hay pack).
+    let onlineRetried = false;
+    window.addEventListener('online', () => {
+      if (onlineRetried) return;
+      onlineRetried = true;
+      if (shouldAutoProvision()) void provision();
+    });
   };
 
   const refresh = (): void => {

@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  isBarcodeAutoDownloadEnabled,
   isBarcodeEnabled,
   isBarcodeOnlineEnabled,
+  setBarcodeAutoDownloadEnabled,
   setBarcodeEnabled,
   setBarcodeOnlineEnabled,
 } from './flag';
@@ -78,5 +80,42 @@ describe('flag del codigo de barras', () => {
     vi.stubGlobal('localStorage', undefined);
     expect(isBarcodeOnlineEnabled()).toBe(false);
     expect(() => setBarcodeOnlineEnabled(true)).not.toThrow();
+  });
+
+  it('la descarga automatica del pack esta activada por defecto', () => {
+    expect(isBarcodeAutoDownloadEnabled()).toBe(true);
+  });
+
+  it('la descarga automatica se desactiva y se reactiva con su flag', () => {
+    setBarcodeAutoDownloadEnabled(false);
+    expect(isBarcodeAutoDownloadEnabled()).toBe(false);
+    setBarcodeAutoDownloadEnabled(true);
+    expect(isBarcodeAutoDownloadEnabled()).toBe(true);
+  });
+
+  it('cualquier valor distinto de "false" mantiene la descarga activada', () => {
+    localStorage.setItem('carbos.barcode.autopack', 'true');
+    expect(isBarcodeAutoDownloadEnabled()).toBe(true);
+    localStorage.setItem('carbos.barcode.autopack', 'cualquier cosa');
+    expect(isBarcodeAutoDownloadEnabled()).toBe(true);
+  });
+
+  it('la descarga automatica no lanza sin localStorage (defecto on)', () => {
+    vi.stubGlobal('localStorage', undefined);
+    expect(isBarcodeAutoDownloadEnabled()).toBe(true);
+    expect(() => setBarcodeAutoDownloadEnabled(false)).not.toThrow();
+  });
+
+  it('la descarga automatica no lanza si localStorage lanza (defecto on)', () => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => {
+        throw new Error('bloqueado');
+      },
+      setItem: () => {
+        throw new Error('bloqueado');
+      },
+    });
+    expect(isBarcodeAutoDownloadEnabled()).toBe(true);
+    expect(() => setBarcodeAutoDownloadEnabled(false)).not.toThrow();
   });
 });
