@@ -265,7 +265,7 @@ export const STRINGS = {
     'carbquality.high': 'Alta',
     'carbquality.note':
       'Según la fibra del alimento (fuente desde 3 g; alta desde 6 g por 100 g). No es el índice glucémico ni consejo dietético.',
-    'gi.external': 'Ver índice glucémico',
+    'gi.external': 'Ver referencia (índice glucémico)',
   },
   en: {
     'app.title': 'Carbos · carbs on your device',
@@ -531,7 +531,7 @@ export const STRINGS = {
     'carbquality.high': 'High',
     'carbquality.note':
       "Based on the food's fiber (source from 3 g; high from 6 g per 100 g). Not the glycemic index or dietary advice.",
-    'gi.external': 'See glycemic index',
+    'gi.external': 'See reference (glycemic index)',
   },
 } as const;
 

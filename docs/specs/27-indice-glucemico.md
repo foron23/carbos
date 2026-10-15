@@ -310,7 +310,7 @@ fiberPer100g)`: `high` >=6 g fibra, `medium` >=3 g, `low` por debajo; `null` si 
 | `carbquality.medium` | Media                                                                                                                     | Medium                                                                                                          |
 | `carbquality.high`   | Alta                                                                                                                      | High                                                                                                            |
 | `carbquality.note`   | Según la fibra del alimento (fuente desde 3 g; alta desde 6 g por 100 g). No es el índice glucémico ni consejo dietético. | Based on the food's fiber (source from 3 g; high from 6 g per 100 g). Not the glycemic index or dietary advice. |
-| `gi.external`        | Ver índice glucémico                                                                                                      | See glycemic index                                                                                              |
+| `gi.external`        | Ver referencia (índice glucémico)                                                                                         | See reference (glycemic index)                                                                                  |
 
 > **Nota i18n.** La guarda `SIN_ACENTO` (`src/i18n/index.test.ts`) incluye ya `indice`,
 > `glucemico` y `dietetico`, de modo que las cadenas ES deben llevarlos con tilde.

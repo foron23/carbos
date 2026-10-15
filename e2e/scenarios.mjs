@@ -2105,12 +2105,14 @@ export const scenarios = [
       const link = await page.$eval('.gi-link', (a) => ({
         href: a.getAttribute('href') || '',
         aria: a.getAttribute('aria-label') || '',
+        text: (a.textContent || '').trim(),
         height: a.getBoundingClientRect().height,
       }));
       assert(
         link.href.startsWith('https://glycemicindex.com/?s='),
         'el enlace apunta a la base de datos de IG',
       );
+      assert(/referencia|reference/i.test(link.text), 'el enlace se lee como una referencia');
       assert(link.aria.length > 0, 'el enlace tiene nombre accesible');
       assert(link.height >= 44, `el enlace mide al menos 44 px (${link.height})`);
 
