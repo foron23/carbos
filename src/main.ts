@@ -28,6 +28,7 @@ import {
   selectableTopk,
   targetProgress,
   toJson,
+  usageCounts,
   weekBreakdown,
 } from './core';
 import type { FoodItem, InsulinKind, InsulinLog, Meal, PortionSize, Vault, WeekDay } from './core';
@@ -643,7 +644,8 @@ function renderSearch(): void {
     list.innerHTML = `<li class="muted">${tr('search.hint')}</li>`;
     return;
   }
-  const results = searchFoods(query, 8, CATALOG);
+  // D63: a igualdad de relevancia, primero lo que la persona mas usa.
+  const results = searchFoods(query, 8, CATALOG, usageCounts(vault.meals));
   if (results.length === 0) {
     list.innerHTML = `<li class="muted" data-i18n="search.noResults">${tr('search.noResults')}</li>`;
     return;

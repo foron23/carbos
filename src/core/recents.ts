@@ -9,6 +9,22 @@ import type { Meal } from './types';
  * - Sin duplicados: un alimento aparece una sola vez, en su uso mas reciente.
  * - `limit <= 0` devuelve una lista vacia.
  */
+/**
+ * Cuenta el uso de cada alimento (D63): cuantas veces aparece su `classId` en el
+ * diario. Se **deriva**, no se almacena (patron D57). Los items sin `classId`
+ * (manuales o escaneados fuera del catalogo) no cuentan.
+ */
+export function usageCounts(meals: readonly Meal[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const meal of meals) {
+    for (const item of meal.items) {
+      if (!item.classId) continue;
+      counts.set(item.classId, (counts.get(item.classId) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
 export function recentClassIds(meals: readonly Meal[], limit = 8): string[] {
   if (limit <= 0) return [];
   const sorted = [...meals].sort((a, b) => {

@@ -28,13 +28,29 @@ function score(food: Food, query: string): number {
   return best;
 }
 
-export function searchFoods(query: string, limit = 20, catalog: Catalog = CATALOG): Food[] {
+/**
+ * Busca alimentos por texto. La relevancia del texto **manda**; a igualdad de
+ * relevancia, `usage` (frecuencia derivada del diario, D63) desempata: primero
+ * los alimentos mas usados, y luego por nombre. Sin `usage`, el orden es el de
+ * siempre.
+ */
+export function searchFoods(
+  query: string,
+  limit = 20,
+  catalog: Catalog = CATALOG,
+  usage?: ReadonlyMap<string, number>,
+): Food[] {
   const q = normalize(query);
   if (q.length === 0) return catalog.foods.slice(0, limit);
   return catalog.foods
     .map((food) => ({ food, value: score(food, q) }))
     .filter((entry) => entry.value > 0)
-    .sort((a, b) => b.value - a.value || a.food.name.es.localeCompare(b.food.name.es))
+    .sort(
+      (a, b) =>
+        b.value - a.value ||
+        (usage?.get(b.food.id) ?? 0) - (usage?.get(a.food.id) ?? 0) ||
+        a.food.name.es.localeCompare(b.food.name.es),
+    )
     .slice(0, limit)
     .map((entry) => entry.food);
 }
