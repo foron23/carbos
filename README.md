@@ -27,12 +27,12 @@ de tu dispositivo.
 - Calidad de vida (ronda 2): borrador persistente, busqueda por uso y explorar por categorias: [`docs/specs/24-calidad-de-vida-2.md`](docs/specs/24-calidad-de-vida-2.md)
 - Diario: agrupar comidas (contenedor reversible): [`docs/specs/25-diario-agrupar-comidas.md`](docs/specs/25-diario-agrupar-comidas.md)
 - Diario: modo simplificado/completo: [`docs/specs/26-diario-modos-simplificado-completo.md`](docs/specs/26-diario-modos-simplificado-completo.md)
-- Indice glucemico en los alimentos (investigacion y prototipos): [`docs/specs/27-indice-glucemico.md`](docs/specs/27-indice-glucemico.md)
+- Indice glucemico: indicador propio de fibra y enlace externo (SPEC 27): [`docs/specs/27-indice-glucemico.md`](docs/specs/27-indice-glucemico.md)
 - Contrato de trabajo: [`docs/receta-de-codigo.md`](docs/receta-de-codigo.md)
 
 ## Estado
 
-Fase 1 (nucleo) en marcha. Ya estan: **catalogo curado** (154 alimentos, generado desde Ciqual
+Fase 1 (nucleo) en marcha. Ya estan: **catalogo curado** (186 alimentos, generado desde Ciqual
 2020 con `make catalog`), diario con totales por dia/semana y **linea temporal del dia** que mezcla
 comidas e insulina, registro de insulina, **captura de foto on-device**, export JSON y **export
 cifrado** (Argon2id + AES-GCM), **ES/EN**, PWA offline e instalable y migracion de esquema. Ya estan
@@ -69,7 +69,9 @@ intenciones queda como **gate con pesos** (D8/D12).
 
 **Diario: agrupar comidas (SPEC 25, D65-D66):** multi-seleccionar dos o mas comidas del dia (entrada visible **Seleccionar** o **pulsacion larga**) y **juntarlas** bajo un contenedor **reversible** con nombre opcional y total **derivado**; **Separar** deshace el contenedor y deja las hijas intactas. El grupo no tiene hora ni slot, no alimenta ninguna dosis y el resumen sigue contando las comidas hijas. `SCHEMA_VERSION 3 -> 4` con migracion tolerante.
 
-**Indice glucemico (SPEC 27, D70-D72; investigacion y prototipos):** investigacion de producto (2026-10-15) sobre integrar el **indice glucemico** en los alimentos. Veredicto: **se puede, pero acotado** — banda **cualitativa** (sin numero), **opcional**, solo en la **ficha** del alimento, con texto y forma redundantes (no solo color) y nota "estimado, no consejo"; nunca en filas ni en el diario. **Bloqueo de datos:** las tablas publicas de IG no son redistribuibles bajo AGPL-3.0; se propone **mapeo propio por categoria** o enlace externo. Decisiones **propuestas**; hay **prototipos desechables** para fijar la UX.
+**Diario: modo simplificado/completo (SPEC 26, D67-D69):** ajuste global en `Ajustes` (por defecto **simplificado**); el modo **completo** anade **proteinas, grasas, kcal, fibra y azucares como composicion** por item, comida y dia (y en el borrador y la cabecera). El **total de carbohidratos no cambia** entre modos. Macros persistidos como campos **opcionales** (patron tolerante); `SCHEMA_VERSION 4 -> 5`.
+
+**Indice glucemico (SPEC 27, D70-D73; implementado):** investigacion de producto (2026-10-15) y **via de minima friccion ya en la app**: un **indicador propio de calidad del carbohidrato (fibra)** en modo completo (banda Baja/Media/Alta, con texto y forma redundantes y `aria-label`; oculta si el alimento no es fuente de carbohidratos o no hay fibra) y un **enlace externo al indice glucemico** **opt-in** (por defecto desactivado; nada se abre sin tu toque). El IG **ni se calcula ni se embebe**: es una respuesta medida (ISO 26642) y las tablas publicas (Atkinson/Sydney/FAO) no son redistribuibles bajo AGPL-3.0. Prototipos desechables en `prototypes/ig/`.
 
 Detalle por entregable: [`docs/specs/02-fase1.md`](docs/specs/02-fase1.md).
 
