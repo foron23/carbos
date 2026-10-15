@@ -239,7 +239,7 @@ que persistir; por eso **no** hay bump de `CATALOG_VERSION`/`SCHEMA_VERSION`.
 | D70 | **Indicador propio de calidad del carbohidrato (fibra), en modo completo** | Banda **Baja/Media/Alta** derivada **solo de la fibra** (umbrales UE, Reglamento 1924/2006: fuente >=3 g, alta >=6 g por 100 g); con **forma + texto** redundantes (no solo color) y `aria-label`; se **oculta** si el alimento no es fuente de carbohidratos (>=5 g) o no hay dato de fibra. **No es el IG**. En el desglose del borrador y las detecciones; **nunca** en filas de resultado ni en el diario. No toca D10/D12 | 27   | cerrada |
 | D71 | **Sin tablas de IG propietarias; enlace externo**                          | El IG **ni se calcula ni se embebe**: es una respuesta medida (ISO 26642) y las tablas publicas (Atkinson/Sydney/FAO) no son redistribuibles; un derivado seria obra derivada. La via es un **enlace a fuente externa** (o, en el futuro, una tabla propia con licencia compatible documentada)                                                                                                                                | 27   | cerrada |
 | D72 | **Guardarrail de frontera IG -> dosis**                                    | Sin ranking ni orden por IG, sin IG en el diario, sin `objetivo de IG`, sin conversion IG->unidades; el indicador es de **fibra**, no de IG; cero claims de manejo de DM1                                                                                                                                                                                                                                                      | 27   | cerrada |
-| D73 | **Enlace externo al IG, opt-in y por defecto off**                         | Ajuste en `Ajustes` (`localStorage`, `carbos.externalLinks`); al activarlo, el desglose ofrece un enlace que abre una **busqueda externa** (sale del dispositivo, avisado). Nada se abre sin el toque de la persona. No embebe datos                                                                                                                                                                                           | 27   | cerrada |
+| D73 | **Enlace externo al IG, siempre visible**                                  | Enlace a la **base de datos de indice glucemico** (glycemicindex.com, Univ. de Sidney) en el borrador y las detecciones, en **cualquier modo** (no es un ajuste). Un alimento sin carbohidratos no lo muestra. No embebe datos: nada sale del dispositivo hasta que la persona toca el enlace                                                                                                                                  | 27   | cerrada |
 
 ## Implementación (2026-10-15)
 
@@ -250,16 +250,14 @@ mas un **enlace externo** opt-in. No se embebe ninguna tabla ni se calcula el IG
 fiberPer100g)`: `high` >=6 g fibra, `medium` >=3 g, `low` por debajo; `null` si no es
   fuente de carbohidratos [<5 g/100 g] o no se conoce la fibra; e `isCarbSource`) +
   `carbquality.test.ts` + `carbquality.boundary.test.ts` (frontera D72).
-- **UI (`src/main.ts`):** en **modo completo**, cada fila del **desglose** (borrador y
-  detecciones) anade la banda (`carbQualityBadge`: 1-3 segmentos rellenos + texto; el color
-  **no** distingue el nivel) y, si el enlace esta permitido **y** el alimento es fuente de
-  carbohidratos, un **enlace** (`giExternalLink`, con `aria-label` y objetivo 44 px) a
-  `https://duckduckgo.com/?q=<nombre> índice glucémico` (locale). En **simple** no aparece
-  nada. La nota `carbquality.note` acompana al borrador y a las detecciones.
-- **Ajuste:** `settings.externalLinks` (`carbos.externalLinks`), por defecto **off**; el
-  aviso explica que el nombre del alimento se envia a un buscador externo.
-- **i18n:** `carbquality.label/low/medium/high/note`, `gi.external`, `gi.searchSuffix`,
-  `settings.externalLinks`/`Hint` (ES/EN, paridad y tildes).
+- **UI (`src/main.ts`):** en **modo completo** cada fila del desglose (borrador y
+  detecciones) anade la **banda** (`carbQualityBadge`: 1-3 segmentos rellenos + texto; el
+  color **no** distingue el nivel). El **enlace** al IG (`giExternalLink`, con `aria-label`
+  y objetivo 44 px) se anade en **cualquier modo** si el alimento es fuente de carbohidratos,
+  y apunta a `https://glycemicindex.com/?s=<nombre en ingles>`. La nota `carbquality.note`
+  acompana a la banda (borrador y detecciones).
+- **i18n:** `carbquality.label/low/medium/high/note`, `gi.external` (ES/EN, paridad y
+  tildes).
 - **Estilos:** `src/style.css` (banda neutra con tokens, enlace de 44 px, `forced-colors`).
 - **Tests:** unitarios (`carbquality.test.ts`, `carbquality.boundary.test.ts`) + E2E nuevo
   ("calidad del carbohidrato (fibra) y enlace externo al IG"). Gate:
@@ -279,12 +277,12 @@ fiberPer100g)`: `high` >=6 g fibra, `medium` >=3 g, `low` por debajo; `null` si 
 - **Nucleo:** `src/core/carbquality.ts` (`carbQualityBand`/`isCarbSource`, funcion pura) y
   `src/core/carbquality.boundary.test.ts` (frontera D72). **No** se toca
   `src/core/totals.ts` (carbos) ni `src/insulin/*`.
-- **UI:** `src/main.ts` — `appendCarbQuality()` (`:1393`) anade la banda y el enlace en el
-  **desglose del borrador** (`renderDraft`, `:911`) y en las **detecciones**
-  (`renderDetect`, `:1482`); la nota, en `renderDraftMacros` (`:1040`) y en
-  `#detect-carbquality-note`. **Fuera**: `renderResultList()` (`:798`) y `mealEntry()`
-  (`:1961`). El ajuste `settings.externalLinks` vive junto al modo. `src/style.css`
-  (banda neutra con forma, enlace con objetivo 44 px, `forced-colors`).
+- **UI:** `src/main.ts` — `appendCarbQuality()` (`:1383`) anade la banda (en completo) y
+  el **enlace al IG (en cualquier modo)** en el desglose del borrador (`renderDraft`,
+  `:884`) y en las detecciones (`renderDetect`, `:1472`); la nota de la banda, en
+  `renderDraftMacros` (`:1020`) y en `#detect-carbquality-note`. **Fuera**:
+  `renderResultList()` (`:771`) y `mealEntry()` (`:1987`). `src/style.css` (banda neutra
+  con forma, enlace con objetivo 44 px, `forced-colors`).
 - **i18n:** `src/i18n/index.ts` (claves ES/EN, guarda de paridad y de tildes).
 - **Prototipos:** `prototypes/ig/` (desechables; ver abajo).
 
@@ -305,17 +303,14 @@ fiberPer100g)`: `high` >=6 g fibra, `medium` >=3 g, `low` por debajo; `null` si 
 
 ### i18n
 
-| Clave                        | ES                                                                                                                                                                                | EN                                                                                                                                                                                      |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `carbquality.label`          | Calidad del carbohidrato (fibra)                                                                                                                                                  | Carbohydrate quality (fiber)                                                                                                                                                            |
-| `carbquality.low`            | Baja                                                                                                                                                                              | Low                                                                                                                                                                                     |
-| `carbquality.medium`         | Media                                                                                                                                                                             | Medium                                                                                                                                                                                  |
-| `carbquality.high`           | Alta                                                                                                                                                                              | High                                                                                                                                                                                    |
-| `carbquality.note`           | Según la fibra del alimento (fuente desde 3 g; alta desde 6 g por 100 g). No es el índice glucémico ni consejo dietético.                                                         | Based on the food's fiber (source from 3 g; high from 6 g per 100 g). Not the glycemic index or dietary advice.                                                                         |
-| `gi.external`                | Ver índice glucémico (fuente externa)                                                                                                                                             | See glycemic index (external source)                                                                                                                                                    |
-| `gi.searchSuffix`            | índice glucémico                                                                                                                                                                  | glycemic index                                                                                                                                                                          |
-| `settings.externalLinks`     | Permitir abrir fuentes externas                                                                                                                                                   | Allow opening external sources                                                                                                                                                          |
-| `settings.externalLinksHint` | Muestra enlaces en el desglose (modo completo) que abren una web fuera de la app. Al tocar uno, el nombre del alimento se envía a un buscador externo. Nada se abre sin tu toque. | Shows links in the breakdown (complete mode) that open a website outside the app. When you tap one, the food name is sent to an external search engine. Nothing opens without your tap. |
+| Clave                | ES                                                                                                                        | EN                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `carbquality.label`  | Calidad del carbohidrato (fibra)                                                                                          | Carbohydrate quality (fiber)                                                                                    |
+| `carbquality.low`    | Baja                                                                                                                      | Low                                                                                                             |
+| `carbquality.medium` | Media                                                                                                                     | Medium                                                                                                          |
+| `carbquality.high`   | Alta                                                                                                                      | High                                                                                                            |
+| `carbquality.note`   | Según la fibra del alimento (fuente desde 3 g; alta desde 6 g por 100 g). No es el índice glucémico ni consejo dietético. | Based on the food's fiber (source from 3 g; high from 6 g per 100 g). Not the glycemic index or dietary advice. |
+| `gi.external`        | Ver índice glucémico                                                                                                      | See glycemic index                                                                                              |
 
 > **Nota i18n.** La guarda `SIN_ACENTO` (`src/i18n/index.test.ts`) incluye ya `indice`,
 > `glucemico` y `dietetico`, de modo que las cadenas ES deben llevarlos con tilde.
@@ -324,8 +319,8 @@ fiberPer100g)`: `high` >=6 g fibra, `medium` >=3 g, `low` por debajo; `null` si 
 
 Los criterios marcados _(m)_ se comprueban con una formula concreta (Tests).
 
-1. Por defecto (modo simplificado) **no** se pinta ningun indicador; en completo se pinta
-   la banda de fibra (que **no** es IG). _(m)_
+1. En modo **simplificado** no se pinta la banda de fibra (pero **si** el enlace al IG);
+   en **completo** se anade la banda (que **no** es IG). _(m)_
 2. El indicador aparece **solo** en el desglose del borrador y en las detecciones;
    **nunca** en resultados de busqueda ni en el diario. _(m)_
 3. La banda es **cualitativa**, con **texto y forma** redundantes y **sin numero**; el
@@ -335,15 +330,17 @@ Los criterios marcados _(m)_ se comprueban con una formula concreta (Tests).
    indicador. _(m)_
 6. La **nota** ("no es el índice glucémico ni consejo dietético") es visible junto al
    indicador, en el borrador y en las detecciones. _(m)_
-7. El **enlace externo** al IG es **opt-in** (por defecto off), no embebe datos, tiene
-   nombre accesible y objetivo tactil >= 44 px. _(m)_
+7. El **enlace externo** al IG **aparece directamente** (en cualquier modo, sin ajuste),
+   apunta a la base de datos de IG, no embebe datos, tiene nombre accesible y objetivo
+   tactil >= 44 px; un alimento sin carbohidratos no lo muestra. _(m)_
 8. **Sin tablas propietarias embebidas:** ningun artefacto versionado contiene valores
    copiados de Atkinson/Sydney/FAO.
 9. **Sin cruce regulatorio** (estructural): ningun modulo de `src/insulin/*` ni el camino
    del calculo referencia el indicador ni el IG. _(m)_
 10. **i18n:** toda clave nueva existe en **es** y **en**, con tildes correctas.
 11. **Sin regresiones:** SPEC 22-26 siguen verdes.
-12. `make check` + `make e2e` (56/56) + `make audit-uiux` en verde. _(m)_
+12. `make check` + `make e2e` (57/57) en verde. _(m)_ (`make audit-uiux` tiene un rojo
+    **preexistente** ajeno a este cambio, en el grupo `detect-boxes`.)
 13. **Go/no-go (_m_).** Criterio **vivo**: si el indicador no demuestra utilidad sin
     volverse consejo, se retira (como FPU/eCarbs). Queda pendiente de uso real.
 
@@ -352,11 +349,13 @@ Los criterios marcados _(m)_ se comprueban con una formula concreta (Tests).
 - **Unitarios** (vitest): `src/core/carbquality.test.ts` (umbrales, no aplica, sin fibra);
   `src/core/carbquality.boundary.test.ts` (frontera D72: `src/core/totals.ts` y
   `src/insulin/**` no referencian el indicador); `src/i18n/index.test.ts` (paridad y tildes).
-- **E2E** (Firefox, `make e2e`): en simple no hay banda; en completo aparece con forma +
-  texto ("Alta" en garbanzos) y el total de carbos no cambia; el enlace esta oculto por
-  defecto, se activa, mide >= 44 px y persiste; ni banda ni enlace en el diario.
-- **Auditoria** (`make audit-uiux`): verde. _La auditoria no abre Ajustes, asi que la
-  cobertura especifica de la banda y el enlace la aportan los tests unitarios y el E2E._
+- **E2E** (Firefox, `make e2e`): en simple **no** hay banda pero **si** el enlace al IG; en
+  completo aparece la banda con forma + texto ("Alta" en garbanzos) y el total de carbos no
+  cambia; el enlace apunta a la base de datos de IG, mide >= 44 px y tiene nombre accesible;
+  un alimento sin carbohidratos no muestra ni banda ni enlace; ni banda ni enlace en el diario.
+- **Auditoria** (`make audit-uiux`): la banda usa texto+forma y el enlace cumple el objetivo
+  tactil de 44 px. _La auditoria tiene un rojo **preexistente** (grupo `detect-boxes`), ajeno
+  a este cambio; la cobertura del indicador la aportan los tests unitarios y el E2E._
 - **Gate**: `make check`.
 
 ## Prototipos (UX)

@@ -2089,23 +2089,32 @@ export const scenarios = [
     name: 'calidad del carbohidrato (fibra) y enlace externo al IG (SPEC 27)',
     async run(page, ctx) {
       await openApp(page, ctx.base);
-      await page.evaluate(() => {
-        localStorage.removeItem('carbos.mode');
-        localStorage.removeItem('carbos.externalLinks');
-      });
+      await page.evaluate(() => localStorage.removeItem('carbos.mode'));
       await reload(page);
       await waitFor(page, '#app header h1');
 
-      // En simple no aparece nada: la vista coincide con la de hoy.
+      // En simple: sin banda, pero el enlace al IG aparece directamente.
       await addFood(page, 'garbanzos');
       assertEqual(
         await page.$$eval('.carbquality', (nodes) => nodes.length),
         0,
         'en simple no hay banda de calidad',
       );
+      await waitFor(page, '#draft-items .gi-link');
       const simpleCarbs = await text(page, '#draft-total');
+      const link = await page.$eval('.gi-link', (a) => ({
+        href: a.getAttribute('href') || '',
+        aria: a.getAttribute('aria-label') || '',
+        height: a.getBoundingClientRect().height,
+      }));
+      assert(
+        link.href.startsWith('https://glycemicindex.com/?s='),
+        'el enlace apunta a la base de datos de IG',
+      );
+      assert(link.aria.length > 0, 'el enlace tiene nombre accesible');
+      assert(link.height >= 44, `el enlace mide al menos 44 px (${link.height})`);
 
-      // Completo: banda de fibra (garbanzos = alta) con texto + forma.
+      // Completo: se anade la banda de fibra (garbanzos = alta) con texto + forma.
       await page.$eval('#settings', (el) => {
         el.open = true;
       });
@@ -2130,42 +2139,21 @@ export const scenarios = [
         'el total de carbos del borrador no cambia entre modos',
       );
 
-      // Un alimento sin carbohidratos oculta la banda (no se inventa).
+      // Un alimento sin carbohidratos: ni banda ni enlace (no aplica).
       await addFood(page, 'pechuga de pollo');
-      const chickenHasBand = await page.evaluate(() =>
+      const chicken = await page.evaluate(() =>
         Array.from(document.querySelectorAll('#draft-items .draft-row'))
           .filter((row) => row.textContent.includes('Pechuga'))
-          .some((row) => row.querySelector('.carbquality-band')),
+          .map((row) => ({
+            band: Boolean(row.querySelector('.carbquality-band')),
+            link: Boolean(row.querySelector('.gi-link')),
+          })),
       );
-      assert(!chickenHasBand, 'un alimento sin carbohidratos no muestra banda');
-
-      // Enlace externo al IG: oculto por defecto; visible si la persona lo permite.
-      assertEqual(
-        await page.$$eval('.gi-link', (nodes) => nodes.length),
-        0,
-        'sin enlace externo por defecto',
+      assert(chicken.length > 0, 'el pollo esta en el borrador');
+      assert(
+        chicken.every((row) => !row.band && !row.link),
+        'sin carbohidratos no hay banda ni enlace',
       );
-      await page.$eval('#settings', (el) => {
-        el.open = true;
-      });
-      await click(page, '#external-links-toggle');
-      await page.waitForFunction(() => localStorage.getItem('carbos.externalLinks') === '1', {
-        timeout: 8000,
-      });
-      await waitFor(page, '#draft-items .gi-link');
-      const link = await page.$eval('.gi-link', (a) => ({
-        href: a.getAttribute('href') || '',
-        aria: a.getAttribute('aria-label') || '',
-        height: a.getBoundingClientRect().height,
-      }));
-      assert(link.href.includes('duckduckgo.com/?q='), 'el enlace apunta a una busqueda externa');
-      assert(link.aria.length > 0, 'el enlace tiene nombre accesible');
-      assert(link.height >= 44, `el enlace mide al menos 44 px (${link.height})`);
-
-      // El enlace persiste entre recargas (ajuste global).
-      await reload(page);
-      await waitFor(page, '#app header h1');
-      await waitFor(page, '#draft-items .gi-link');
 
       // Registra: en el diario no aparece ni la banda ni el enlace (criterio 2).
       await register(page);

@@ -226,32 +226,6 @@ function writeMode(mode: ScreenMode): void {
 
 let screenMode: ScreenMode = readMode();
 
-/**
- * Enlaces externos (SPEC 27 / D73): el indice glucemico **ni se calcula ni se
- * embebe** (es una respuesta medida y las tablas publicas no son redistribuibles).
- * Si la persona lo permite, se ofrece un **enlace** a una busqueda externa. Por
- * defecto esta **desactivado** y nada se abre sin su toque.
- */
-const EXTERNAL_LINKS_KEY = 'carbos.externalLinks';
-
-function readExternalLinks(): boolean {
-  try {
-    return localStorage.getItem(EXTERNAL_LINKS_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function writeExternalLinks(enabled: boolean): void {
-  try {
-    localStorage.setItem(EXTERNAL_LINKS_KEY, enabled ? '1' : '0');
-  } catch {
-    /* almacenamiento no disponible */
-  }
-}
-
-let externalLinksEnabled = readExternalLinks();
-
 function readViewDate(): string | null {
   try {
     const stored = sessionStorage.getItem(VIEW_DATE_KEY);
@@ -660,8 +634,6 @@ app.innerHTML = `
       </label>
     </div>
     <p id="mode-hint" class="muted" aria-live="polite"></p>
-    <label class="check"><input id="external-links-toggle" type="checkbox" /> <span data-i18n="settings.externalLinks"></span></label>
-    <p class="muted" data-i18n="settings.externalLinksHint"></p>
     <label class="field daily-target-field"><span data-i18n="settings.dailyTarget"></span><input id="daily-target" type="number" min="0" step="1" inputmode="numeric" /></label>
     <p><button id="persist" type="button" data-i18n="button.persist"></button></p>
     <p id="persist-status" class="muted" aria-live="polite"></p>
@@ -1017,12 +989,19 @@ function renderDraft(): void {
       remove.className = 'remove';
       row.appendChild(remove);
 
+      const resolved = resolveItem(item);
       if (screenMode === 'complete') {
         const breakdown = macroBreakdown(macroItem(item));
         if (breakdown) row.appendChild(breakdown);
-        const resolved = resolveItem(item);
-        appendCarbQuality(row, resolved.name, resolved.carbsPer100g, resolved.fiberPer100g);
       }
+      const carbFood = foodById(resolved.classId);
+      appendCarbQuality(
+        row,
+        resolved.name,
+        carbFood?.name.en ?? resolved.name,
+        resolved.carbsPer100g,
+        resolved.fiberPer100g,
+      );
       list.appendChild(row);
     });
   }
@@ -1373,11 +1352,16 @@ function carbQualityBadge(band: CarbQualityBand): HTMLElement {
   return row;
 }
 
-/** Enlace a una busqueda externa del indice glucemico (nada se embebe). */
-function giExternalLink(name: string): HTMLAnchorElement {
+/**
+ * Enlace a la base de datos de indice glucemico (Universidad de Sidney). La app
+ * **no** embebe ni calcula el IG: ofrece un enlace directo; nada sale del
+ * dispositivo hasta que la persona lo toca. `query` suele ser el nombre en ingles
+ * (la base esta en ingles); `name` es el nombre visible (para el texto accesible).
+ */
+function giExternalLink(name: string, query: string): HTMLAnchorElement {
   const anchor = document.createElement('a');
   anchor.className = 'gi-link';
-  anchor.href = `https://duckduckgo.com/?q=${encodeURIComponent(`${name} ${tr('gi.searchSuffix')}`)}`;
+  anchor.href = `https://glycemicindex.com/?s=${encodeURIComponent(query)}`;
   anchor.target = '_blank';
   anchor.rel = 'noopener noreferrer';
   anchor.setAttribute('aria-label', `${tr('gi.external')}: ${name}`);
@@ -1391,20 +1375,21 @@ function giExternalLink(name: string): HTMLAnchorElement {
 }
 
 /**
- * Anexa a una fila del desglose la banda de calidad (si aplica) y el enlace al
- * IG (si la persona lo permite **y** el alimento es fuente de carbohidratos).
- * Solo en modo completo. Devuelve `true` si pinto la banda.
+ * Anexa a una fila la banda de calidad (solo en modo completo) y el enlace al IG
+ * (en cualquier modo, si el alimento es fuente de carbohidratos). Devuelve `true`
+ * si pinto la banda. El enlace abarca tambien el modo simple: es informacion de
+ * composicion, no un ajuste que ocultar, y no envia nada hasta el toque.
  */
 function appendCarbQuality(
   row: HTMLElement,
   name: string,
+  query: string,
   carbsPer100g: number,
   fiberPer100g: number | undefined,
 ): boolean {
-  if (screenMode !== 'complete') return false;
-  const band = carbQualityBand(carbsPer100g, fiberPer100g);
+  const band = screenMode === 'complete' ? carbQualityBand(carbsPer100g, fiberPer100g) : null;
   if (band) row.appendChild(carbQualityBadge(band));
-  if (externalLinksEnabled && isCarbSource(carbsPer100g)) row.appendChild(giExternalLink(name));
+  if (isCarbSource(carbsPer100g)) row.appendChild(giExternalLink(name, query));
   return band !== null;
 }
 
@@ -1556,6 +1541,7 @@ function renderDetect(): void {
         appendCarbQuality(
           row,
           qualityFood.name[locale],
+          qualityFood.name.en,
           qualityFood.carbsPer100g,
           qualityFood.fiberPer100g,
         ) || qualityShown;
@@ -2485,14 +2471,6 @@ function wire(): void {
     });
   }
   renderModeControl();
-
-  const externalToggle = byId<HTMLInputElement>('external-links-toggle');
-  externalToggle.checked = externalLinksEnabled;
-  externalToggle.addEventListener('change', () => {
-    externalLinksEnabled = externalToggle.checked;
-    writeExternalLinks(externalLinksEnabled);
-    render();
-  });
 
   localeSelect.addEventListener('change', () => {
     const value = localeSelect.value;
