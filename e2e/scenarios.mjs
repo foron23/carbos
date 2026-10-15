@@ -2029,4 +2029,78 @@ export const scenarios = [
       await screenshot(page, 'modo-completo');
     },
   },
+  {
+    name: 'calidad del carbohidrato (fibra) y enlace externo al IG (SPEC 27)',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await page.evaluate(() => {
+        localStorage.removeItem('carbos.mode');
+        localStorage.removeItem('carbos.externalLinks');
+      });
+      await reload(page);
+      await waitFor(page, '#app header h1');
+
+      // En simple no aparece nada: la vista coincide con la de hoy.
+      await addFood(page, 'garbanzos');
+      assertEqual(
+        await page.$$eval('.carbquality', (nodes) => nodes.length),
+        0,
+        'en simple no hay banda de calidad',
+      );
+
+      // Completo: banda de fibra (garbanzos = alta) con texto + forma + aria.
+      await page.$eval('#settings', (el) => {
+        el.open = true;
+      });
+      await click(page, '#mode-complete');
+      await page.waitForFunction(() => localStorage.getItem('carbos.mode') === 'complete', {
+        timeout: 8000,
+      });
+      await waitFor(page, '#draft-items .carbquality');
+      const band = await page.$eval('.carbquality-band', (el) => ({
+        text: (el.textContent || '').trim(),
+        bars: el.querySelectorAll('.carbquality-bars i').length,
+        aria: el.getAttribute('aria-label') || '',
+      }));
+      assert(band.text.length > 0, 'la banda lleva texto (no depende del color)');
+      assertEqual(band.bars, 3, 'la banda lleva forma de 3 segmentos');
+      assert(band.aria.length > 0, 'la banda lleva aria-label');
+
+      // Un alimento sin carbohidratos oculta la banda (no se inventa).
+      await addFood(page, 'pechuga de pollo');
+      const chickenHasBand = await page.evaluate(() =>
+        Array.from(document.querySelectorAll('#draft-items .draft-row'))
+          .filter((row) => row.textContent.includes('Pechuga'))
+          .some((row) => row.querySelector('.carbquality-band')),
+      );
+      assert(!chickenHasBand, 'un alimento sin carbohidratos no muestra banda');
+
+      // Enlace externo al IG: oculto por defecto; visible si la persona lo permite.
+      assertEqual(
+        await page.$$eval('.gi-link', (nodes) => nodes.length),
+        0,
+        'sin enlace externo por defecto',
+      );
+      await page.$eval('#settings', (el) => {
+        el.open = true;
+      });
+      await click(page, '#external-links-toggle');
+      await page.waitForFunction(() => localStorage.getItem('carbos.externalLinks') === '1', {
+        timeout: 8000,
+      });
+      await waitFor(page, '#draft-items .gi-link');
+      const href = await page.$eval('.gi-link', (a) => a.getAttribute('href'));
+      assert(
+        href !== null && href.includes('duckduckgo.com/?q='),
+        'el enlace apunta a una busqueda externa',
+      );
+
+      // El enlace persiste entre recargas (ajuste global).
+      await reload(page);
+      await waitFor(page, '#app header h1');
+      await waitFor(page, '#draft-items .gi-link');
+
+      await screenshot(page, 'carbquality-ig');
+    },
+  },
 ];

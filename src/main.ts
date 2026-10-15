@@ -1,6 +1,7 @@
 import './style.css';
 import {
   applyAlternative,
+  carbQualityBand,
   carbsByMoment,
   dayCarbs,
   dayMacros,
@@ -41,6 +42,7 @@ import {
   weekBreakdown,
 } from './core';
 import type {
+  CarbQualityBand,
   FoodItem,
   InsulinKind,
   InsulinLog,
@@ -221,6 +223,32 @@ function writeMode(mode: ScreenMode): void {
 }
 
 let screenMode: ScreenMode = readMode();
+
+/**
+ * Enlaces externos (SPEC 27 / D73): el indice glucemico **ni se calcula ni se
+ * embebe** (es una respuesta medida y las tablas publicas no son redistribuibles).
+ * Si la persona lo permite, se ofrece un **enlace** a una busqueda externa. Por
+ * defecto esta **desactivado** y nada se abre sin su toque.
+ */
+const EXTERNAL_LINKS_KEY = 'carbos.externalLinks';
+
+function readExternalLinks(): boolean {
+  try {
+    return localStorage.getItem(EXTERNAL_LINKS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeExternalLinks(enabled: boolean): void {
+  try {
+    localStorage.setItem(EXTERNAL_LINKS_KEY, enabled ? '1' : '0');
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
+let externalLinksEnabled = readExternalLinks();
 
 function readViewDate(): string | null {
   try {
@@ -629,6 +657,8 @@ app.innerHTML = `
       </label>
     </div>
     <p id="mode-hint" class="muted" aria-live="polite"></p>
+    <label class="check"><input id="external-links-toggle" type="checkbox" /> <span data-i18n="settings.externalLinks"></span></label>
+    <p class="muted" data-i18n="settings.externalLinksHint"></p>
     <label class="field daily-target-field"><span data-i18n="settings.dailyTarget"></span><input id="daily-target" type="number" min="0" step="1" inputmode="numeric" /></label>
     <p><button id="persist" type="button" data-i18n="button.persist"></button></p>
     <p id="persist-status" class="muted" aria-live="polite"></p>
@@ -987,6 +1017,8 @@ function renderDraft(): void {
       if (screenMode === 'complete') {
         const breakdown = macroBreakdown(macroItem(item));
         if (breakdown) row.appendChild(breakdown);
+        const resolved = resolveItem(item);
+        appendCarbQuality(row, resolved.name, resolved.carbsPer100g, resolved.fiberPer100g);
       }
       list.appendChild(row);
     });
@@ -1016,9 +1048,20 @@ function renderDraftMacros(): void {
     origin: draft.origin,
   };
   const breakdown = macroBreakdown(mealMacros(synthetic));
-  if (!breakdown) return;
-  breakdown.id = 'draft-macros';
-  host.appendChild(breakdown);
+  if (breakdown) {
+    breakdown.id = 'draft-macros';
+    host.appendChild(breakdown);
+  }
+  const hasQuality = draft.items.some((item) => {
+    const resolved = resolveItem(item);
+    return carbQualityBand(resolved.carbsPer100g, resolved.fiberPer100g) !== null;
+  });
+  if (hasQuality) {
+    const note = document.createElement('p');
+    note.className = 'muted carbquality-note';
+    note.textContent = tr('carbquality.note');
+    host.appendChild(note);
+  }
 }
 
 function setPhotoStatus(key: StringKey | null): void {
@@ -1291,6 +1334,67 @@ function macroBreakdown(macros: Macros): HTMLElement | null {
   return wrap;
 }
 
+/** Clave i18n de la banda de calidad del carbohidrato. */
+function carbQualityKey(band: CarbQualityBand): StringKey {
+  if (band === 'high') return 'carbquality.high';
+  if (band === 'medium') return 'carbquality.medium';
+  return 'carbquality.low';
+}
+
+/**
+ * Insignia de calidad del carbohidrato (SPEC 27): banda con **forma + texto**
+ * redundantes (no solo color, WCAG 1.4.1). Dato derivado de la fibra; no es el IG.
+ */
+function carbQualityBadge(band: CarbQualityBand): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'carbquality';
+  const label = document.createElement('span');
+  label.className = 'carbquality-label';
+  label.textContent = tr('carbquality.label');
+  const badge = document.createElement('span');
+  badge.className = `carbquality-band carbquality-band--${band}`;
+  badge.setAttribute('role', 'img');
+  badge.setAttribute('aria-label', `${tr('carbquality.label')}: ${tr(carbQualityKey(band))}`);
+  const bars = document.createElement('span');
+  bars.className = 'carbquality-bars';
+  bars.setAttribute('aria-hidden', 'true');
+  for (let index = 0; index < 3; index += 1) bars.appendChild(document.createElement('i'));
+  const text = document.createElement('span');
+  text.className = 'carbquality-band-text';
+  text.textContent = tr(carbQualityKey(band));
+  badge.append(bars, text);
+  row.append(label, badge);
+  return row;
+}
+
+/** Enlace a una busqueda externa del indice glucemico (nada se embebe). */
+function giExternalLink(name: string): HTMLAnchorElement {
+  const anchor = document.createElement('a');
+  anchor.className = 'gi-link';
+  anchor.href = `https://duckduckgo.com/?q=${encodeURIComponent(`${name} ${tr('gi.searchSuffix')}`)}`;
+  anchor.target = '_blank';
+  anchor.rel = 'noopener noreferrer';
+  anchor.textContent = `${tr('gi.external')} ↗`;
+  return anchor;
+}
+
+/**
+ * Anexa a una fila del desglose la banda de calidad (y el enlace al IG si la
+ * persona lo ha permitido). Solo en modo completo; se **oculta** cuando no hay
+ * carbohidratos o no se conoce la fibra.
+ */
+function appendCarbQuality(
+  row: HTMLElement,
+  name: string,
+  carbsPer100g: number,
+  fiberPer100g: number | undefined,
+): void {
+  if (screenMode !== 'complete') return;
+  const band = carbQualityBand(carbsPer100g, fiberPer100g);
+  if (band) row.appendChild(carbQualityBadge(band));
+  if (externalLinksEnabled) row.appendChild(giExternalLink(name));
+}
+
 /** Sincroniza el control segmentado de Ajustes con `screenMode`. */
 function renderModeControl(): void {
   byId<HTMLInputElement>('mode-simple').checked = screenMode === 'simple';
@@ -1401,6 +1505,15 @@ function renderDetect(): void {
     const grams = draftItem ? ` · ${Math.round(draftItem.grams)} ${tr('unit.grams')}` : '';
     name.textContent = `${topkLabel(best)} · ${Math.round(best.p * 100)}%${grams}`;
     row.appendChild(name);
+    const qualityFood = foodById(best.classId);
+    if (qualityFood) {
+      appendCarbQuality(
+        row,
+        qualityFood.name[locale],
+        qualityFood.carbsPer100g,
+        qualityFood.fiberPer100g,
+      );
+    }
     const alternatives = selectableTopk(result.topk);
     if (alternatives.length > 1) {
       const select = document.createElement('select');
@@ -2321,6 +2434,14 @@ function wire(): void {
     });
   }
   renderModeControl();
+
+  const externalToggle = byId<HTMLInputElement>('external-links-toggle');
+  externalToggle.checked = externalLinksEnabled;
+  externalToggle.addEventListener('change', () => {
+    externalLinksEnabled = externalToggle.checked;
+    writeExternalLinks(externalLinksEnabled);
+    render();
+  });
 
   localeSelect.addEventListener('change', () => {
     const value = localeSelect.value;

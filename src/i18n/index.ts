@@ -257,6 +257,17 @@ export const STRINGS = {
     'macro.sugars': 'Azúcares',
     'macro.estimateNote': 'Composición estimada del catálogo. No es consejo dietético.',
     'macro.derived': 'calculado',
+    'carbquality.label': 'Calidad del carbohidrato (fibra)',
+    'carbquality.low': 'Baja',
+    'carbquality.medium': 'Media',
+    'carbquality.high': 'Alta',
+    'carbquality.note':
+      'Según la fibra del alimento (fuente desde 3 g; alta desde 6 g por 100 g). No es el índice glucémico.',
+    'gi.external': 'Ver índice glucémico (fuente externa)',
+    'gi.searchSuffix': 'índice glucémico',
+    'settings.externalLinks': 'Permitir abrir fuentes externas',
+    'settings.externalLinksHint':
+      'Muestra enlaces que abren una web fuera de la app (por ejemplo, el índice glucémico). Nada se abre sin tu toque.',
   },
   en: {
     'app.title': 'Carbos · carbs on your device',
@@ -514,6 +525,17 @@ export const STRINGS = {
     'macro.sugars': 'Sugars',
     'macro.estimateNote': 'Estimated composition from the catalog. Not dietary advice.',
     'macro.derived': 'computed',
+    'carbquality.label': 'Carbohydrate quality (fiber)',
+    'carbquality.low': 'Low',
+    'carbquality.medium': 'Medium',
+    'carbquality.high': 'High',
+    'carbquality.note':
+      "Based on the food's fiber (source from 3 g; high from 6 g per 100 g). Not the glycemic index.",
+    'gi.external': 'See glycemic index (external source)',
+    'gi.searchSuffix': 'glycemic index',
+    'settings.externalLinks': 'Allow opening external sources',
+    'settings.externalLinksHint':
+      'Shows links that open a website outside the app (for example, the glycemic index). Nothing opens without your tap.',
   },
 } as const;
 

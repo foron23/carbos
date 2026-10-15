@@ -3,6 +3,7 @@ export * from './schema';
 export * from './migrate';
 export * from './groups';
 export * from './totals';
+export * from './carbquality';
 export * from './portion';
 export * from './detection';
 export * from './timeline';
