@@ -295,6 +295,28 @@ variantes a comparar:
 La comparacion fija la variante recomendada (previsiblemente **H1**), con la
 variante **"nada" (C13)** como control honesto.
 
+### Resultado (2026-10-15)
+
+Construidos y verificados (desechables; `prototypes/` esta en `.gitignore`, como
+manda la convencion):
+
+- **Ficheros:** `prototypes/ig/index.html` (comparacion), `h1-detalle.html`,
+  `h2-fila.html`, `h3-enlace.html`, `h4-educativo.html`, `c13-nada.html`;
+  capturas en `prototypes/shots/ig-*.png`; verificador
+  `prototypes/shots/render-ig.mjs` (Firefox de Puppeteer, como `e2e`).
+- **Verificacion automatica (0 fallos, movil 390x844 + escritorio 1440x900):**
+  sin errores de consola ni desborde; en **H1** cada banda tiene **texto + forma
+  (3 segmentos) + `aria-label`** y **contraste >= 4,5:1** (no depende del color);
+  `H3`/`H4`/`C13` **no** muestran ningun valor por alimento; las imagenes del
+  indice cargan.
+- **Recomendacion:** **H1 es la base** (F1), con **H4** como companera (F2) y
+  **H3** como respaldo de datos cuando no haya estimacion propia (F3). **H2 se
+  descarta** (satura el escaneo y moraliza). **C13 ("nada")** sigue siendo la
+  alternativa honesta si al usarlo no demuestra utilidad sin volverse consejo.
+- **Como verlo:** abrir `prototypes/ig/index.html` (doble clic; no necesita
+  servidor). `node prototypes/shots/render-ig.mjs` regenera las capturas y
+  revalida la semantica.
+
 ## Fuera de alcance
 
 - **Carga glucemica (GL) cuantificada / FPU / eCarbs / carbos extendidos /
