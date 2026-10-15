@@ -930,6 +930,12 @@ main {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
+  /* Pulsacion larga (D66): evita que la seleccion nativa de texto o el menu
+     contextual tactil compitan con el temporizador. */
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .timeline-card--insulin {
@@ -1094,6 +1100,85 @@ main {
 
 .timeline-actions .repeat-entry {
   color: var(--accent);
+}
+
+/* --- Diario: agrupar comidas (SPEC 25) ---------------------------------- */
+
+.diary-tools {
+  margin-block-start: 0.5rem;
+}
+
+.select-meals,
+.group-meals {
+  min-height: 44px;
+}
+
+#group-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-block-start: 0.5rem;
+}
+
+#group-controls input[type='text'] {
+  flex: 1 1 12rem;
+  min-inline-size: 0;
+}
+
+#group-controls .muted {
+  flex: 1 0 100%;
+  margin: 0;
+}
+
+/* Checkbox de seleccion: el area de pulsacion es la etiqueta (>= 44 px). */
+label.select-meal {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 44px;
+  min-block-size: 44px;
+  align-self: center;
+  margin-inline-end: 0.15rem;
+}
+
+input.select-meal {
+  inline-size: 1.35rem;
+  block-size: 1.35rem;
+  min-inline-size: 1.35rem;
+  min-block-size: 1.35rem;
+  accent-color: var(--accent);
+}
+
+/* Marcador del grupo: cuadrado redondeado relleno, distinto del plato y la gota. */
+.timeline-marker--group {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 2px solid var(--accent);
+  border-radius: 0.45rem;
+}
+
+.timeline-card--group {
+  border-inline-start-width: 3px;
+  border-inline-start-color: var(--accent);
+}
+
+.timeline-group-items {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline-group-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-inline-size: 0;
+  font-size: var(--text-xs);
 }
 
 /* --- Resumen del dia dentro del Diario (B6/B7) -------------------------- */
