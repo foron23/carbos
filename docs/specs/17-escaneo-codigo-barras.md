@@ -378,6 +378,14 @@ a la guarda de acentos del test. No renderizar `origin` si no se pinta en el dia
      Verificado end-to-end con los packs reales (Chrome headless sobre `dist/`): ES importa
      ~282k productos y `8480000003089` (Mercadona/Hacendado) y `4056482891380` (Lidl)
      resuelven.
+- **Arreglo de la provision del pack (regresion)**: `ensurePack` decidia "ya hay pack" con
+  `countProducts() > 0`, pero la consulta en linea (Fase B) cachea productos en el **mismo**
+  store `products`. Un unico producto cacheado (o un import a medias) impedia descargar el
+  pack **para siempre**, de modo que un EAN presente en el pack (p.ej. unos anacardos
+  Carrefour) salia como miss aunque los datos estuvieran. Ahora la senal es la lista de
+  **packs importados** (`carbos.barcode.packs`, solo ids, nunca datos de usuario): un store
+  con productos ya no sustituye al pack. El miss solo aparece cuando el EAN no esta en el
+  pack descargado, y el aviso sigue ofreciendo descargar / consultar en linea / a mano.
 - **Pendiente (heredado)**: guardar-en-local tras un miss; `field.barcode` (clave muerta);
   streaming del JSONL; decidir la API de Mercadona (nombre/ingredientes/alergenos, sin
   carbs); CDN opcional con `--base-url`.

@@ -60,6 +60,59 @@ interface UseCodeResult {
 const DEFAULT_GRAMS = 100;
 
 /**
+ * Clave de localStorage con los **ids de los packs ya importados** (solo
+ * metadata: id, nunca datos de usuario). Es la senal fiable de "hay pack": el
+ * heuristico anterior (`countProducts() > 0`) fallaba porque la consulta en linea
+ * cachea productos en el MISMO store `products`, de modo que un unico producto
+ * cacheado impedia descargar el pack para siempre.
+ */
+const PACKS_KEY = 'carbos.barcode.packs';
+
+/**
+ * Ids de pack guardados, o `null` si `localStorage` no esta disponible (p. ej.
+ * modo privado): distinguir "vacio" de "no disponible" evita re-descargar el
+ * pack en cada apertura cuando no hay almacen persistente.
+ */
+function storedPackIds(): string[] | null {
+  try {
+    const storage = globalThis.localStorage;
+    if (!storage) return null;
+    const raw = storage.getItem(PACKS_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((id): id is string => typeof id === 'string');
+  } catch {
+    return null;
+  }
+}
+
+/** Ids de pack importados en este dispositivo (lista vacia si no hay almacen). */
+export function importedPackIds(): string[] {
+  return storedPackIds() ?? [];
+}
+
+/** Registra ids de pack tras una importacion correcta (merge, sin duplicados). */
+export function rememberPackIds(ids: readonly string[]): void {
+  if (ids.length === 0) return;
+  try {
+    const merged = new Set([...importedPackIds(), ...ids]);
+    globalThis.localStorage?.setItem(PACKS_KEY, JSON.stringify([...merged]));
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
+/**
+ * ¿Hay que provisionar (descargar) el pack? Solo si **no se ha importado
+ * ninguno**; el contenido del store `products` no es prueba de tener pack.
+ * Funcion pura y exportada para poder probarla sin DOM.
+ */
+export function needsPackProvision(imported: readonly string[]): boolean {
+  return imported.length === 0;
+}
+
+/**
  * Hook estrecho para el arnes E2E (mismo patron que `__carbosBarcodeStub`): si
  * `globalThis.__carbosBarcodeFetch` esta definido, se usa en lugar de `fetch`
  * para el manifest/pack y la consulta en linea. Si no, es inerte.
@@ -197,6 +250,9 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
         });
       }
       setStatus('barcode.downloaded');
+      // Se recuerda que YA hay pack: es la senal de "provisionado", independiente
+      // del store `products` (que tambien llena la consulta en linea).
+      rememberPackIds(chosen.map((entry) => entry.id));
     } catch {
       setStatus('barcode.downloadFailed');
     }
@@ -212,7 +268,16 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
     if (packPrep) return packPrep;
     packPrep = (async () => {
       try {
-        if ((await countProducts()) > 0) return;
+        // La presencia de pack se mide por los packs IMPORTADOS, no por el store
+        // `products`: la consulta en linea cachea productos ahi mismo, asi que un
+        // store con datos no implica tener pack (regresion corregida).
+        const stored = storedPackIds();
+        if (stored === null) {
+          // Sin almacen persistente no se puede recordar: ultimo recurso, el store.
+          if ((await countProducts()) > 0) return;
+        } else if (!needsPackProvision(stored)) {
+          return;
+        }
         await download();
       } catch {
         /* sin datos: el escaneo caera a "no encontrado" */
@@ -243,6 +308,9 @@ export function setupBarcode(host: HTMLElement, deps: BarcodeDeps): BarcodeHandl
       if (!manifestFile || !packFile) throw new Error('faltan ficheros');
       const manifest = parseManifest(JSON.parse(await manifestFile.text()));
       await importPack({ manifest, blob: packFile });
+      // Una importacion manual tambien cuenta como "hay pack": sin esto, el
+      // siguiente escaneo creeria que no hay datos y volveria a descargar.
+      rememberPackIds([`import:${manifest.locale}`]);
       setStatus('barcode.imported');
     } catch {
       setStatus('barcode.importFailed');
