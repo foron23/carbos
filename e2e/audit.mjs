@@ -61,6 +61,9 @@ const PASSES = [
     height: 844,
     detections: true,
   },
+  // Pasada de agrupacion (SPEC 25): registra comidas y entra en seleccion para
+  // que la regla de objetivo tactil (MIN_HIT) cubra Seleccionar/Juntar/casilla.
+  { id: 'grupo-390x844', width: 390, height: 844, grouping: true },
   // Pasada de escritorio (>= 64rem) imprescindible para verificar el rail.
   { id: 'desktop-1280x800', width: 1280, height: 800 },
 ];
@@ -323,6 +326,67 @@ async function launchBrowser(pass) {
   return puppeteer.launch(launchOptions);
 }
 
+/**
+ * Pasada de agrupacion (SPEC 25): registra 2 comidas y entra en modo seleccion
+ * para que `collect()` aplique la regla de objetivo tactil y nombre accesible a
+ * `Seleccionar`, `Juntar`, la casilla (via su etiqueta) y el nombre del grupo.
+ */
+async function seedGrouping(page) {
+  for (const query of ['pan', 'manzana']) {
+    await page.$eval('#entry-mode-search', (el) => {
+      el.checked = true;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await page.$eval(
+      '#food-search',
+      (el, q) => {
+        el.value = q;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      },
+      query,
+    );
+    await page.waitForSelector('#search-results button.result', { timeout: 8000 });
+    await page.$eval('#search-results button.result', (el) => el.click());
+    await page.$eval('#register', (el) => el.click());
+    await wait(250);
+  }
+  await page.$eval('#select-meals', (el) => el.click());
+  await page.waitForSelector('#diary .select-meal input[type="checkbox"]', { timeout: 8000 });
+}
+
+/** Agrupa las comidas sembradas y comprueba que Separar es tactil y se nombra. */
+async function assertGroupingControls(page, fatal, prefix) {
+  await page.evaluate(() => {
+    document.querySelectorAll('#diary .select-meal input[type="checkbox"]').forEach((box) => {
+      if (!box.checked) box.click();
+    });
+  });
+  await page.waitForFunction(() => document.getElementById('group-meals')?.disabled === false, {
+    timeout: 8000,
+  });
+  await page.$eval('#group-meals', (el) => el.click());
+  await page.waitForSelector('#diary .timeline-entry--group .timeline-toggle', { timeout: 8000 });
+  await page.$eval('#diary .timeline-entry--group .timeline-toggle', (el) => el.click());
+  await page.waitForSelector('#diary .timeline-entry--group .ungroup-entry', { timeout: 8000 });
+  const info = await page.evaluate(() => {
+    const el = document.querySelector('#diary .timeline-entry--group .ungroup-entry');
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    const label = (el.getAttribute('aria-label') || el.textContent || '').trim();
+    return { height: Math.round(rect.height), width: Math.round(rect.width), label };
+  });
+  if (!info) {
+    fatal.push(`${prefix} no hay boton Separar visible`);
+    console.log('  SIN SEPARAR');
+    return;
+  }
+  if (info.height < MIN_HIT) {
+    fatal.push(`${prefix} Separar mide ${info.height}px < ${MIN_HIT}`);
+  }
+  if (!info.label) fatal.push(`${prefix} Separar sin nombre accesible`);
+  console.log(`  grupo: Separar ${info.width}x${info.height}px, nombre "${info.label}"`);
+}
+
 async function runPass(browser, base, fixture, pass, fatal) {
   const page = await browser.newPage();
   const prefix = `[${pass.id}]`;
@@ -349,6 +413,8 @@ async function runPass(browser, base, fixture, pass, fatal) {
       await page.$eval('#ins-gate-accept', (el) => el.click());
       await wait(300);
     }
+
+    if (pass.grouping) await seedGrouping(page);
 
     if (pass.detections) {
       await page.$eval('#file-input', (el) => {
@@ -578,6 +644,8 @@ async function runPass(browser, base, fixture, pass, fatal) {
         }
       }
     }
+
+    if (pass.grouping) await assertGroupingControls(page, fatal, prefix);
   } finally {
     await page.close();
   }
