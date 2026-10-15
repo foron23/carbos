@@ -76,6 +76,27 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--url", default="")
     parser.add_argument("--no-quantize", action="store_true")
     parser.add_argument("--onnx", type=Path, default=None, help="ONNX a validar (stage validate).")
+    parser.add_argument(
+        "--init",
+        type=Path,
+        default=None,
+        help="Checkpoint .pt del student a REINICIALIZAR: se heredan la capa cabeza (classifier.3) "
+        "de las clases que ya existian y se anaden las nuevas. Preserva la precision de las clases "
+        "antiguas al ampliar el catalogo (extension de cabeza).",
+    )
+    parser.add_argument(
+        "--init-classes",
+        type=Path,
+        default=None,
+        help="JSON con las clases del checkpoint --init (lista, o manifest con classifier.classes).",
+    )
+    parser.add_argument(
+        "--classes-file",
+        type=Path,
+        default=None,
+        help="JSON (lista o manifest) que fija las clases del modelo, un subconjunto del catalogo "
+        "(p. ej. las antiguas + los frutos secos nuevos). Por defecto, todas las del catalogo.",
+    )
     return parser.parse_args()
 
 
@@ -334,6 +355,51 @@ def build_student(n_out: int, train_backbone: bool):
     return model
 
 
+def _load_init_classes(path: Path) -> list[str]:
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if isinstance(data, dict) and "classifier" in data:
+        return data["classifier"]["classes"]
+    if isinstance(data, dict) and "classes" in data:
+        return data["classes"]
+    if isinstance(data, list):
+        return data
+    raise SystemExit(f"no se pudieron leer las clases de {path}")
+
+
+def init_student_head(model, init_pt: Path, init_classes: Path, class_order: list[str]) -> int:
+    """Hereda la cabeza (`classifier.3`) de un checkpoint previo.
+
+    Las clases que ya existian copian su fila; las nuevas conservan la
+    inicializacion aleatoria de `build_student`. Asi ampliar el catalogo no
+    reentrena ni degrada las clases antiguas.
+    """
+    import torch
+
+    sd = torch.load(init_pt, map_location="cpu")
+    # Se carga TODO el checkpoint (backbone + classifier.0, que si se entreno)
+    # salvo la cabeza final, cuyas dimensiones cambian al ampliar el catalogo.
+    body = {
+        k: v for k, v in sd.items() if k not in ("classifier.3.weight", "classifier.3.bias")
+    }
+    model.load_state_dict(body, strict=False)
+    old_classes = _load_init_classes(init_classes)
+    ow = sd["classifier.3.weight"]
+    ob = sd["classifier.3.bias"]
+    new_w = model.classifier[3].weight.data
+    new_b = model.classifier[3].bias.data
+    index = {cid: i for i, cid in enumerate(old_classes)}
+    copied = 0
+    with torch.no_grad():
+        for j, cid in enumerate(class_order):
+            i = index.get(cid)
+            if i is not None and i < ow.shape[0]:
+                new_w[j] = ow[i]
+                new_b[j] = ob[i]
+                copied += 1
+    print(f"  init: {copied}/{len(class_order)} clases heredadas de {Path(init_pt).name}")
+    return copied
+
+
 def trainable_params(model):
     return [p for p in model.parameters() if p.requires_grad]
 
@@ -551,6 +617,11 @@ def main() -> None:
     classes = parse_catalog(CATALOG)
     print(f"parsed catalog classes: {len(classes)}")
     class_order = [c["id"] for c in classes] + [UNKNOWN_ID]
+    if args.classes_file is not None:
+        class_order = _load_init_classes(args.classes_file)
+        keep = set(class_order)
+        classes = [c for c in classes if c["id"] in keep]
+        print(f"clases fijadas por --classes-file: {len(class_order)}")
     n_out = len(class_order)
 
     labeled = bool(args.data)
@@ -625,6 +696,10 @@ def main() -> None:
 
     if args.stage in ("all", "train"):
         model = build_student(n_out, args.train_backbone)
+        if args.init is not None:
+            if args.init_classes is None:
+                raise SystemExit("--init necesita --init-classes")
+            init_student_head(model, args.init, args.init_classes, class_order)
         report["train"] = train_student(model, paths, train_idx, val_idx, teacher, args, n_out, args.smoke)
         pt = args.out / "student_catalog.pt"
         torch.save(model.state_dict(), pt)

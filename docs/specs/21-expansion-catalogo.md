@@ -146,12 +146,15 @@ Hueco estructural de la seccion J cerrado con 4 alimentos de **Ciqual directo** 
 esquema (solo contenido). Se anaden alias en `src/catalog/classmap.ts` (`cashew`, `pistachio`,
 `sunflower_seed`, `chestnut`) para modelos publicos.
 
-**El modelo NO reconoce todavia estas clases por foto.** La lista de clases del clasificador se deriva
-del catalogo (`training/distill_clip.py`, `class_order = ids + __unknown__`), pero el clasificador
-publicado es anterior (155 clases). Se verifico el pipeline con `--smoke` sobre el catalogo ampliado:
-emite **191 clases** (190 + `__unknown__`), incluida `anacardos`. **Nada se ha publicado**: para que la
-foto las reconozca hace falta (a) imagenes revisadas por clase nueva, (b) `make distill-clip`,
-(c) `make weights-manifest` y **publicar los pesos** (viven fuera del repo, D18/D24), (d) apuntar
-`public/model-manifest.json` a la version nueva. Hasta entonces, los 4 frutos secos se encuentran por
-**busqueda, manual y codigo de barras**, no por foto. Obs.: 21 imagenes por clase ya descargadas en
-`data/images/` (Wikimedia; gitignored), pendientes de revision/confirmacion.
+**El clasificador ya las reconoce por foto (extension de cabeza, `weights-0.4.0`).** Un reentrenado
+completo del catalogo ampliado (191 clases) medido con `make identify` bajaba el top-3 de identificacion
+a la mitad (0,27 vs 0,50), porque anadir clases sin datos in-domain diluye el ranking. La via que **no
+regresiona** es la **extension de cabeza**: se hereda el modelo publicado (155 clases) y se entrenan
+**solo las filas nuevas** de `classifier.3` sobre `data/images` con el backbone congelado
+(`training/distill_clip.py --init <pt> --init-classes <manifest> --classes-file <lista>`). Medido: 159
+clases (154 antiguas + los 4 frutos secos + `__unknown__`) con las clases antiguas **intactas**
+(`box_top1`/`box_top3` identicos a los publicados, `dish_recall_top3` 0,494 vs 0,497) y los 4 frutos
+secos reconocibles (pipas/castanas casi siempre; anacardos/pistachos parciales por lo ruidoso de las
+imagenes de Wikimedia, sin confirmar). Publicado en `weights-0.4.0` con 21 imagenes por clase en
+`data/images/` (gitignored). Pendiente: revisar/confirmar esas imagenes y, si se quiere cubrir tambien
+los platos de SPEC 21, planear un set in-domain mayor antes de ampliar mas la cabeza.
