@@ -1,6 +1,7 @@
 import './style.css';
 import {
   applyAlternative,
+  carbQualityBand,
   carbsByMoment,
   dayCarbs,
   dayMacros,
@@ -14,6 +15,7 @@ import {
   groupCarbs,
   groupMeals,
   hasMacros,
+  isCarbSource,
   itemCarbs,
   itemMacros,
   loadVault,
@@ -42,6 +44,7 @@ import {
   weekBreakdown,
 } from './core';
 import type {
+  CarbQualityBand,
   FoodItem,
   InsulinKind,
   InsulinLog,
@@ -222,6 +225,32 @@ function writeMode(mode: ScreenMode): void {
 }
 
 let screenMode: ScreenMode = readMode();
+
+/**
+ * Enlaces externos (SPEC 27 / D73): el indice glucemico **ni se calcula ni se
+ * embebe** (es una respuesta medida y las tablas publicas no son redistribuibles).
+ * Si la persona lo permite, se ofrece un **enlace** a una busqueda externa. Por
+ * defecto esta **desactivado** y nada se abre sin su toque.
+ */
+const EXTERNAL_LINKS_KEY = 'carbos.externalLinks';
+
+function readExternalLinks(): boolean {
+  try {
+    return localStorage.getItem(EXTERNAL_LINKS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeExternalLinks(enabled: boolean): void {
+  try {
+    localStorage.setItem(EXTERNAL_LINKS_KEY, enabled ? '1' : '0');
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
+let externalLinksEnabled = readExternalLinks();
 
 function readViewDate(): string | null {
   try {
@@ -523,6 +552,7 @@ app.innerHTML = `
         <p id="detect-summary" class="muted" aria-live="polite"></p>
         <h3 data-i18n="photo.detected"></h3>
         <ul id="detect-results" class="draft"></ul>
+        <p id="detect-carbquality-note" class="muted carbquality-note" data-i18n="carbquality.note" hidden></p>
         <p class="muted" data-i18n="photo.resultsNote"></p>
       </div>
       <p><button id="share-photo" type="button" data-i18n="contrib.share" hidden></button></p>
@@ -630,6 +660,8 @@ app.innerHTML = `
       </label>
     </div>
     <p id="mode-hint" class="muted" aria-live="polite"></p>
+    <label class="check"><input id="external-links-toggle" type="checkbox" /> <span data-i18n="settings.externalLinks"></span></label>
+    <p class="muted" data-i18n="settings.externalLinksHint"></p>
     <label class="field daily-target-field"><span data-i18n="settings.dailyTarget"></span><input id="daily-target" type="number" min="0" step="1" inputmode="numeric" /></label>
     <p><button id="persist" type="button" data-i18n="button.persist"></button></p>
     <p id="persist-status" class="muted" aria-live="polite"></p>
@@ -988,6 +1020,8 @@ function renderDraft(): void {
       if (screenMode === 'complete') {
         const breakdown = macroBreakdown(macroItem(item));
         if (breakdown) row.appendChild(breakdown);
+        const resolved = resolveItem(item);
+        appendCarbQuality(row, resolved.name, resolved.carbsPer100g, resolved.fiberPer100g);
       }
       list.appendChild(row);
     });
@@ -1017,9 +1051,20 @@ function renderDraftMacros(): void {
     origin: draft.origin,
   };
   const breakdown = macroBreakdown(mealMacros(synthetic));
-  if (!breakdown) return;
-  breakdown.id = 'draft-macros';
-  host.appendChild(breakdown);
+  if (breakdown) {
+    breakdown.id = 'draft-macros';
+    host.appendChild(breakdown);
+  }
+  const hasQuality = draft.items.some((item) => {
+    const resolved = resolveItem(item);
+    return carbQualityBand(resolved.carbsPer100g, resolved.fiberPer100g) !== null;
+  });
+  if (hasQuality) {
+    const note = document.createElement('p');
+    note.className = 'muted carbquality-note';
+    note.textContent = tr('carbquality.note');
+    host.appendChild(note);
+  }
 }
 
 function setPhotoStatus(key: StringKey | null): void {
@@ -1296,6 +1341,73 @@ function macroBreakdown(macros: Macros): HTMLElement | null {
   return wrap;
 }
 
+/** Clave i18n de la banda de calidad del carbohidrato. */
+function carbQualityKey(band: CarbQualityBand): StringKey {
+  if (band === 'high') return 'carbquality.high';
+  if (band === 'medium') return 'carbquality.medium';
+  return 'carbquality.low';
+}
+
+/**
+ * Insignia de calidad del carbohidrato (SPEC 27): banda con **forma + texto**
+ * redundantes. El color **no** distingue la banda (nada de semaforo rojo/verde):
+ * la leen el recuento de segmentos y la palabra. Dato derivado de la fibra; no es el IG.
+ */
+function carbQualityBadge(band: CarbQualityBand): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'carbquality';
+  const label = document.createElement('span');
+  label.className = 'carbquality-label';
+  label.textContent = tr('carbquality.label');
+  const badge = document.createElement('span');
+  badge.className = `carbquality-band carbquality-band--${band}`;
+  const bars = document.createElement('span');
+  bars.className = 'carbquality-bars';
+  bars.setAttribute('aria-hidden', 'true');
+  for (let index = 0; index < 3; index += 1) bars.appendChild(document.createElement('i'));
+  const text = document.createElement('span');
+  text.className = 'carbquality-band-text';
+  text.textContent = tr(carbQualityKey(band));
+  badge.append(bars, text);
+  row.append(label, badge);
+  return row;
+}
+
+/** Enlace a una busqueda externa del indice glucemico (nada se embebe). */
+function giExternalLink(name: string): HTMLAnchorElement {
+  const anchor = document.createElement('a');
+  anchor.className = 'gi-link';
+  anchor.href = `https://duckduckgo.com/?q=${encodeURIComponent(`${name} ${tr('gi.searchSuffix')}`)}`;
+  anchor.target = '_blank';
+  anchor.rel = 'noopener noreferrer';
+  anchor.setAttribute('aria-label', `${tr('gi.external')}: ${name}`);
+  const text = document.createElement('span');
+  text.textContent = tr('gi.external');
+  const arrow = document.createElement('span');
+  arrow.setAttribute('aria-hidden', 'true');
+  arrow.textContent = ' ↗';
+  anchor.append(text, arrow);
+  return anchor;
+}
+
+/**
+ * Anexa a una fila del desglose la banda de calidad (si aplica) y el enlace al
+ * IG (si la persona lo permite **y** el alimento es fuente de carbohidratos).
+ * Solo en modo completo. Devuelve `true` si pinto la banda.
+ */
+function appendCarbQuality(
+  row: HTMLElement,
+  name: string,
+  carbsPer100g: number,
+  fiberPer100g: number | undefined,
+): boolean {
+  if (screenMode !== 'complete') return false;
+  const band = carbQualityBand(carbsPer100g, fiberPer100g);
+  if (band) row.appendChild(carbQualityBadge(band));
+  if (externalLinksEnabled && isCarbSource(carbsPer100g)) row.appendChild(giExternalLink(name));
+  return band !== null;
+}
+
 /** Sincroniza el control segmentado de Ajustes con `screenMode`. */
 function renderModeControl(): void {
   byId<HTMLInputElement>('mode-simple').checked = screenMode === 'simple';
@@ -1395,6 +1507,7 @@ function renderDetect(): void {
       ? `${resolved} · ${tr('photo.detected')}${engine}`
       : `${tr('photo.unknownOnly')}${engine}`;
   list.innerHTML = '';
+  let qualityShown = false;
   detections.forEach((result, index) => {
     // La fila comparte la MISMA definicion de "resuelto" que el resumen, el
     // estado, el overlay y el borrador: la clase top-1 (`result.classId`). Asi
@@ -1437,6 +1550,16 @@ function renderDetect(): void {
       list.appendChild(row);
       return;
     }
+    const qualityFood = foodById(best.classId);
+    if (qualityFood) {
+      qualityShown =
+        appendCarbQuality(
+          row,
+          qualityFood.name[locale],
+          qualityFood.carbsPer100g,
+          qualityFood.fiberPer100g,
+        ) || qualityShown;
+    }
     if (alternatives.length > 1) {
       const select = document.createElement('select');
       select.className = 'detect-alt';
@@ -1455,6 +1578,7 @@ function renderDetect(): void {
     }
     list.appendChild(row);
   });
+  byId('detect-carbquality-note').hidden = !(screenMode === 'complete' && qualityShown);
 }
 
 async function startDetection(image: CapturedImage): Promise<void> {
@@ -2361,6 +2485,14 @@ function wire(): void {
     });
   }
   renderModeControl();
+
+  const externalToggle = byId<HTMLInputElement>('external-links-toggle');
+  externalToggle.checked = externalLinksEnabled;
+  externalToggle.addEventListener('change', () => {
+    externalLinksEnabled = externalToggle.checked;
+    writeExternalLinks(externalLinksEnabled);
+    render();
+  });
 
   localeSelect.addEventListener('change', () => {
     const value = localeSelect.value;

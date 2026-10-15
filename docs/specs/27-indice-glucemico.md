@@ -21,7 +21,8 @@
 > curada alimento a alimento con metodologia documentada y licencia compatible**.
 > **Veredicto:** la funcion solo cabe como informacion cualitativa secundaria, y el
 > **margen sobre no hacerla es estrecho**; la opcion "nada" (C13) es runner-up.
-> Decisiones **D70-D72** (propuestas). No toca el camino del calculo (D12) ni el de la
+> Decisiones **D70-D73** (implementadas 2026-10-15: indicador propio de **fibra** +
+> enlace externo opt-in; ni se calcula ni se embebe el IG). No toca el camino del calculo (D12) ni el de la
 > dosis (D10); sin backend, sin dependencias nuevas y sin red en runtime (D11).
 
 ## Contexto
@@ -54,9 +55,10 @@ tocar codigo:
   ajuste de insulina, y choca con la identidad **calma** ("un solo numero:
   carbohidratos"; `docs/specs/16-uiux-v2.md:171`).
 
-Esta spec **no implementa** la funcion: documenta la investigacion, filtra las
-candidatas, **construye prototipos** para elegir la mejor UX y deja las decisiones en
-**propuesta**, listas para decidir con los prototipos delante.
+Esta spec primero documento la investigacion, filtro las candidatas y **construyo
+prototipos** para elegir la mejor UX; despues se **implemento la via de minima
+friccion**: un **indicador propio de fibra** (no IG) mas un **enlace externo** opt-in al
+indice glucemico (D70-D73, _Implementacion_ mas abajo).
 
 ## Metodo
 
@@ -111,6 +113,10 @@ ruido, moralizacion o cruce con la dosis.
 
 ## La elegida: banda cualitativa opcional en el desglose
 
+> **Superado por _Implementacion_ (D70-D73).** Este bloque describe el diseno de _banda de
+> IG_ que se investigo; la via finalmente elegida e implementada fue un **indicador de
+> fibra** (no IG) mas un **enlace externo**. Se conserva como registro del razonamiento.
+
 **Que.** Un **indicador de IG estimado, cualitativo y opcional** que solo aparece
 **cuando el alimento se muestra en su contexto de composicion** (el desglose del
 borrador y las detecciones), **nunca** en las filas de resultado de busqueda ni en el
@@ -126,7 +132,7 @@ completo (no lo enciende el modo completo).
 
 - **No un numero.** La variabilidad intra-individual (CV 20-43 %, R1) y la dependencia
   de coccion/proceso hacen que un valor puntual engane; la regla de redaccion prohibe
-  "preciso" (`docs/decisiones.md:123`).
+  "preciso" (`docs/decisiones.md:124`).
 - **Banda + texto + forma.** WCAG 1.4.1 (Uso del color): el color no puede ser el unico
   canal; se anaden etiqueta y forma (G14/G111, R2).
 - **Un indicador por alimento, no en filas ni en el diario.** En el desglose cada
@@ -222,133 +228,141 @@ IG calculado, sino un indicador **propio y transparente de calidad del carbohidr
 (fibra, azúcares, grado de procesado), con su propio nombre y definición, **sin llamarlo
 "IG"**.
 
-Cobertura aproximada sobre los **186 alimentos** (172 CIQUAL + 14 recetas propias; el
-recuento "154" del README esta desactualizado): frutas, cereales, legumbres, lacteos y
-dulces (~95-110) admitirian curacion; los platos compuestos (~40-50) se **omiten**;
-los alimentos sin carbohidrato (~30-40) **no aplican**. Si finalmente se persiste como
-campo opcional, se sigue el **patron SPEC 26/D68** (campo `?` en `Food`/`FoodItem`, Zod
-tolerante, `CATALOG_VERSION`/`SCHEMA_VERSION` bumpeados con test).
+Cobertura del dato que se usa: el indicador se apoya **solo en la fibra**
+(`fiberPer100g`), que ya trae el catalogo (SPEC 26). No hay tabla de IG que curar ni campo
+que persistir; por eso **no** hay bump de `CATALOG_VERSION`/`SCHEMA_VERSION`.
 
-## Decisiones nuevas (propuesta D70-D72)
+## Decisiones (D70-D73, implementadas 2026-10-15)
 
-| #   | Decision                                                      | Detalle                                                                                                                                                                                                                                                                                                                                                                                        | Estado    |
-| --- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| D70 | **IG cualitativo, opcional y solo en el desglose**            | Banda Bajo/Medio/Alto con texto y forma redundantes (no solo color), **sin numero**, marcada "estimado"; en el contexto de composicion del alimento (desglose del borrador/detecciones), **nunca** en filas de resultado ni en el diario; incluye la **explicacion colapsada** (F2). **Opt-in propio** en `Ajustes`, por defecto oculto e **independiente del modo completo**. No toca D10/D12 | propuesta |
-| D71 | **Sin tablas de IG propietarias; dato por alimento o enlace** | El valor solo puede venir de una **tabla propia curada alimento a alimento con fuente, metodologia y licencia compatible** (o permiso); en otro caso, **enlace a fuente externa**; se **omite** si no aplica. Se reconoce que una banda derivada de Atkinson/Sydney/FAO seria **obra derivada**: no se embebe. Campo opcional tolerante (patron D68) si se persiste                            | propuesta |
-| D72 | **Guardarrail de frontera IG -> dosis**                       | Sin ranking ni orden por IG, sin IG en el diario, sin `objetivo de IG`, sin conversion IG->unidades ni IG->carbos->insulina; textos de "estimado, no consejo dietetico ni guia de insulina"; **test de frontera** que prohibe cualquier ruta IG->unidades                                                                                                                                      | propuesta |
+| #   | Decision                                                                   | Detalle                                                                                                                                                                                                                                                                                                                                                                                                                        | Spec | Estado  |
+| --- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---- | ------- |
+| D70 | **Indicador propio de calidad del carbohidrato (fibra), en modo completo** | Banda **Baja/Media/Alta** derivada **solo de la fibra** (umbrales UE, Reglamento 1924/2006: fuente >=3 g, alta >=6 g por 100 g); con **forma + texto** redundantes (no solo color) y `aria-label`; se **oculta** si el alimento no es fuente de carbohidratos (>=5 g) o no hay dato de fibra. **No es el IG**. En el desglose del borrador y las detecciones; **nunca** en filas de resultado ni en el diario. No toca D10/D12 | 27   | cerrada |
+| D71 | **Sin tablas de IG propietarias; enlace externo**                          | El IG **ni se calcula ni se embebe**: es una respuesta medida (ISO 26642) y las tablas publicas (Atkinson/Sydney/FAO) no son redistribuibles; un derivado seria obra derivada. La via es un **enlace a fuente externa** (o, en el futuro, una tabla propia con licencia compatible documentada)                                                                                                                                | 27   | cerrada |
+| D72 | **Guardarrail de frontera IG -> dosis**                                    | Sin ranking ni orden por IG, sin IG en el diario, sin `objetivo de IG`, sin conversion IG->unidades; el indicador es de **fibra**, no de IG; cero claims de manejo de DM1                                                                                                                                                                                                                                                      | 27   | cerrada |
+| D73 | **Enlace externo al IG, opt-in y por defecto off**                         | Ajuste en `Ajustes` (`localStorage`, `carbos.externalLinks`); al activarlo, el desglose ofrece un enlace que abre una **busqueda externa** (sale del dispositivo, avisado). Nada se abre sin el toque de la persona. No embebe datos                                                                                                                                                                                           | 27   | cerrada |
+
+## Implementación (2026-10-15)
+
+Se implementa la via de **minima friccion**: un **indicador propio de fibra** (no IG)
+mas un **enlace externo** opt-in. No se embebe ninguna tabla ni se calcula el IG.
+
+- **Nucleo:** `src/core/carbquality.ts` (funciones puras `carbQualityBand(carbsPer100g,
+fiberPer100g)`: `high` >=6 g fibra, `medium` >=3 g, `low` por debajo; `null` si no es
+  fuente de carbohidratos [<5 g/100 g] o no se conoce la fibra; e `isCarbSource`) +
+  `carbquality.test.ts` + `carbquality.boundary.test.ts` (frontera D72).
+- **UI (`src/main.ts`):** en **modo completo**, cada fila del **desglose** (borrador y
+  detecciones) anade la banda (`carbQualityBadge`: 1-3 segmentos rellenos + texto; el color
+  **no** distingue el nivel) y, si el enlace esta permitido **y** el alimento es fuente de
+  carbohidratos, un **enlace** (`giExternalLink`, con `aria-label` y objetivo 44 px) a
+  `https://duckduckgo.com/?q=<nombre> índice glucémico` (locale). En **simple** no aparece
+  nada. La nota `carbquality.note` acompana al borrador y a las detecciones.
+- **Ajuste:** `settings.externalLinks` (`carbos.externalLinks`), por defecto **off**; el
+  aviso explica que el nombre del alimento se envia a un buscador externo.
+- **i18n:** `carbquality.label/low/medium/high/note`, `gi.external`, `gi.searchSuffix`,
+  `settings.externalLinks`/`Hint` (ES/EN, paridad y tildes).
+- **Estilos:** `src/style.css` (banda neutra con tokens, enlace de 44 px, `forced-colors`).
+- **Tests:** unitarios (`carbquality.test.ts`, `carbquality.boundary.test.ts`) + E2E nuevo
+  ("calidad del carbohidrato (fibra) y enlace externo al IG"). Gate:
+  `make check` (451) + `make e2e` (56/56) + `make audit-uiux` GREEN.
+- **Fuera:** no hay valor numerico, ni IG embebido, ni conversion a dosis.
 
 ## Alcance
 
-> **Estado de esta spec: investigacion y prototipos.** Las decisiones D70-D72 quedan
-> en **propuesta**; la implementacion en la app se decide **con los prototipos delante**
-> y **tras** resolver la procedencia/licencia del dato. El alcance de abajo describe
-> _donde iria_ cada pieza si se aprueba.
+> **Estado: implementado (2026-10-15), via de minima friccion.** D70-D73 quedan
+> **cerradas**. No se embebe ni se calcula el IG: se implementa el indicador propio de
+> **fibra** (D70) y el **enlace externo opt-in** (D73). El bloque describe _donde_ vive
+> cada pieza.
 
-- **Datos:** `tools/catalog/build_catalog.py` (si se persiste: tabla **propia curada por
-  alimento**, con metodologia y licencia; **no** desde CIQUAL/USDA),
-  `tools/catalog/test_build_catalog.py`, `src/catalog/types.ts` (`Food.giBand?`,
-  `CATALOG_VERSION`), `src/catalog/schema.ts`, `catalog.ts` (regenerado con `make catalog`).
-- **Nucleo:** `src/core/types.ts` (`FoodItem.giBand?` opcional, patron D68),
-  `src/core/schema.ts`, `src/core/migrate.ts` (tolerante, acepta la version previa),
-  `src/core/export.ts` (tolerancia a campos nuevos). **No** se toca `src/core/totals.ts`
-  (carbos) ni `src/insulin/*`.
-- **UI:** `src/main.ts` — `macroBreakdown()` (`:1286`) y `renderDraft()` (`:879`) para
-  co-ubicar el indicador con los macros; `renderDetect()` (`:1370`) para las detecciones;
-  **fuera**: `renderResultList()` (`:766`) y `mealEntry()` (`:1837`). Reutiliza
-  `macroFields()` (`:1242`) y `resolveItem()` (`:1213`). `src/style.css` (banda/etiqueta
-  con forma, tokens, reduced-motion, `forced-colors`).
-- **i18n:** `src/i18n/index.ts` (claves ES/EN, guarda de paridad).
+- **Datos:** ninguno nuevo. `fiberPer100g` ya existe (SPEC 26); **no** se persiste
+  `giBand` ni se toca el catalogo ni el esquema (el diseno de tabla propia se
+  **descarto**: ver _Coste de datos_).
+- **Nucleo:** `src/core/carbquality.ts` (`carbQualityBand`/`isCarbSource`, funcion pura) y
+  `src/core/carbquality.boundary.test.ts` (frontera D72). **No** se toca
+  `src/core/totals.ts` (carbos) ni `src/insulin/*`.
+- **UI:** `src/main.ts` — `appendCarbQuality()` (`:1393`) anade la banda y el enlace en el
+  **desglose del borrador** (`renderDraft`, `:911`) y en las **detecciones**
+  (`renderDetect`, `:1482`); la nota, en `renderDraftMacros` (`:1040`) y en
+  `#detect-carbquality-note`. **Fuera**: `renderResultList()` (`:798`) y `mealEntry()`
+  (`:1961`). El ajuste `settings.externalLinks` vive junto al modo. `src/style.css`
+  (banda neutra con forma, enlace con objetivo 44 px, `forced-colors`).
+- **i18n:** `src/i18n/index.ts` (claves ES/EN, guarda de paridad y de tildes).
 - **Prototipos:** `prototypes/ig/` (desechables; ver abajo).
 
-### Detalle
+### Detalle (lo implementado)
 
-- **F1a.** Indicador **Banda + etiqueta** ("Bajo/Medio/Alto") con **texto y forma**
-  redundantes y `aria-label` que nombra la banda; la nota `gi.estimateNote` visible. Sin numero.
-- **F1b.** Ubicacion: en el **desglose del borrador** y en las **detecciones**, junto a
-  los macros; **nunca** en resultados de busqueda ni en el diario.
-- **F1c.** **Oculto** si el alimento no aporta carbohidratos o no hay estimacion
-  defendible (no se inventa).
-- **F1d.** **Opt-in propio, por defecto oculto**, en `Ajustes` (`localStorage`),
-  **independiente** del modo completo.
-- **F1e.** **Explicacion colapsada** "¿que es el IG?" (patron `<details>`) y **enlace
-  externo** (F3) cuando no hay valor propio.
-- **F1f.** Datos: tabla **propia por alimento** con metodologia y licencia, marcada
-  estimada; las 14 recetas propias **se omiten** (plato compuesto); test de "no inventa".
-- **F1g.** Guardarrail (D72): test de frontera que comprueba que ningun modulo
-  `src/insulin/*` ni el camino del calculo referencia el IG.
+- **F1a.** Banda **Baja/Media/Alta** con **forma** (1-3 segmentos rellenos) y **texto**;
+  el color **no** distingue el nivel (sin semaforo rojo/verde). Sin numero.
+- **F1b.** Ubicacion: **desglose del borrador** y **detecciones**, en **modo completo**;
+  **nunca** en resultados de busqueda ni en el diario.
+- **F1c.** **Oculta** si el alimento no es fuente de carbohidratos (>=5 g/100 g) o no hay
+  fibra (no se inventa).
+- **F1d.** La banda aparece con el **modo completo** (D70); el **enlace** es un **opt-in
+  propio** (D73), por defecto off.
+- **F1e.** **Enlace externo** al IG (busqueda) con nombre accesible; abre fuera de la app.
+- **F1f.** Datos: **solo fibra** (dato existente). Sin tablas de IG.
+- **F1g.** Guardarrail (D72): `src/core/carbquality.boundary.test.ts` comprueba que
+  `src/core/totals.ts` y `src/insulin/**` no referencian el indicador.
 
 ### i18n
 
-| Clave              | ES                                                                      | EN                                                             |
-| ------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `gi.label`         | Índice glucémico (estimado)                                             | Glycemic index (estimated)                                     |
-| `gi.low`           | Bajo                                                                    | Low                                                            |
-| `gi.medium`        | Medio                                                                   | Medium                                                         |
-| `gi.high`          | Alto                                                                    | High                                                           |
-| `gi.estimateNote`  | Estimación de composición. No es consejo dietético ni guía de insulina. | Estimated composition. Not dietary advice or insulin guidance. |
-| `gi.notApplicable` | Sin carbohidratos: no aplica                                            | No carbs: not applicable                                       |
-| `gi.learn`         | ¿Qué es el índice glucémico?                                            | What is the glycemic index?                                    |
-| `gi.external`      | Ver IG en una fuente externa                                            | See GI in an external source                                   |
-| `settings.giLabel` | Mostrar el índice glucémico estimado                                    | Show estimated glycemic index                                  |
+| Clave                        | ES                                                                                                                                                                                | EN                                                                                                                                                                                      |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `carbquality.label`          | Calidad del carbohidrato (fibra)                                                                                                                                                  | Carbohydrate quality (fiber)                                                                                                                                                            |
+| `carbquality.low`            | Baja                                                                                                                                                                              | Low                                                                                                                                                                                     |
+| `carbquality.medium`         | Media                                                                                                                                                                             | Medium                                                                                                                                                                                  |
+| `carbquality.high`           | Alta                                                                                                                                                                              | High                                                                                                                                                                                    |
+| `carbquality.note`           | Según la fibra del alimento (fuente desde 3 g; alta desde 6 g por 100 g). No es el índice glucémico ni consejo dietético.                                                         | Based on the food's fiber (source from 3 g; high from 6 g per 100 g). Not the glycemic index or dietary advice.                                                                         |
+| `gi.external`                | Ver índice glucémico (fuente externa)                                                                                                                                             | See glycemic index (external source)                                                                                                                                                    |
+| `gi.searchSuffix`            | índice glucémico                                                                                                                                                                  | glycemic index                                                                                                                                                                          |
+| `settings.externalLinks`     | Permitir abrir fuentes externas                                                                                                                                                   | Allow opening external sources                                                                                                                                                          |
+| `settings.externalLinksHint` | Muestra enlaces en el desglose (modo completo) que abren una web fuera de la app. Al tocar uno, el nombre del alimento se envía a un buscador externo. Nada se abre sin tu toque. | Shows links in the breakdown (complete mode) that open a website outside the app. When you tap one, the food name is sent to an external search engine. Nothing opens without your tap. |
 
-> **Nota i18n.** Las cadenas ES propuestas llevan **tildes** (índice, glucémico,
-> estimación, dietético, guía, qué). La guarda de `src/i18n/index.test.ts` exige tildes
-> en ES y usa una lista blanca `SIN_ACENTO` para palabras sin tilde (p. ej. "kcal"): al
-> implementar hay que **anadir nuevas palabras sin tilde** a esa lista si aparecen (p. ej.
-> "insulina" no la necesita, pero "glucemico"/"indice" si llevan tilde). Si alguna clave
-> coincide ES/EN debera anadirse a `IGUALES_PERMITIDAS`.
+> **Nota i18n.** La guarda `SIN_ACENTO` (`src/i18n/index.test.ts`) incluye ya `indice`,
+> `glucemico` y `dietetico`, de modo que las cadenas ES deben llevarlos con tilde.
 
 ## Criterios de aceptacion
 
 Los criterios marcados _(m)_ se comprueban con una formula concreta (Tests).
 
-1. Por defecto (opt-in oculto) **no** se pinta ningun indicador de IG; la vista coincide
-   con la de hoy (simplificado) y con la de completo **sin** IG. _(m)_
-2. Al activarlo, el indicador aparece **solo** en el desglose del borrador y en las
-   detecciones; **nunca** en resultados de busqueda ni en el diario. _(m)_
-3. El indicador es una **banda cualitativa** con **texto y forma** redundantes (no solo
-   color) y **sin ningun numero** de IG. _(m)_
-4. Un alimento **sin carbohidratos** o sin estimacion defendible **no** muestra
-   indicador (no se inventa). _(m)_
-5. El **total de carbohidratos** y el objetivo **no cambian** se muestre o no el IG. _(m)_
-6. La **nota** "estimado / no consejo" es visible junto al indicador. _(m)_
-7. Existe una **explicacion colapsada** y, cuando no hay valor propio, un **enlace
-   externo** en lugar de un numero. _(m)_
-8. **Sin tablas propietarias embebidas:** ningun artefacto versionado del repo contiene
-   valores copiados de Atkinson/Sydney/FAO; si hay dato embebido, es una tabla propia con
-   fuente, metodologia y licencia compatible documentadas.
+1. Por defecto (modo simplificado) **no** se pinta ningun indicador; en completo se pinta
+   la banda de fibra (que **no** es IG). _(m)_
+2. El indicador aparece **solo** en el desglose del borrador y en las detecciones;
+   **nunca** en resultados de busqueda ni en el diario. _(m)_
+3. La banda es **cualitativa**, con **texto y forma** redundantes y **sin numero**; el
+   color **no** distingue el nivel (sin semaforo rojo/verde). _(m)_
+4. Un alimento **sin carbohidratos** (o sin fibra) **no** muestra banda (no se inventa). _(m)_
+5. El **total de carbohidratos** y el objetivo **no cambian** se muestre o no el
+   indicador. _(m)_
+6. La **nota** ("no es el índice glucémico ni consejo dietético") es visible junto al
+   indicador, en el borrador y en las detecciones. _(m)_
+7. El **enlace externo** al IG es **opt-in** (por defecto off), no embebe datos, tiene
+   nombre accesible y objetivo tactil >= 44 px. _(m)_
+8. **Sin tablas propietarias embebidas:** ningun artefacto versionado contiene valores
+   copiados de Atkinson/Sydney/FAO.
 9. **Sin cruce regulatorio** (estructural): ningun modulo de `src/insulin/*` ni el camino
-   del calculo referencia el IG ni el concepto de banda. _(m)_
-10. **i18n:** toda clave nueva existe en **es** y **en**, con tildes correctas; guarda de
-    paridad intacta.
+   del calculo referencia el indicador ni el IG. _(m)_
+10. **i18n:** toda clave nueva existe en **es** y **en**, con tildes correctas.
 11. **Sin regresiones:** SPEC 22-26 siguen verdes.
-12. `make check` (+ `make e2e` con los escenarios nuevos) en verde. _(m)_
-13. **Go/no-go (_m_).** Si al probar H1 (uso real o revision) no demuestra utilidad
-    informativa **sin volverse consejo** o exige datos que no se pueden licenciar, se aplica
-    **C13** (aplazar/omitir) y la feature no se implementa. Este criterio es bloqueante.
+12. `make check` + `make e2e` (56/56) + `make audit-uiux` en verde. _(m)_
+13. **Go/no-go (_m_).** Criterio **vivo**: si el indicador no demuestra utilidad sin
+    volverse consejo, se retira (como FPU/eCarbs). Queda pendiente de uso real.
 
 ## Tests
 
-- **Unitarios** (vitest):
-  - `src/catalog/`: banda por **alimento** (no por categoria); "no aplica" en alimentos
-    sin carbohidrato; cobertura de la tabla propia; paridad con el esquema zod.
-  - `src/core/migrate.ts`: si se persiste el campo, version previa migra tolerante
-    (patron SPEC 26).
-  - **Frontera (D72):** test que comprueba que `src/core/totals.ts` y `src/insulin/*` no
-    referencian el IG (analogo a los boundary tests `src/chat/boundary.test.ts` y
-    `src/barcode/boundary.test.ts`).
-  - `src/i18n/index.test.ts`: guarda de paridad cubre las claves nuevas y las tildes.
-- **E2E** (Firefox, `make e2e`): por defecto no hay indicador; al activarlo aparece en el
-  borrador con banda + texto (no solo color) y el total de carbos no cambia; no aparece en
-  el diario.
-- **Auditoria** (`make audit-uiux`): la banda y el control opt-in cumplen contraste
-  (texto >= 4,5:1; borde >= 3:1) y objetivo tactil (MIN_HIT=44) y no dependen del color.
+- **Unitarios** (vitest): `src/core/carbquality.test.ts` (umbrales, no aplica, sin fibra);
+  `src/core/carbquality.boundary.test.ts` (frontera D72: `src/core/totals.ts` y
+  `src/insulin/**` no referencian el indicador); `src/i18n/index.test.ts` (paridad y tildes).
+- **E2E** (Firefox, `make e2e`): en simple no hay banda; en completo aparece con forma +
+  texto ("Alta" en garbanzos) y el total de carbos no cambia; el enlace esta oculto por
+  defecto, se activa, mide >= 44 px y persiste; ni banda ni enlace en el diario.
+- **Auditoria** (`make audit-uiux`): verde. _La auditoria no abre Ajustes, asi que la
+  cobertura especifica de la banda y el enlace la aportan los tests unitarios y el E2E._
 - **Gate**: `make check`.
 
 ## Prototipos (UX)
 
-> **Seccion adicional** al patron de 13 secciones, propia de una spec de investigacion
-> (la implementacion no esta aprobada aun).
+> **Seccion adicional** al patron de 13 secciones, propia de una spec con investigacion y
+> prototipos.
 
 Desechables y **no versionados** (`.gitignore:12` ignora `prototypes/`, como manda la
 convencion del repo): son mockups locales para decidir, no un entregable de build.
@@ -475,5 +489,5 @@ Construidos y verificados (desechables; `prototypes/` esta en `.gitignore`):
   (`FoodItem`); `src/style.css` (`.chip` :297, `.macro-breakdown` :1222);
   `src/chat/boundary.test.ts` y `src/barcode/boundary.test.ts` (patron de frontera);
   `docs/specs/16-uiux-v2.md:171` (identidad calma); `docs/specs/26-diario-modos-simplificado-completo.md`
-  (D67-D69); `docs/decisiones.md` (D10, D11, D12, D16, D19, D67, D70-D72, reglas de
+  (D67-D69); `docs/decisiones.md` (D10, D11, D12, D16, D19, D67, D70-D73, reglas de
   redaccion :123); `docs/receta-de-codigo.md`.

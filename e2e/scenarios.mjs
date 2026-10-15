@@ -2085,4 +2085,98 @@ export const scenarios = [
       await screenshot(page, 'modo-completo');
     },
   },
+  {
+    name: 'calidad del carbohidrato (fibra) y enlace externo al IG (SPEC 27)',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      await page.evaluate(() => {
+        localStorage.removeItem('carbos.mode');
+        localStorage.removeItem('carbos.externalLinks');
+      });
+      await reload(page);
+      await waitFor(page, '#app header h1');
+
+      // En simple no aparece nada: la vista coincide con la de hoy.
+      await addFood(page, 'garbanzos');
+      assertEqual(
+        await page.$$eval('.carbquality', (nodes) => nodes.length),
+        0,
+        'en simple no hay banda de calidad',
+      );
+      const simpleCarbs = await text(page, '#draft-total');
+
+      // Completo: banda de fibra (garbanzos = alta) con texto + forma.
+      await page.$eval('#settings', (el) => {
+        el.open = true;
+      });
+      await click(page, '#mode-complete');
+      await page.waitForFunction(() => localStorage.getItem('carbos.mode') === 'complete', {
+        timeout: 8000,
+      });
+      await waitFor(page, '#draft-items .carbquality');
+      const band = await page.$eval('.carbquality-band', (el) => ({
+        text: (el.textContent || '').trim(),
+        bars: el.querySelectorAll('.carbquality-bars i').length,
+        filled: Array.from(el.querySelectorAll('.carbquality-bars i')).filter(
+          (bar) => getComputedStyle(bar).opacity !== '0.25',
+        ).length,
+      }));
+      assert(/Alta|High/.test(band.text), 'la banda nombra el nivel (no solo color)');
+      assertEqual(band.bars, 3, 'la banda lleva forma de 3 segmentos');
+      assertEqual(band.filled, 3, 'la fibra alta rellena los 3 segmentos');
+      assertEqual(
+        await text(page, '#draft-total'),
+        simpleCarbs,
+        'el total de carbos del borrador no cambia entre modos',
+      );
+
+      // Un alimento sin carbohidratos oculta la banda (no se inventa).
+      await addFood(page, 'pechuga de pollo');
+      const chickenHasBand = await page.evaluate(() =>
+        Array.from(document.querySelectorAll('#draft-items .draft-row'))
+          .filter((row) => row.textContent.includes('Pechuga'))
+          .some((row) => row.querySelector('.carbquality-band')),
+      );
+      assert(!chickenHasBand, 'un alimento sin carbohidratos no muestra banda');
+
+      // Enlace externo al IG: oculto por defecto; visible si la persona lo permite.
+      assertEqual(
+        await page.$$eval('.gi-link', (nodes) => nodes.length),
+        0,
+        'sin enlace externo por defecto',
+      );
+      await page.$eval('#settings', (el) => {
+        el.open = true;
+      });
+      await click(page, '#external-links-toggle');
+      await page.waitForFunction(() => localStorage.getItem('carbos.externalLinks') === '1', {
+        timeout: 8000,
+      });
+      await waitFor(page, '#draft-items .gi-link');
+      const link = await page.$eval('.gi-link', (a) => ({
+        href: a.getAttribute('href') || '',
+        aria: a.getAttribute('aria-label') || '',
+        height: a.getBoundingClientRect().height,
+      }));
+      assert(link.href.includes('duckduckgo.com/?q='), 'el enlace apunta a una busqueda externa');
+      assert(link.aria.length > 0, 'el enlace tiene nombre accesible');
+      assert(link.height >= 44, `el enlace mide al menos 44 px (${link.height})`);
+
+      // El enlace persiste entre recargas (ajuste global).
+      await reload(page);
+      await waitFor(page, '#app header h1');
+      await waitFor(page, '#draft-items .gi-link');
+
+      // Registra: en el diario no aparece ni la banda ni el enlace (criterio 2).
+      await register(page);
+      await waitForText(page, '#diary', 'Garbanzos');
+      assertEqual(
+        await page.$$eval('#diary .carbquality, #diary .gi-link', (nodes) => nodes.length),
+        0,
+        'en el diario no aparece la banda ni el enlace',
+      );
+
+      await screenshot(page, 'carbquality-ig');
+    },
+  },
 ];
