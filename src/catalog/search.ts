@@ -42,13 +42,14 @@ export function searchFoods(
 ): Food[] {
   const q = normalize(query);
   if (q.length === 0) return catalog.foods.slice(0, limit);
+  const frequency = (food: Food): number => usage?.get(food.id) ?? 0;
   return catalog.foods
     .map((food) => ({ food, value: score(food, q) }))
     .filter((entry) => entry.value > 0)
     .sort(
       (a, b) =>
         b.value - a.value ||
-        (usage?.get(b.food.id) ?? 0) - (usage?.get(a.food.id) ?? 0) ||
+        frequency(b.food) - frequency(a.food) ||
         a.food.name.es.localeCompare(b.food.name.es),
     )
     .slice(0, limit)

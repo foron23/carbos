@@ -222,18 +222,27 @@ const ID_TO_CATEGORY: ReadonlyMap<string, Category> = (() => {
   return map;
 })();
 
+const CATEGORY_SETS: ReadonlyMap<Category, ReadonlySet<string>> = new Map(
+  CATEGORIES.map((category) => [category, new Set(CATEGORY_IDS[category])]),
+);
+
 /** Categoria curada de un alimento del catalogo (`null` si no esta). */
 export function categoryOf(id: string): Category | null {
   return ID_TO_CATEGORY.get(id) ?? null;
 }
 
-/** Numero de alimentos categorizados (debe igualar el catalogo; ver test). */
-export function categorizedCount(): number {
-  return ID_TO_CATEGORY.size;
+/**
+ * Total de entradas curadas (suma, no el tamano del mapa): con la paridad
+ * comprobada, igualar el tamano del catalogo prueba que no hay ids repetidos ni
+ * de mas (ver test).
+ */
+export function curatedIdCount(): number {
+  return CATEGORIES.reduce((total, category) => total + CATEGORY_IDS[category].length, 0);
 }
 
 /** Los alimentos del catalogo de una categoria, en orden de catalogo. */
 export function foodsByCategory(category: Category, catalog: Catalog = CATALOG): Food[] {
-  const ids = new Set(CATEGORY_IDS[category]);
+  const ids = CATEGORY_SETS.get(category);
+  if (!ids) return [];
   return catalog.foods.filter((food) => ids.has(food.id));
 }

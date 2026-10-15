@@ -252,3 +252,53 @@ export async function captureDownload(page, triggerSelector) {
     }
   }, triggerSelector);
 }
+
+/**
+ * Arranque limpio y comun a todos los escenarios: idioma es, sin resolucion en
+ * linea, onboarding ya visto y **sin borrador persistente** (D62). Un escenario
+ * previo puede haber dejado un borrador en `localStorage` (el mismo contexto de
+ * navegador se reutiliza); se vacia por la UI antes de recargar para que el
+ * flush de `pagehide` no lo resucite.
+ */
+export async function openApp(page, base) {
+  await page.goto(base, { waitUntil: 'domcontentloaded' });
+  await unregisterServiceWorkers(page);
+  await clearDatabase(page);
+  // Espera a que el primer render termine (asi el borrador restaurado, si lo hay,
+  // ya esta pintado y se puede vaciar).
+  await page.waitForFunction(
+    () => (document.querySelector('#day-total')?.textContent ?? '').length > 0,
+  );
+  await page.evaluate(() => {
+    localStorage.setItem('carbos.locale', 'es');
+    localStorage.setItem('carbos.onboarded', '1');
+    localStorage.removeItem('carbos.barcode.online');
+    localStorage.removeItem('carbos.draft');
+  });
+  await page.evaluate(() => {
+    for (let guard = 0; guard < 100; guard += 1) {
+      const remove = document.querySelector('#draft-items .remove');
+      if (!remove) break;
+      remove.click();
+    }
+  });
+  await reload(page);
+  await waitFor(page, '#app header h1');
+}
+
+/** Pulsa el primer elemento `selector` cuyo texto incluya `needle`; exige hallarlo. */
+export async function clickByText(page, selector, needle) {
+  const found = await page.evaluate(
+    (sel, text) => {
+      const node = Array.from(document.querySelectorAll(sel)).find((el) =>
+        (el.textContent ?? '').includes(text),
+      );
+      if (!node) return false;
+      node.click();
+      return true;
+    },
+    selector,
+    needle,
+  );
+  if (!found) throw new Error(`no existe "${needle}" en ${selector}`);
+}

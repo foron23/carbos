@@ -2,20 +2,20 @@ import './style.css';
 import {
   applyAlternative,
   carbsByMoment,
-  clearDraft,
   dayCarbs,
   dayTimeline,
+  DRAFT_KEY,
   deleteInsulin,
   deleteMeal,
   emptyVault,
   fromJson,
   itemCarbs,
-  loadDraft,
   loadVault,
   mealCarbs,
   mealsForDate,
   mergeDetections,
   MOMENTS,
+  parseDraft,
   portionGrams,
   PORTION_SIZES,
   putInsulin,
@@ -23,15 +23,24 @@ import {
   recentClassIds,
   replaceVault,
   roundCarbs,
-  saveDraft,
   scaleGrams,
   selectableTopk,
+  serializeDraft,
   targetProgress,
   toJson,
   usageCounts,
   weekBreakdown,
 } from './core';
-import type { FoodItem, InsulinKind, InsulinLog, Meal, PortionSize, Vault, WeekDay } from './core';
+import type {
+  FoodItem,
+  InsulinKind,
+  InsulinLog,
+  Meal,
+  PersistedDraft,
+  PortionSize,
+  Vault,
+  WeekDay,
+} from './core';
 import { CATALOG, CATEGORIES, foodsByCategory, searchFoods } from './catalog';
 import type { Category, Food } from './catalog';
 import { detectLocale, isLocale, isStringKey, storeLocale, t } from './i18n';
@@ -223,33 +232,70 @@ let vault: Vault = emptyVault();
 
 /**
  * Borrador persistente (D62): se guarda con `debounce` en cada mutacion y se
- * vuelca al ocultar la pestana. `restoredDraft` solo sirve para anunciar una vez
- * que el borrador volvio tras una recarga.
+ * vuelca al ocultar la pestana. El I/O de `localStorage` vive aqui (`core/` queda
+ * puro). `restoredDraft` solo sirve para anunciar una vez que el borrador volvio.
  */
 const DRAFT_SAVE_MS = 400;
 let draftSaveTimer: number | null = null;
+let lastStoredDraft: string | null = null;
 let restoredDraft = false;
+
+function readStoredDraft(): PersistedDraft | null {
+  try {
+    return parseDraft(localStorage.getItem(DRAFT_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredDraft(payload: string): void {
+  try {
+    localStorage.setItem(DRAFT_KEY, payload);
+    lastStoredDraft = payload;
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
+function eraseStoredDraft(): void {
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* almacenamiento no disponible */
+  }
+  lastStoredDraft = null;
+}
 
 function persistDraft(immediate = false): void {
   if (draftSaveTimer !== null) {
     window.clearTimeout(draftSaveTimer);
     draftSaveTimer = null;
   }
+  // Un borrador de EDICION no se persiste: al recargar no se sabria que edita una
+  // comida existente y se registraria como nueva (duplicado). Solo persiste una
+  // comida NUEVA (manual/foto o una repeticion, D61). Un borrador vacio se descarta.
+  if (editingMeal !== null || draft.items.length === 0) {
+    eraseStoredDraft();
+    return;
+  }
+  const payload = serializeDraft(draft.origin, draft.items);
+  if (payload === lastStoredDraft) return;
   if (immediate) {
-    saveDraft(draft.origin, draft.items);
+    writeStoredDraft(payload);
     return;
   }
   draftSaveTimer = window.setTimeout(() => {
     draftSaveTimer = null;
-    saveDraft(draft.origin, draft.items);
+    writeStoredDraft(payload);
   }, DRAFT_SAVE_MS);
 }
 
 /** Restaura el borrador persistido (si lo hay) antes del primer render. */
 function hydrateDraft(): void {
-  const persisted = loadDraft();
+  const persisted = readStoredDraft();
   if (!persisted) return;
   draft = { origin: persisted.origin, items: persisted.items };
+  lastStoredDraft = serializeDraft(draft.origin, draft.items);
   restoredDraft = true;
 }
 
@@ -655,10 +701,10 @@ function renderResultList(foods: readonly Food[]): void {
     button.textContent = `${food.name[locale]} · ${food.carbsPer100g} ${tr('unit.grams')}/100 ${tr('unit.grams')}`;
     button.addEventListener('click', () => {
       addFoodToDraft(food);
+      // Limpia la busqueda y repinta: muestra la pista, o la categoria activa
+      // (para poder anadir varios alimentos seguidos de la misma categoria).
       byId<HTMLInputElement>('food-search').value = '';
-      list.innerHTML = '';
-      activeCategory = null;
-      renderExploreChips();
+      renderSearch();
     });
     item.append(button, favoriteStar(food));
     list.appendChild(item);
@@ -1412,7 +1458,7 @@ function resetEdit(): void {
   repeatPending = false;
   draft = { origin: 'manual', items: [] };
   // D62: registrar o cancelar descarta el borrador persistido.
-  clearDraft();
+  eraseStoredDraft();
 }
 
 /** Carga una comida registrada en el borrador para ajustarla y guardarla. */

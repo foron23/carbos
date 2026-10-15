@@ -76,6 +76,13 @@ insulina.
 se descarta por solaparse, por exigir assets/permiso o por chocar con la identidad
 del producto.
 
+> **Relacion con SPEC 23.** Ronda nueva con su propia investigacion (2026-10-15,
+> cuatro angulos); los totales son **independientes** de los de SPEC 23 (otra lista,
+> otro contexto). En particular, SPEC 23 descarto C11 "busqueda con ranking por
+> frecuencia" ("poca ganancia visible"); aqui se recupera como **F2** con evidencia
+> nueva (Cronometer "Most Frequent", Yazio) y menor esfuerzo: un **desempate**
+> derivado del diario (patron D57), no un ranking fino configurable.
+
 ## Las 3 elegidas
 
 ### F1. Borrador persistente
@@ -137,23 +144,28 @@ Estas decisiones quedan **cerradas** con la implementacion de SPEC 24.
 
 Todo en `src/core/draft.ts` (nuevo), `src/catalog/categories.ts` (nuevo),
 `src/catalog/search.ts`, `src/core/recents.ts` (helper de uso), `src/main.ts`,
-`src/style.css`, `src/i18n/index.ts`, los escenarios E2E (`e2e/scenarios.mjs`) y las
+`src/style.css`, `src/i18n/index.ts`, los escenarios E2E (`e2e/scenarios.mjs`,
+`e2e/scenarios-records.mjs` y el helper compartido `e2e/helpers.mjs`) y las
 aserciones del auditor si aplican. Sin dependencias nuevas y sin cambios de esquema.
 
 ### F1. Borrador persistente
 
-- **F1a.** Modulo puro `src/core/draft.ts`: `serializeDraft(draft)`, `parseDraft(raw)`
-  (tolerante: `null` si no cuadra) y una persistencia de bajo nivel
-  (`saveDraft`/`loadDraft`/`clearDraft`) sobre `localStorage` (`carbos.draft`), con
-  clave de version.
+- **F1a.** Modulo **puro** `src/core/draft.ts`: `serializeDraft(origin, items)` y
+  `parseDraft(raw)` (tolerante: `null` si no cuadra), reutilizando el esquema Zod
+  (`foodItemSchema`/`mealOriginSchema`) como unica fuente de "item valido". El I/O de
+  `localStorage` (`carbos.draft`, con clave de version) vive en `main.ts`, como el
+  resto de ajustes locales: `core/` no toca el navegador.
 - **F1b.** En `main.ts`, cada mutacion del borrador (anadir/quitar item, ajustar
-  gramos, atajos) persiste con **debounce**; al arrancar, se **restaura** el borrador
-  (items + origen) y se pinta.
-- **F1c.** `resetEdit()` (registrar y cancelar) **limpia** el borrador persistido.
-  Un borrador vacio tambien lo limpia.
-- **F1d.** No se persiste la foto ni las detecciones; solo `{ origin, items }`.
-- **F1e.** La lectura tolera `localStorage` no disponible o JSON corrupto: borrador
-  vacio, sin romper.
+  gramos, atajos) persiste con **debounce** (solo si cambia); al arrancar, se
+  **restaura** el borrador (items + origen), se pinta y se **anuncia** una vez
+  (`draft.restored`).
+- **F1c.** `resetEdit()` (registrar y cancelar) **limpia** el borrador persistido. Un
+  borrador vacio tambien lo limpia.
+- **F1d.** **No** se persiste un borrador de **edicion** (una comida ya registrada):
+  al recargar no se sabria que edita una existente y se registraria como nueva. Solo
+  persiste una comida **nueva** (manual/foto o repeticion, D61).
+- **F1e.** No se persiste la foto ni las detecciones; solo `{ origin, items }`. La
+  lectura tolera `localStorage` no disponible o JSON corrupto: borrador vacio.
 
 ### F2. Busqueda que prioriza tu uso
 
@@ -169,7 +181,7 @@ aserciones del auditor si aplican. Sin dependencias nuevas y sin cambios de esqu
 ### F3. Explorar el catalogo por categorias
 
 - **F3a.** Modulo `src/catalog/categories.ts`: `Category` (union de claves),
-  `CATEGORY_ORDER`, `categoryOf(id)`, `foodsByCategory(category, catalog)` y una
+  `CATEGORIES`, `categoryOf(id)`, `foodsByCategory(category, catalog)` y una
   **guarda de paridad**: todo id del catalogo tiene categoria (test).
 - **F3b.** En el modo Buscar, una fila de chips (una por categoria) encima de los
   resultados; un toque filtra por esa categoria (resultados clicables, mismo
@@ -185,44 +197,46 @@ aserciones del auditor si aplican. Sin dependencias nuevas y sin cambios de esqu
 Claves nuevas en **es** y **en** (el tipo `StringKey` y la guarda de paridad lo
 imponen):
 
-| Clave                   | ES                   | EN                |
-| ----------------------- | -------------------- | ----------------- |
-| `search.explore`        | Explorar             | Explore           |
-| `category.cereals`      | Cereales y pan       | Cereals & bread   |
-| `category.potatoes`     | Patatas y tuberculos | Potatoes & tubers |
-| `category.legumes`      | Legumbres            | Legumes           |
-| `category.vegetables`   | Verduras             | Vegetables        |
-| `category.fruits`       | Frutas               | Fruits            |
-| `category.dairy`        | Lacteos y postres    | Dairy & desserts  |
-| `category.protein`      | Proteinas            | Protein           |
-| `category.dishes`       | Platos cocinados     | Cooked dishes     |
-| `category.sweets`       | Dulces y reposteria  | Sweets & bakery   |
-| `category.nuts`         | Frutos secos         | Nuts              |
-| `category.sauces`       | Salsas y grasas      | Sauces & fats     |
-| `category.drinks`       | Bebidas              | Drinks            |
-| `draft.restored` (aria) | Borrador restaurado  | Draft restored    |
+| Clave                   | ES                     | EN                  |
+| ----------------------- | ---------------------- | ------------------- |
+| `search.explore`        | Explorar por categoría | Explore by category |
+| `category.cereals`      | Cereales y pan         | Cereals & bread     |
+| `category.potatoes`     | Patatas y tuberculos   | Potatoes & tubers   |
+| `category.legumes`      | Legumbres              | Legumes             |
+| `category.vegetables`   | Verduras               | Vegetables          |
+| `category.fruits`       | Frutas                 | Fruits              |
+| `category.dairy`        | Lacteos y postres      | Dairy & desserts    |
+| `category.protein`      | Proteinas              | Protein             |
+| `category.dishes`       | Platos cocinados       | Cooked dishes       |
+| `category.sweets`       | Dulces y reposteria    | Sweets & bakery     |
+| `category.nuts`         | Frutos secos           | Nuts                |
+| `category.sauces`       | Salsas y grasas        | Sauces & fats       |
+| `category.drinks`       | Bebidas                | Drinks              |
+| `draft.restored` (aria) | Borrador restaurado.   | Draft restored.     |
 
 ## Criterios de aceptacion
 
 Los criterios marcados _(m)_ se comprueban con una formula concreta (Tests).
 
 1. **(F1)** Con un borrador de varios items, **recargar** la app lo **restaura**
-   (mismos items, mismos gramos y orden); registrar o cancelar lo **descartan**. _(m)_
+   (mismos items, gramos y orden); **registrar** lo descarta. _(m)_
 2. **(F1)** Un `carbos.draft` corrupto o ausente no rompe: arranca con borrador
    vacio. _(m)_
-3. **(F2)** Con un alimento frecuente y otro raro **igualmente relevantes** para una
+3. **(F1)** Un borrador de **edicion** (comida ya registrada) **no** se persiste:
+   recargar no la duplica. _(m)_
+4. **(F2)** Con un alimento frecuente y otro raro **igualmente relevantes** para una
    consulta, el frecuente aparece **antes**; con `usage` vacio, el orden es el de
    hoy. _(m)_
-4. **(F2)** El uso **no** adelanta un resultado de **menor relevancia** de texto. _(m)_
-5. **(F3)** Todo id del catalogo resuelve a **una** categoria (guarda de paridad). _(m)_
-6. **(F3)** Pulsar una categoria lista **solo** alimentos de esa categoria; un toque
+5. **(F2)** El uso **no** adelanta un resultado de **menor relevancia** de texto. _(m)_
+6. **(F3)** Todo id del catalogo resuelve a **una** categoria (guarda de paridad). _(m)_
+7. **(F3)** Pulsar una categoria lista **solo** alimentos de esa categoria; un toque
    anade al borrador con la porcion por defecto. _(m)_
-7. **(F3)** Con la busqueda vacia, se ofrecen las categorias para explorar. _(m)_
-8. **(F3)** Chips y resultados miden **>= 44 px**.
-9. **Sin regresiones**: SPEC 22 y 23 siguen verdes (nav, linea de tiempo, resumen,
-   quick-add, objetivo, repetir).
-10. **i18n**: toda clave nueva existe en **es** y **en**; guarda de paridad intacta.
-11. `make check` (+ `make e2e` con los escenarios nuevos) en verde.
+8. **(F3)** Con la busqueda vacia, se ofrecen las categorias para explorar. _(m)_
+9. **(F3)** Chips y resultados miden **>= 44 px**. _(m)_
+10. **Sin regresiones**: SPEC 22 y 23 siguen verdes (nav, linea de tiempo, resumen,
+    quick-add, objetivo, repetir).
+11. **i18n**: toda clave nueva existe en **es** y **en**; guarda de paridad intacta.
+12. `make check` (+ `make e2e` con los escenarios nuevos) en verde.
 
 ## Tests
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATEGORIES, categorizedCount, categoryOf, foodsByCategory } from './categories';
+import { CATEGORIES, categoryOf, curatedIdCount, foodsByCategory } from './categories';
 import { CATALOG } from './catalog';
 
 describe('categorias curadas (D64)', () => {
@@ -9,7 +9,9 @@ describe('categorias curadas (D64)', () => {
   });
 
   it('no hay ids curados de mas ni repetidos (biyeccion con el catalogo)', () => {
-    expect(categorizedCount()).toBe(CATALOG.foods.length);
+    // La suma de entradas curadas iguala el catalogo solo si no hay duplicados
+    // ni huerfanos (con la paridad de arriba ya comprobada).
+    expect(curatedIdCount()).toBe(CATALOG.foods.length);
   });
 
   it('ninguna categoria queda vacia', () => {

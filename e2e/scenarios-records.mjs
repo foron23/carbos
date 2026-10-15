@@ -1,9 +1,8 @@
 // Escenarios del registro diario: editar y quitar una comida ya registrada.
 // Van en su propio fichero para no tocar scenarios.mjs (spec 17 en curso).
-import { assertEqual, click, readStore, setValue } from './helpers.mjs';
-// `openApp` vive en scenarios.mjs: aisla el estado (incluido el borrador
-// persistente, D62) entre escenarios; aqui se reutiliza para no duplicarlo.
-import { openApp } from './scenarios.mjs';
+// `openApp` (helpers.mjs) aisla el estado entre escenarios, incluido el borrador
+// persistente (D62).
+import { assertEqual, click, openApp, readStore, setValue } from './helpers.mjs';
 
 /** Anade el primer resultado del catalogo al borrador (modo Buscar). */
 async function addFood(page, query) {
@@ -47,6 +46,12 @@ export const scenarios = [
       );
       const draftRows = await page.$$eval('#draft-items .draft-row', (nodes) => nodes.length);
       assertEqual(draftRows, 1, 'el borrador carga los alimentos de la comida');
+      // Un borrador de EDICION no se persiste (recargar no debe duplicar; D62).
+      assertEqual(
+        await page.evaluate(() => localStorage.getItem('carbos.draft')),
+        null,
+        'el borrador de edicion no se persiste',
+      );
 
       // Ajusta los gramos y guarda.
       await page.$eval('#draft-items input[type="number"]', (el) => {

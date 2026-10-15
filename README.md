@@ -62,7 +62,7 @@ intenciones queda como **gate con pesos** (D8/D12).
 
 **Calidad de vida (SPEC 23, D59-D61):** atajos de un toque (**recientes y favoritos**) al añadir comida, **objetivo diario** de carbohidratos con progreso en el topbar y el resumen, y **repetir** una comida registrada. Ajustes locales (`localStorage`), sin backend ni esquema.
 
-**Calidad de vida 2 (SPEC 24, D62-D64):** el **borrador persistente** sobrevive a la recarga, la **busqueda prioriza tus alimentos frecuentes** (frecuencia derivada del diario, no almacenada) y el catalogo se puede **explorar por categorias** sin teclear. Sigue sin backend ni esquema.
+**Calidad de vida 2 (SPEC 24, D62-D64):** el **borrador persistente** sobrevive a la recarga, la **busqueda prioriza tus alimentos mas usados** (frecuencia derivada del diario, no almacenada) y el catalogo se puede **explorar por categorias** sin teclear. Sigue sin backend ni esquema.
 
 Detalle por entregable: [`docs/specs/02-fase1.md`](docs/specs/02-fase1.md).
 

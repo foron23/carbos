@@ -6,53 +6,20 @@ import {
   assert,
   assertEqual,
   captureDownload,
-  clearDatabase,
   click,
+  clickByText,
+  openApp,
   readContributions,
   readStore,
   reload,
   screenshot,
   setValue,
   text,
-  unregisterServiceWorkers,
   uploadFile,
   waitFor,
   waitForContributionCount,
   waitForText,
 } from './helpers.mjs';
-
-export async function openApp(page, base) {
-  await page.goto(base, { waitUntil: 'domcontentloaded' });
-  await unregisterServiceWorkers(page);
-  await clearDatabase(page);
-  // Espera a que el primer render termine (el borrador ya esta pintado si habia
-  // uno persistido de un escenario previo).
-  await page.waitForFunction(
-    () => (document.querySelector('#day-total')?.textContent ?? '').length > 0,
-  );
-  // Estado limpio entre escenarios: idioma es y resolucion en linea APAGADA
-  // (defecto); un escenario previo puede haberla dejado activada en localStorage.
-  // Tambien se marca como ya presentada: el dialogo inicial es una capa fija que
-  // falsearia las medidas de geometria (nav, anclas) de los escenarios de layout.
-  await page.evaluate(() => {
-    localStorage.setItem('carbos.locale', 'es');
-    localStorage.setItem('carbos.onboarded', '1');
-    localStorage.removeItem('carbos.barcode.online');
-    localStorage.removeItem('carbos.draft');
-  });
-  // Un escenario previo pudo dejar un borrador persistente (D62); empty it via the
-  // UI so the in-memory draft is also clean before reloading (the pagehide flush
-  // would otherwise resurrect it on the reload).
-  await page.evaluate(() => {
-    for (let guard = 0; guard < 100; guard += 1) {
-      const remove = document.querySelector('#draft-items .remove');
-      if (!remove) break;
-      remove.click();
-    }
-  });
-  await reload(page);
-  await waitFor(page, '#app header h1');
-}
 
 async function addFood(page, query, resultIndex = 0) {
   await switchEntryMode(page, '#entry-mode-search');
@@ -1851,70 +1818,69 @@ export const scenarios = [
     },
   },
   {
-    name: 'el borrador sobrevive a la recarga (F1/D62)',
+    name: 'el borrador sobrevive a la recarga',
     async run(page, ctx) {
       await openApp(page, ctx.base);
-      // Sin borrador previo, no hay nada persistido.
       assertEqual(
         await page.evaluate(() => localStorage.getItem('carbos.draft')),
         null,
         'sin borrador, no hay nada persistido',
       );
+
+      // Borrador de varios items, en orden.
       await addFood(page, 'manzana');
-      const before = await page.$eval('#draft-items .draft-row', (el) => ({
-        text: (el.textContent ?? '').trim(),
-        grams: el.querySelector('input[type="number"]')?.value ?? '',
-      }));
-      assert(before.text.includes('Manzana'), 'el borrador tiene la manzana');
+      await addFood(page, 'pan');
+      const readRows = () =>
+        page.$$eval('#draft-items .draft-row', (nodes) =>
+          nodes.map((row) => ({
+            text: (row.textContent ?? '').trim(),
+            grams: row.querySelector('input[type="number"]')?.value ?? '',
+          })),
+        );
+      const before = await readRows();
+      assertEqual(before.length, 2, 'el borrador tiene dos items');
+      assert(
+        before[0].text.includes('Manzana') && before[1].text.includes('Pan'),
+        'el borrador conserva el orden',
+      );
       // El borrador se guarda con debounce: se espera a que aterrice.
       await page.waitForFunction(
         () => (localStorage.getItem('carbos.draft') ?? '').includes('manzana'),
         { timeout: 4000 },
       );
 
-      // Recargar restaura el borrador (mismos gramos) y lo anuncia.
+      // Recargar restaura el borrador (mismos items, gramos y orden) y lo anuncia.
       await reload(page);
       await waitFor(page, '#app header h1');
       await page.waitForSelector('#draft-items .draft-row', { timeout: 8000 });
-      const after = await page.$eval('#draft-items .draft-row', (el) => ({
-        text: (el.textContent ?? '').trim(),
-        grams: el.querySelector('input[type="number"]')?.value ?? '',
-      }));
-      assert(after.text.includes('Manzana'), 'el borrador vuelve tras recargar');
-      assertEqual(after.grams, before.grams, 'conserva los gramos');
+      const after = await readRows();
+      assert(
+        JSON.stringify(after) === JSON.stringify(before),
+        'mismos items, gramos y orden tras recargar',
+      );
       assertEqual(
         await text(page, '#register-status'),
         'Borrador restaurado.',
         'avisa al restaurar',
       );
 
-      // Quitar el ultimo item descarta el borrador persistido.
-      await page.$eval('#draft-items .remove', (el) => el.click());
-      await page.waitForFunction(
-        () => document.querySelectorAll('#draft-items .draft-row').length === 0,
-      );
+      // Registrar descarta el borrador persistido (y no vuelve).
+      await register(page);
       await page.waitForFunction(() => localStorage.getItem('carbos.draft') === null, {
         timeout: 4000,
       });
-      assertEqual(
-        await page.evaluate(() => localStorage.getItem('carbos.draft')),
-        null,
-        'un borrador vacio se descarta',
-      );
-
-      // Y tras recargar ya no vuelve.
       await reload(page);
       await waitFor(page, '#app header h1');
       assertEqual(
         await page.$$eval('#draft-items .draft-row', (els) => els.length),
         0,
-        'un borrador vacio no se restaura',
+        'registrar descarta el borrador',
       );
       await screenshot(page, 'borrador-persistente');
     },
   },
   {
-    name: 'explora el catalogo por categoria (F3/D64)',
+    name: 'explora el catalogo por categoria',
     async run(page, ctx) {
       await openApp(page, ctx.base);
       await switchEntryMode(page, '#entry-mode-search');
@@ -1931,12 +1897,7 @@ export const scenarios = [
       assert(chipH >= 44, `el chip mide al menos 44 px (${chipH})`);
 
       // Pulsar una categoria lista solo sus alimentos y la marca activa (F3b/F3e).
-      await page.evaluate(() => {
-        const chip = Array.from(document.querySelectorAll('#explore .explore-chip')).find(
-          (el) => el.textContent === 'Frutas',
-        );
-        chip?.click();
-      });
+      await clickByText(page, '#explore .explore-chip', 'Frutas');
       await page.waitForSelector('#search-results .result');
       const results = await page.$$eval('#search-results .result', (els) =>
         els.map((el) => el.textContent ?? ''),
@@ -1946,6 +1907,11 @@ export const scenarios = [
         'Frutas lista la manzana',
       );
       assert(!results.some((t) => t.includes('Pechuga')), 'no lista alimentos de otra categoria');
+      const resultH = await page.$eval(
+        '#search-results .result',
+        (el) => el.getBoundingClientRect().height,
+      );
+      assert(resultH >= 44, `el resultado mide al menos 44 px (${resultH})`);
       assertEqual(
         await page.$eval('#explore .explore-chip[aria-pressed="true"]', (el) => el.textContent),
         'Frutas',
@@ -1953,14 +1919,19 @@ export const scenarios = [
       );
 
       // Un toque anade al borrador con la porcion por defecto (F3b).
-      await page.evaluate(() => {
-        const button = Array.from(document.querySelectorAll('#search-results .result')).find((el) =>
-          (el.textContent ?? '').includes('Manzana'),
-        );
-        button?.click();
-      });
+      await clickByText(page, '#search-results .result', 'Manzana');
       await page.waitForSelector('#draft-items .draft-row');
       assert((await text(page, '#draft-items')).includes('Manzana'), 'anade desde la categoria');
+
+      // Volver a pulsar el chip activo sale del filtro (F3e).
+      await clickByText(page, '#explore .explore-chip', 'Frutas');
+      await page.waitForFunction(
+        () => document.querySelector('#explore .explore-chip[aria-pressed="true"]') === null,
+      );
+      assert(
+        (await text(page, '#search-results')).includes('Escribe al menos 2 letras'),
+        'vuelve a la pista',
+      );
 
       // Al teclear, las categorias se ocultan (busqueda normal).
       await setValue(page, '#food-search', 'manzana');
