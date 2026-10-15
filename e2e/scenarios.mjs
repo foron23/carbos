@@ -518,7 +518,7 @@ export const scenarios = [
       const download = await captureDownload(page, '#export');
       assert(download, 'se dispara la descarga');
       const parsed = JSON.parse(download.body);
-      assertEqual(parsed.version, 4, 'version de esquema en el export');
+      assertEqual(parsed.version, 5, 'version de esquema en el export');
       assert(Array.isArray(parsed.groups), 'el export lleva la lista de grupos');
       assertEqual(parsed.meals.length, 1, 'el export lleva la comida');
       const file = join(ctx.tmpDir, 'plain.json');
@@ -1938,6 +1938,95 @@ export const scenarios = [
       await setValue(page, '#food-search', 'manzana');
       await page.waitForFunction(() => document.querySelector('#explore').hidden);
       await screenshot(page, 'explorar-categoria');
+    },
+  },
+  {
+    name: 'modo completo muestra macros y kcal y el total de carbos no cambia',
+    async run(page, ctx) {
+      await openApp(page, ctx.base);
+      // Arranca siempre en simple, aunque otro escenario haya dejado el modo fijado.
+      await page.evaluate(() => localStorage.removeItem('carbos.mode'));
+      await reload(page);
+      await waitFor(page, '#app header h1');
+
+      // En simple (por defecto): sin desglose visible ni kcal en el total del dia.
+      const visibleBreakdowns = () =>
+        page.$$eval(
+          '.macro-breakdown',
+          (nodes) =>
+            nodes.filter((node) => !node.hidden && node.getClientRects().length > 0).length,
+        );
+      assertEqual(await visibleBreakdowns(), 0, 'en simple no hay desglose visible');
+      assert(
+        !(await text(page, '#day-total')).includes('kcal'),
+        'en simple el total del dia no muestra kcal',
+      );
+
+      // Borrador en simple: guarda el total de carbos para compararlo luego.
+      await switchEntryMode(page, '#entry-mode-search');
+      await addFood(page, 'manzana');
+      const simpleCarbs = await text(page, '#draft-total');
+
+      // Cambia a completo desde Ajustes (el details puede estar plegado).
+      await page.$eval('#settings', (el) => {
+        el.open = true;
+      });
+      await click(page, '#mode-complete');
+      await page.waitForFunction(() => localStorage.getItem('carbos.mode') === 'complete', {
+        timeout: 8000,
+      });
+
+      // En completo el borrador revela el desglose, sin tocar los carbos.
+      await waitFor(page, '#draft-items .macro-breakdown');
+      assert(
+        await page.evaluate(() => Boolean(document.querySelector('#draft-macros'))),
+        'existe #draft-macros',
+      );
+      const draftMacros = await page.$$eval('#draft-items .macro-breakdown [data-macro]', (nodes) =>
+        nodes.map((node) => node.getAttribute('data-macro')),
+      );
+      assert(draftMacros.includes('protein'), 'el desglose del borrador incluye proteinas');
+      assert(draftMacros.includes('kcal'), 'el desglose del borrador incluye kcal');
+      assertEqual(
+        await text(page, '#draft-total'),
+        simpleCarbs,
+        'el total de carbos del borrador no cambia entre modos',
+      );
+
+      // Registra: el diario y el resumen muestran macros; el dia anade kcal.
+      await register(page);
+      await waitForText(page, '#diary', 'Manzana');
+      await waitFor(page, '#diary .macro-breakdown');
+      await waitFor(page, '#summary-macros');
+      assert(
+        (await text(page, '#day-total')).includes('kcal'),
+        'en completo el total del dia muestra kcal',
+      );
+
+      // El modo persiste entre recargas.
+      await reload(page);
+      await waitFor(page, '#app header h1');
+      await page.waitForFunction(() => localStorage.getItem('carbos.mode') === 'complete', {
+        timeout: 8000,
+      });
+      await waitFor(page, '#diary .macro-breakdown');
+
+      // Vuelve a simple: el desglose desaparece.
+      await page.$eval('#settings', (el) => {
+        el.open = true;
+      });
+      await click(page, '#mode-simple');
+      await page.waitForFunction(() => localStorage.getItem('carbos.mode') === 'simple', {
+        timeout: 8000,
+      });
+      await page.waitForFunction(
+        () =>
+          Array.from(document.querySelectorAll('.macro-breakdown')).every(
+            (node) => node.hidden || node.getClientRects().length === 0,
+          ),
+        { timeout: 8000 },
+      );
+      await screenshot(page, 'modo-completo');
     },
   },
 ];
