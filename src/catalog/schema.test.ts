@@ -54,6 +54,38 @@ describe('catalog schema', () => {
   it('rechaza carbsRange con min mayor que max', () => {
     expect(() => foodSchema.parse({ ...tortilla, carbsRange: [10, 5] })).toThrow();
   });
+
+  it('acepta macros y energia opcionales', () => {
+    const food = {
+      ...tortilla,
+      proteinPer100g: 3.2,
+      fatPer100g: 1.1,
+      kcalPer100g: 40,
+      fiberPer100g: 0.5,
+      sugarsPer100g: 2,
+    };
+    const parsed = foodSchema.parse(food);
+    expect(parsed.proteinPer100g).toBe(3.2);
+    expect(parsed.kcalPer100g).toBe(40);
+  });
+
+  it('acepta kcalDerived booleano', () => {
+    expect(foodSchema.parse({ ...tortilla, kcalPer100g: 100, kcalDerived: true }).kcalDerived).toBe(
+      true,
+    );
+  });
+
+  it('rechaza macros negativos', () => {
+    expect(() => foodSchema.parse({ ...tortilla, proteinPer100g: -1 })).toThrow();
+    expect(() => foodSchema.parse({ ...tortilla, fatPer100g: -1 })).toThrow();
+    expect(() => foodSchema.parse({ ...tortilla, kcalPer100g: -1 })).toThrow();
+    expect(() => foodSchema.parse({ ...tortilla, fiberPer100g: -1 })).toThrow();
+    expect(() => foodSchema.parse({ ...tortilla, sugarsPer100g: -1 })).toThrow();
+  });
+
+  it('rechaza kcalDerived no booleano', () => {
+    expect(() => foodSchema.parse({ ...tortilla, kcalDerived: 'true' })).toThrow();
+  });
 });
 
 describe('class map', () => {

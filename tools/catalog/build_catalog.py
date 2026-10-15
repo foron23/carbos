@@ -6,6 +6,24 @@ Los valores de carbohidratos por 100 g se toman **directamente** de Ciqual
 abajo. La curacion vive en tools/catalog/selection.csv
 (id, nombres ES/EN, sinonimos, porcion por defecto, codigo y fuente).
 
+Ademas de los carbohidratos (const_code 31000), desde SPEC 26 el generador lee
+los macros de Ciqual con `load_macros` (const_code -> campo):
+
+  - 25000 -> proteinPer100g
+  - 40000 -> fatPer100g
+  - 328   -> kcalPer100g (energia de la fuente)
+  - 34100 -> fiberPer100g
+  - 32000 -> sugarsPer100g
+
+Reglas de composicion:
+
+  - kcal: si la fuente trae 328 se publica tal cual; si falta pero hay proteina y
+    grasa, se deriva `4p + 4c + 9f` (c = carbs 31000) y se marca kcalDerived.
+    Si no se puede calcular, se omite.
+  - fibra y azucares: **solo** de la fuente; lo que falte se omite (no se deriva).
+  - `own`: los macros se derivan de los ingredientes igual que los carbos; la kcal
+    es `4p + 4c + 9f` de la propia receta marcada como derivada.
+
 selection.csv incorpora la columna opcional `source`:
 
   - `ciqual` (por defecto si falta o viene vacia): `code` = alim_code Ciqual.
@@ -50,14 +68,34 @@ from pathlib import Path
 
 CIQUAL_URL = "https://ciqual.anses.fr/cms/sites/default/files/inline-files/XML_2020_07_07.zip"
 CARBS_CONST_CODE = "31000"  # Carbohydrate (g/100g)
+MACRO_CONSTS = {  # const_code -> campo de la entrada
+    "25000": "proteinPer100g",  # Protein (g/100g)
+    "40000": "fatPer100g",  # Fat (g/100g)
+    "328": "kcalPer100g",  # Energy (kcal/100g)
+    "34100": "fiberPer100g",  # Dietary fibre (g/100g)
+    "32000": "sugarsPer100g",  # Sugars (g/100g)
+}
+MACRO_FIELDS = (
+    "proteinPer100g",
+    "fatPer100g",
+    "fiberPer100g",
+    "sugarsPer100g",
+)
+USDA_MACRO_KEYS = {  # campo -> claves equivalentes aceptadas en usda.json
+    "proteinPer100g": ("proteinPer100g", "protein"),
+    "fatPer100g": ("fatPer100g", "fat"),
+    "kcalPer100g": ("kcalPer100g", "kcal", "energyKcalPer100g"),
+    "fiberPer100g": ("fiberPer100g", "fiber"),
+    "sugarsPer100g": ("sugarsPer100g", "sugars"),
+}
 DEFAULT_SOURCE = "ciqual"
 VALID_SOURCES = ("ciqual", "usda", "own")
 DEFAULT_UNCERTAINTY = 0.15
 RANGE_DECIMALS = 2
 MIN_FOODS = 150
 ATTRIBUTION = (
-    "ANSES/Ciqual 2020 (Licence Ouverte) - valores de carbohidratos por 100 g; "
-    "USDA FoodData Central (CC0) para ampliaciones"
+    "ANSES/Ciqual 2020 (Licence Ouverte) - carbohidratos, macros y energia "
+    "por 100 g; USDA FoodData Central (CC0) para ampliaciones"
 )
 
 
@@ -117,6 +155,20 @@ def load_carbs(xml_dir: Path) -> dict[str, float]:
         if value is not None:
             carbs[field(block, "alim_code")] = value
     return carbs
+
+
+def load_macros(xml_dir: Path) -> dict[str, dict[str, float]]:
+    """Devuelve {campo: {alim_code: valor}} para los const_code de MACRO_CONSTS."""
+    macros: dict[str, dict[str, float]] = {name: {} for name in MACRO_CONSTS.values()}
+    text = read_text(xml_dir / "compo_2020_07_07.xml")
+    for block in re.findall(r"<COMPO>(.*?)</COMPO>", text, re.S):
+        name = MACRO_CONSTS.get(field(block, "const_code"))
+        if name is None:
+            continue
+        value = parse_number(field(block, "teneur"))
+        if value is not None:
+            macros[name][field(block, "alim_code")] = value
+    return macros
 
 
 def load_names(xml_dir: Path) -> dict[str, str]:
@@ -181,7 +233,43 @@ def usda_name(item: dict) -> str:
     return item.get("name") or item.get("description") or ""
 
 
-def build_entry(row: dict, carbs: dict[str, float], names: dict[str, str], usda: dict) -> dict:
+def _usda_macro(item: dict, target: str) -> float | None:
+    for key in USDA_MACRO_KEYS[target]:
+        value = item.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+    return None
+
+
+def attach_ciqual_macros(entry: dict, code: str, macros: dict[str, dict[str, float]]) -> None:
+    """Adjunta protein/fat/fiber/sugars de la fuente y kcal (fuente o 4/4/9)."""
+    for name in MACRO_FIELDS:
+        value = macros[name].get(code)
+        if value is not None:
+            entry[name] = value
+    kcal = macros["kcalPer100g"].get(code)
+    if kcal is not None:
+        entry["kcalPer100g"] = kcal
+    elif "proteinPer100g" in entry and "fatPer100g" in entry:
+        # kcal derivada 4/4/9; se redondea a 2 decimales para un catalogo estable.
+        entry["kcalPer100g"] = round(
+            4 * entry["proteinPer100g"] + 4 * entry["carbs"] + 9 * entry["fatPer100g"],
+            RANGE_DECIMALS,
+        )
+        entry["kcalDerived"] = True
+
+
+def attach_usda_macros(entry: dict, item: dict) -> None:
+    """Copia los macros presentes en el item USDA; los ausentes se omiten."""
+    for target in USDA_MACRO_KEYS:
+        value = _usda_macro(item, target)
+        if value is not None:
+            entry[target] = value
+
+
+def build_entry(
+    row: dict, carbs: dict[str, float], macros: dict[str, dict[str, float]], names: dict[str, str], usda: dict
+) -> dict:
     """Entrada para source=ciqual|usda (nunca own). Sin IO."""
     src = source_of(row)
     code = row["code"].strip()
@@ -194,6 +282,7 @@ def build_entry(row: dict, carbs: dict[str, float], names: dict[str, str], usda:
             )
         entry["carbs"] = carbs[code]
         entry["source"] = f"Ciqual 2020 #{code} - {names.get(code, '')}".strip()
+        attach_ciqual_macros(entry, code, macros)
     elif src == "usda":
         item = usda.get(code)
         if item is None:
@@ -202,6 +291,7 @@ def build_entry(row: dict, carbs: dict[str, float], names: dict[str, str], usda:
             )
         entry["carbs"] = usda_carbs(item)
         entry["source"] = f"USDA FDC #{code} - {usda_name(item)}".strip()
+        attach_usda_macros(entry, item)
     else:
         raise SystemExit(
             f"source desconocido '{src}' en id {entry['id']} (esperado ciqual|usda|own)"
@@ -222,6 +312,8 @@ def build_own_entry(
         )
     ingredients = recipe.get("ingredients") or []
     total = 0.0
+    macro_totals = {name: 0.0 for name in MACRO_FIELDS}
+    macro_seen = {name: False for name in MACRO_FIELDS}
     used: list[str] = []
     for ingredient in ingredients:
         fid = str(ingredient["id"]).strip()
@@ -235,7 +327,13 @@ def build_own_entry(
                 f"receta {rid}: ingrediente {fid} no existe en el catalogo "
                 "(¿typo de id?)"
             )
-        total += ingredient["grams"] * index[fid]["carbs"] / 100.0
+        factor = ingredient["grams"] / 100.0
+        total += factor * index[fid]["carbs"]
+        for name in MACRO_FIELDS:
+            value = index[fid].get(name)
+            if value is not None:
+                macro_totals[name] += factor * value
+                macro_seen[name] = True
         used.append(fid)
     yield_grams = recipe.get("yieldGrams") or sum(i["grams"] for i in ingredients)
     if not yield_grams:
@@ -249,6 +347,15 @@ def build_own_entry(
     hi = round(nominal * (1 + uncertainty), RANGE_DECIMALS)
     entry["carbs"] = round(nominal, RANGE_DECIMALS)
     entry["range"] = [lo, hi]
+    for name in MACRO_FIELDS:  # deriva solo los macros presentes en algun ingrediente
+        if macro_seen[name]:
+            entry[name] = round(macro_totals[name] / yield_grams * 100.0, RANGE_DECIMALS)
+    if "proteinPer100g" in entry and "fatPer100g" in entry:  # kcal 4/4/9 de la receta
+        entry["kcalPer100g"] = round(
+            4 * entry["proteinPer100g"] + 4 * entry["carbs"] + 9 * entry["fatPer100g"],
+            RANGE_DECIMALS,
+        )
+        entry["kcalDerived"] = True
     entry["source"] = (
         f"Receta propia #{rid} - derivada de {len(ingredients)} ingredientes: "
         f"{', '.join(used)}"
@@ -259,6 +366,7 @@ def build_own_entry(
 def build(
     rows: list[dict],
     carbs: dict[str, float],
+    macros: dict[str, dict[str, float]],
     names: dict[str, str],
     usda: dict,
     recipes: dict,
@@ -270,7 +378,7 @@ def build(
     for row in rows:  # 1a pasada: no-own -> indice
         if source_of(row) == "own":
             continue
-        entry = build_entry(row, carbs, names, usda)
+        entry = build_entry(row, carbs, macros, names, usda)
         if entry["id"] in index:
             raise SystemExit(f"Ids duplicados: {entry['id']}")
         index[entry["id"]] = entry
@@ -311,6 +419,14 @@ def render(entries: list[dict]) -> str:
         if entry.get("range"):
             lo, hi = entry["range"]
             lines.append(f"      carbsRange: [{lo}, {hi}],")
+        for name in ("proteinPer100g", "fatPer100g", "kcalPer100g"):
+            if name in entry:
+                lines.append(f"      {name}: {entry[name]},")
+        if entry.get("kcalDerived"):
+            lines.append("      kcalDerived: true,")
+        for name in ("fiberPer100g", "sugarsPer100g"):
+            if name in entry:
+                lines.append(f"      {name}: {entry[name]},")
         lines.append(f"      defaultPortionGrams: {entry['portion']},")
         lines.append(f"      source: {ts(entry['source'])},")
         lines.append("    },")
@@ -334,10 +450,12 @@ def main() -> None:
         )
 
     carbs: dict[str, float] = {}
+    macros: dict[str, dict[str, float]] = {}
     names: dict[str, str] = {}
     if "ciqual" in sources:
         xml_dir = args.ciqual or ensure_ciqual(args.cache)
         carbs = load_carbs(xml_dir)
+        macros = load_macros(xml_dir)
         names = load_names(xml_dir)
         if not carbs:
             raise SystemExit("No se pudieron leer los carbohidratos de Ciqual.")
@@ -345,7 +463,7 @@ def main() -> None:
     usda = load_usda(args.usda) if "usda" in sources else {}
     recipes = load_recipes(args.recipes) if "own" in sources else {}
 
-    entries = build(rows, carbs, names, usda, recipes)
+    entries = build(rows, carbs, macros, names, usda, recipes)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(render(entries), encoding="utf-8")
