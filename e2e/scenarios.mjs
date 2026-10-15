@@ -518,7 +518,8 @@ export const scenarios = [
       const download = await captureDownload(page, '#export');
       assert(download, 'se dispara la descarga');
       const parsed = JSON.parse(download.body);
-      assertEqual(parsed.version, 3, 'version de esquema en el export');
+      assertEqual(parsed.version, 4, 'version de esquema en el export');
+      assert(Array.isArray(parsed.groups), 'el export lleva la lista de grupos');
       assertEqual(parsed.meals.length, 1, 'el export lleva la comida');
       const file = join(ctx.tmpDir, 'plain.json');
       await writeFile(file, download.body, 'utf8');
