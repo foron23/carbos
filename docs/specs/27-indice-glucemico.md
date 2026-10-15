@@ -166,6 +166,19 @@ FDC tampoco. Las tablas publicas de IG tienen **licencias incompatibles** con AG
 | FAO/WHO 1998 (FN Paper 66, Tabla 8)       | lectura gratis       | "All rights reserved"                      | **No**                 |
 | Repos GitHub "abiertos"                   | variable             | derivan de las tablas anteriores           | **No** (origen dudoso) |
 
+**Cita ≠ licencia (y ≠ dataset abierto).** Atribuir la fuente satisface la norma
+academica, pero **no concede el derecho a redistribuir**: las tablas se protegen como
+compilacion (derecho de autor) y, en la UE, por el **derecho _sui generis_ de bases de
+datos**. Extraer y redistribuir una parte sustancial de una tabla protegida puede
+infringir **aunque se cite**. La atribucion es necesaria y suficiente **solo** para las
+fuentes abiertas (CIQUAL = Licence Ouverte; Open Food Facts = ODbL).
+
+**No hay atajo con licencia limpia (comprobado).** Wikidata describe el _concepto_ de IG
+(`Q273924`) y no ofrece un dataset denso de valores por alimento; DBpedia/Wikipedia
+(CC BY-SA) tienen cobertura escasa y con la misma procedencia restringida; los repos
+"MIT" de GitHub licencian el _codigo_, no acreditan los _valores_. Es decir: **hoy no
+existe un dataset de IG abierto, autoritativo y con licencia compatible**.
+
 **Clave del bloqueo (corregida).** El IG es **especifico del alimento, la variedad y la
 coccion** (el mismo "arroz" va de bajo a alto). Por tanto:
 
@@ -174,14 +187,24 @@ coccion** (el mismo "arroz" va de bajo a alto). Por tanto:
    propia": las tablas estan protegidas y su licencia **no permite** redistribuirlas
    (ni una version derivada) bajo AGPL-3.0.
 
-**Vias honestas (por orden):**
+**Vías honestas (por fricción creciente):**
 
-- **F3 (enlace externo):** no embeber nada; un puntero a una fuente de terceros. Cero
-  licencias, cero precision falsa.
-- **Tabla propia curada alimento a alimento**, con **fuente y metodologia
-  documentadas** y **licencia compatible** (o permiso expreso) para los valores; se
-  marca "estimado" y se **omite** donde no sea defendible. Es el unico camino para un
-  valor embebido, y exige revision antes de escribir el primer dato.
+- **(0) Enlace externo (F3): la vía sin complicación.** Un puntero a una fuente de
+  terceros (idealmente una búsqueda con el nombre del alimento); la app no copia nada.
+  Cero licencias, cero mantenimiento; **una línea por alimento**. Coste: **sale del
+  dispositivo** -> opt-in + aviso (patrón D48, como la consulta de código de barras).
+- **(1) Tabla propia pequeña y curada** (p. ej. 30-60 alimentos de carbohidrato de uso
+  común en España), con **fuente y metodología documentadas** y valores de procedencia
+  **permitida**; banda marcada "estimado"; **se oculta** donde no haya dato. La fricción
+  aquí es de **curaduría y mantenimiento** (el IG es del alimento y la cocción), no de
+  licencia si la fuente lo permite. Es el único camino para un **valor embebido**.
+- **(2) Licenciar/permiso** de una tabla grande (Sydney/Atkinson): descartado para una
+  app AGPL sin ánimo de lucro, por coste y por contaminación de licencia.
+
+> **Techo honesto (ciencia).** Incluso con licencia perfecta, la variabilidad del IG
+> (CV 20-43 %; cocción, variedad, comida entera) hace que un valor **preciso** engañe; el
+> máximo honesto es una **banda** o un **enlace**. La restricción legal y la científica
+> apuntan al mismo sitio: **banda o puntero, nunca un número**.
 
 Cobertura aproximada sobre los **186 alimentos** (172 CIQUAL + 14 recetas propias; el
 recuento "154" del README esta desactualizado): frutas, cereales, legumbres, lacteos y
