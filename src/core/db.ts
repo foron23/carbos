@@ -1,12 +1,13 @@
-import type { InsulinLog, Meal, Vault } from './types';
+import type { InsulinLog, Meal, MealGroup, Vault } from './types';
 import { SCHEMA_VERSION, emptyVault } from './types';
-import { upgradeMeal } from './migrate';
+import { normalizeGroups, upgradeMeal } from './migrate';
 
 const DB_NAME = 'carbos';
-// El overlay de productos escaneados suma el store `products` (DB_VERSION 2 -> 3).
-const DB_VERSION = 3;
+// SPEC 25 (D65) suma el store `groups` por los contenedores de comidas (DB_VERSION 3 -> 4).
+const DB_VERSION = 4;
 const STORE_MEALS = 'meals';
 const STORE_INSULIN = 'insulin';
+const STORE_GROUPS = 'groups';
 const STORE_CONTRIBUTIONS = 'contributions';
 const STORE_PRODUCTS = 'products';
 
@@ -20,6 +21,9 @@ export function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_INSULIN)) {
         db.createObjectStore(STORE_INSULIN, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORE_GROUPS)) {
+        db.createObjectStore(STORE_GROUPS, { keyPath: 'id' });
       }
       if (!db.objectStoreNames.contains(STORE_CONTRIBUTIONS)) {
         db.createObjectStore(STORE_CONTRIBUTIONS, { keyPath: 'id' });
@@ -70,6 +74,21 @@ export function deleteInsulin(id: string): Promise<void> {
   );
 }
 
+export function putGroup(group: MealGroup): Promise<IDBValidKey> {
+  return tx(STORE_GROUPS, 'readwrite', (store) => store.put(group));
+}
+
+/** Separar un grupo por id; las comidas hijas quedan intactas (D65). */
+export function deleteGroup(id: string): Promise<void> {
+  return tx<undefined>(STORE_GROUPS, 'readwrite', (store) => store.delete(id)).then(
+    () => undefined,
+  );
+}
+
+export function allGroups(): Promise<MealGroup[]> {
+  return tx<MealGroup[]>(STORE_GROUPS, 'readonly', (store) => store.getAll());
+}
+
 /**
  * Escribe muchos registros en UNA sola transaccion (importacion de packs). Evita
  * el coste de abrir/cerrar la base por cada fila cuando el pack trae miles.
@@ -99,19 +118,28 @@ export function allInsulin(): Promise<InsulinLog[]> {
 }
 
 export async function loadVault(): Promise<Vault> {
-  const [meals, insulin] = await Promise.all([allMeals(), allInsulin()]);
-  return { version: SCHEMA_VERSION, meals: meals.map(upgradeMeal), insulin };
+  const [meals, insulin, groups] = await Promise.all([allMeals(), allInsulin(), allGroups()]);
+  return {
+    version: SCHEMA_VERSION,
+    meals: meals.map(upgradeMeal),
+    insulin,
+    groups: normalizeGroups(groups),
+  };
 }
 
 export function replaceVault(vault: Vault): Promise<void> {
   return openDb().then(
     (db) =>
       new Promise<void>((resolve, reject) => {
-        const transaction = db.transaction([STORE_MEALS, STORE_INSULIN], 'readwrite');
+        const transaction = db.transaction([STORE_MEALS, STORE_INSULIN, STORE_GROUPS], 'readwrite');
         transaction.objectStore(STORE_MEALS).clear();
         transaction.objectStore(STORE_INSULIN).clear();
+        transaction.objectStore(STORE_GROUPS).clear();
         for (const meal of vault.meals) transaction.objectStore(STORE_MEALS).put(meal);
         for (const log of vault.insulin) transaction.objectStore(STORE_INSULIN).put(log);
+        for (const group of vault.groups ?? []) {
+          transaction.objectStore(STORE_GROUPS).put(group);
+        }
         transaction.oncomplete = () => {
           db.close();
           resolve();
@@ -121,4 +149,4 @@ export function replaceVault(vault: Vault): Promise<void> {
   );
 }
 
-export { emptyVault, STORE_CONTRIBUTIONS, STORE_PRODUCTS };
+export { emptyVault, STORE_CONTRIBUTIONS, STORE_GROUPS, STORE_PRODUCTS };

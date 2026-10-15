@@ -1,5 +1,5 @@
-import { mealSchema, vaultSchema } from './schema';
-import type { Meal, Vault } from './types';
+import { mealGroupSchema, mealSchema, vaultSchema } from './schema';
+import type { Meal, MealGroup, Vault } from './types';
 import { SCHEMA_VERSION } from './types';
 
 const TIME_RE = /^\d{2}:\d{2}$/;
@@ -28,13 +28,34 @@ export function upgradeMeal(input: unknown): Meal {
   return mealSchema.parse({ ...item, time, origin });
 }
 
+/**
+ * Lectura tolerante de grupos (como el borrador D62): se conservan solo las
+ * entradas que parsean via `mealGroupSchema`, se deduplican los ids de hija y se
+ * descartan los grupos que quedan con menos de 2 hijas (un contenedor asi no
+ * aporta nada y `pruneGroups` lo desharia igual). Siempre devuelve un array.
+ */
+export function normalizeGroups(input: unknown): MealGroup[] {
+  if (!Array.isArray(input)) return [];
+  const groups: MealGroup[] = [];
+  for (const entry of input) {
+    const parsed = mealGroupSchema.safeParse(entry);
+    if (!parsed.success) continue;
+    const mealIds = [...new Set(parsed.data.mealIds)];
+    if (mealIds.length < 2) continue;
+    groups.push({ ...parsed.data, mealIds });
+  }
+  return groups;
+}
+
 export function migrateVault(input: unknown): Vault {
   const record = asRecord(input);
   const version = typeof record.version === 'number' ? record.version : Number.NaN;
-  if (version === 1 || version === 2 || version === SCHEMA_VERSION) {
+  // Acepta explicitamente 1 | 2 | 3 | 4. `version === 3` (vault actuales) sube a 4.
+  if (version === 1 || version === 2 || version === 3 || version === SCHEMA_VERSION) {
     const rawMeals = Array.isArray(record.meals) ? record.meals : [];
     const meals = rawMeals.map(upgradeMeal);
-    return vaultSchema.parse({ ...record, version: SCHEMA_VERSION, meals });
+    const groups = normalizeGroups(record.groups);
+    return vaultSchema.parse({ ...record, version: SCHEMA_VERSION, meals, groups });
   }
   throw new Error(`Version de esquema no soportada: ${String(record.version)}`);
 }

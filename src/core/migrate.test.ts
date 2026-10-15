@@ -3,11 +3,11 @@ import { migrateVault, slotToTime, upgradeMeal } from './migrate';
 import { SCHEMA_VERSION } from './types';
 
 describe('migracion de esquema (slot -> time)', () => {
-  it('la version actual es 3', () => {
-    expect(SCHEMA_VERSION).toBe(3);
+  it('la version actual es 4', () => {
+    expect(SCHEMA_VERSION).toBe(4);
   });
 
-  it('sube un vault v1 a v3 con time desde la franja y origin manual', () => {
+  it('sube un vault v1 a v4 con time desde la franja y origin manual', () => {
     const legacy = {
       version: 1,
       meals: [
@@ -22,12 +22,12 @@ describe('migracion de esquema (slot -> time)', () => {
       insulin: [],
     };
     const vault = migrateVault(legacy);
-    expect(vault.version).toBe(3);
+    expect(vault.version).toBe(4);
     expect(vault.meals[0]?.time).toBe('14:00');
     expect(vault.meals[0]?.origin).toBe('manual');
   });
 
-  it('sube un vault v2 a v3 conservando origin', () => {
+  it('sube un vault v2 a v4 conservando origin', () => {
     const current = {
       version: 2,
       meals: [
@@ -43,7 +43,7 @@ describe('migracion de esquema (slot -> time)', () => {
       insulin: [],
     };
     const vault = migrateVault(current);
-    expect(vault.version).toBe(3);
+    expect(vault.version).toBe(4);
     expect(vault.meals[0]?.time).toBe('21:00');
     expect(vault.meals[0]?.origin).toBe('photo');
   });
@@ -81,6 +81,74 @@ describe('migracion de esquema (slot -> time)', () => {
     });
     expect(vault.meals[0]?.time).toBe('09:15');
     expect(vault.meals[0]).not.toHaveProperty('slot');
+  });
+
+  it('acepta explicitamente un vault v3 y le anade groups: []', () => {
+    const vault = migrateVault({
+      version: 3,
+      meals: [
+        {
+          id: 'm1',
+          date: '2026-10-12',
+          time: '09:15',
+          items: [],
+          confidence: null,
+          origin: 'manual',
+        },
+      ],
+      insulin: [],
+    });
+    expect(vault.version).toBe(4);
+    expect(vault.groups).toEqual([]);
+    expect(vault.meals).toHaveLength(1);
+  });
+
+  it('un vault v4 sin groups migra a groups: []', () => {
+    const vault = migrateVault({ version: 4, meals: [], insulin: [] });
+    expect(vault.version).toBe(4);
+    expect(vault.groups).toEqual([]);
+  });
+
+  it('conserva los grupos validos y descarta los invalidos (lectura tolerante)', () => {
+    const vault = migrateVault({
+      version: 3,
+      meals: [
+        { id: 'a', date: '2026-10-12', time: '08:05', items: [], confidence: null },
+        { id: 'b', date: '2026-10-12', time: '08:20', items: [], confidence: null },
+      ],
+      insulin: [],
+      groups: [
+        { id: 'g1', date: '2026-10-12', name: 'Desayuno', mealIds: ['a', 'b'] },
+        { id: '', date: '2026-10-12', mealIds: ['a', 'b'] },
+        { id: 'g2', date: '12/10/2026', mealIds: ['a', 'b'] },
+        { id: 'g3', date: '2026-10-12', mealIds: 'a,b' },
+        null,
+      ],
+    });
+    expect(vault.version).toBe(4);
+    expect(vault.groups).toEqual([
+      { id: 'g1', date: '2026-10-12', name: 'Desayuno', mealIds: ['a', 'b'] },
+    ]);
+  });
+
+  it('usa [] cuando groups no es un array', () => {
+    const vault = migrateVault({ version: 3, meals: [], insulin: [], groups: 'nope' });
+    expect(vault.groups).toEqual([]);
+  });
+
+  it('descarta grupos con menos de 2 hijas y deduplica ids repetidos', () => {
+    const vault = migrateVault({
+      version: 3,
+      meals: [],
+      insulin: [],
+      groups: [
+        { id: 'g1', date: '2026-10-12', mealIds: ['a'] },
+        { id: 'g2', date: '2026-10-12', mealIds: [] },
+        { id: 'g3', date: '2026-10-12', mealIds: ['a', 'a'] },
+        { id: 'g4', date: '2026-10-12', mealIds: ['a', 'b', 'a'] },
+      ],
+    });
+    expect(vault.groups).toEqual([{ id: 'g4', date: '2026-10-12', mealIds: ['a', 'b'] }]);
   });
 
   it('rechaza una version desconocida', () => {

@@ -45,10 +45,18 @@ export const insulinLogSchema = z.object({
   kind: insulinKindSchema,
 });
 
+export const mealGroupSchema = z.object({
+  id: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'fecha esperada YYYY-MM-DD'),
+  name: z.string().min(1).optional(),
+  mealIds: z.array(z.string().min(1)),
+});
+
 export const vaultSchema = z.object({
   version: z.literal(SCHEMA_VERSION),
   meals: z.array(mealSchema),
   insulin: z.array(insulinLogSchema),
+  groups: z.array(mealGroupSchema).optional(),
 });
 
 export type VaultInput = z.input<typeof vaultSchema>;

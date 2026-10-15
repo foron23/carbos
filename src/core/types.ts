@@ -42,14 +42,28 @@ export interface InsulinLog {
   kind: InsulinKind;
 }
 
-export const SCHEMA_VERSION = 3;
+/**
+ * Contenedor **no destructivo y reversible** de comidas (SPEC 25 / D65).
+ * Referencia IDs de comidas (`mealIds`): no copia ni fusiona nada. **No** tiene
+ * hora ni slot propios; el total se **deriva** de las hijas y nunca se almacena.
+ */
+export interface MealGroup {
+  id: string;
+  date: string;
+  name?: string | undefined;
+  mealIds: string[];
+}
+
+export const SCHEMA_VERSION = 4;
 
 export interface Vault {
   version: number;
   meals: Meal[];
   insulin: InsulinLog[];
+  // Opcional: los vault v3 no lo traen; se lee siempre como `(vault.groups ?? [])`.
+  groups?: MealGroup[] | undefined;
 }
 
 export function emptyVault(): Vault {
-  return { version: SCHEMA_VERSION, meals: [], insulin: [] };
+  return { version: SCHEMA_VERSION, meals: [], insulin: [], groups: [] };
 }

@@ -25,6 +25,49 @@ describe('exportacion JSON', () => {
     expect(fromJson(text)).toEqual(vault);
   });
 
+  it('toJson incluye los grupos y hacen ida y vuelta', () => {
+    const vault = emptyVault();
+    vault.meals.push(
+      {
+        id: 'm1',
+        date: '2026-10-12',
+        time: '08:05',
+        items: [{ id: 'f1', name: 'tostada', grams: 60, carbsPer100g: 50 }],
+        confidence: null,
+        origin: 'manual',
+      },
+      {
+        id: 'm2',
+        date: '2026-10-12',
+        time: '08:20',
+        items: [{ id: 'f2', name: 'cafe', grams: 100, carbsPer100g: 2 }],
+        confidence: null,
+        origin: 'manual',
+      },
+    );
+    vault.groups = [{ id: 'g1', date: '2026-10-12', name: 'Desayuno', mealIds: ['m1', 'm2'] }];
+    const text = toJson(vault);
+    expect(text).toContain('"groups"');
+    const parsed = JSON.parse(text) as { groups?: unknown[] };
+    expect(parsed.groups).toHaveLength(1);
+    expect(fromJson(text)).toEqual(vault);
+  });
+
+  it('fromJson normaliza grupos invalidos a solo los validos', () => {
+    const legacy = {
+      version: 3,
+      meals: [],
+      insulin: [],
+      groups: [
+        { id: 'g1', date: '2026-10-12', mealIds: ['m1', 'm2'] },
+        { id: '', mealIds: [] },
+      ],
+    };
+    const vault = fromJson(JSON.stringify(legacy));
+    expect(vault.version).toBe(SCHEMA_VERSION);
+    expect(vault.groups).toEqual([{ id: 'g1', date: '2026-10-12', mealIds: ['m1', 'm2'] }]);
+  });
+
   it('un classId slot en el top-k no se confunde con la clave de franja', () => {
     const vault = emptyVault();
     vault.meals.push({
