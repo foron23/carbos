@@ -1,15 +1,15 @@
 {
   "detector": {
     "version": "yolo11n-coco",
-    "url": "https://cdn.jsdelivr.net/gh/foron23/carbos@weights-0.2.0/weights/detector.onnx",
+    "url": "https://cdn.jsdelivr.net/gh/foron23/carbos@weights-0.4.0/weights/detector.onnx",
     "sha256": "4358e2dd982c58ad2246858aadb3a6a44edbe1654e6f0fc884290bd9a78d4201",
     "bytes": 10701974
   },
   "classifier": {
-    "version": "distill-clip-clip-vit-large-patch14-v1",
-    "url": "https://cdn.jsdelivr.net/gh/foron23/carbos@weights-0.3.0/weights/classifier.int8.onnx",
-    "sha256": "4a4ef6420bb0725ca10c2d89947b71b88d31fbd15ed5613bd4531252e7ad629e",
-    "bytes": 4619132,
+    "version": "distill-clip-clip-vit-base-patch32-nuts-v1",
+    "url": "https://cdn.jsdelivr.net/gh/foron23/carbos@weights-0.4.0/weights/classifier.int8.onnx",
+    "sha256": "6965736c6cfddba2bcc072be58492ad50b8db6dd42888070a36d83ef91e6b86d",
+    "bytes": 4624268,
     "classes": [
       "pan_blanco",
       "pan_integral",
@@ -165,6 +165,10 @@
       "limonada",
       "refresco_cola",
       "cerveza",
+      "anacardos",
+      "pistachos",
+      "pipas",
+      "castanas",
       "__unknown__"
     ]
   }
