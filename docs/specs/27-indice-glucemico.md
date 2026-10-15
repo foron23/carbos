@@ -80,22 +80,22 @@ candidatas, **construye prototipos** para elegir la mejor UX y deja las decision
 
 ## Candidatas y filtro
 
-| #   | Candidata                                                | Impacto | Frec. | Esfz. | Encaje | Total | ¿Elegida?   | Motivo del descarte                                                                  |
-| --- | -------------------------------------------------------- | ------- | ----- | ----- | ------ | ----- | ----------- | ------------------------------------------------------------------------------------ |
-| C1  | Numero de IG + banda de color                            | 2       | 2     | 2     | 1      | 7     | (prototipo) | Precision falsa (CV 20-43 %, R1) y color unico (WCAG 1.4.1); se prototipa para verlo |
-| C2  | Solo banda de color (semaforo)                           | 2       | 2     | 2     | 1      | 7     | (prototipo) | Moraliza (CHI 2024) y depende del color; se prototipa para verlo                     |
-| C3  | Carga glucemica (GL) por porcion                         | 2       | 2     | 1     | 1      | 6     | no          | Se acerca a cuantificar/dosis; exige IG + carbos exactos y precision que no tenemos   |
-| C4  | Icono/insignia minimalista                               | 2       | 2     | 3     | 2      | 9     | no          | Binario/ambiguo sin texto; el canal redundante es obligatorio                         |
-| C5  | Barra segmentada de 3 tramos                             | 2       | 2     | 2     | 2      | 8     | no          | Muestra un continuo que el dato no sostiene; ambigua sin etiqueta                    |
+| #   | Candidata                                                 | Impacto | Frec. | Esfz. | Encaje | Total | ¿Elegida?   | Motivo del descarte                                                                  |
+| --- | --------------------------------------------------------- | ------- | ----- | ----- | ------ | ----- | ----------- | ------------------------------------------------------------------------------------ |
+| C1  | Numero de IG + banda de color                             | 2       | 2     | 2     | 1      | 7     | (prototipo) | Precision falsa (CV 20-43 %, R1) y color unico (WCAG 1.4.1); se prototipa para verlo |
+| C2  | Solo banda de color (semaforo)                            | 2       | 2     | 2     | 1      | 7     | (prototipo) | Moraliza (CHI 2024) y depende del color; se prototipa para verlo                     |
+| C3  | Carga glucemica (GL) por porcion                          | 2       | 2     | 1     | 1      | 6     | no          | Se acerca a cuantificar/dosis; exige IG + carbos exactos y precision que no tenemos  |
+| C4  | Icono/insignia minimalista                                | 2       | 2     | 3     | 2      | 9     | no          | Binario/ambiguo sin texto; el canal redundante es obligatorio                        |
+| C5  | Barra segmentada de 3 tramos                              | 2       | 2     | 2     | 2      | 8     | no          | Muestra un continuo que el dato no sostiene; ambigua sin etiqueta                    |
 | C6  | **Banda + etiqueta textual (sin numero), en el desglose** | 2       | 2     | 3     | 3      | 10    | **F1**      | —                                                                                    |
-| C7  | Indicador en filas de resultado                          | 2       | 3     | 2     | 1      | 8     | no          | Satura el escaneo y moraliza (R2)                                                    |
-| C8  | Indicador en el diario                                   | 1       | 3     | 2     | 1      | 7     | no          | Convierte cada comida en un juicio recurrente; riesgo regulatorio (R4)               |
-| C9  | **Explicacion educativa ("¿que es el IG?")**             | 3       | 1     | 3     | 3      | 10    | **F2**      | Absorbida por F1 (nota educativa colapsada)                                          |
-| C10 | Segunda metrica ignorable (colapsada)                    | 1       | 1     | 3     | 3      | 8     | no          | Es la forma de F1; no una feature aparte                                             |
-| C11 | **Enlace/consulta a fuente externa (sin dato embebido)** | 2       | 1     | 3     | 3      | 9     | **F3**      | Respaldo de datos de F1 (evita licencia y precision falsa)                           |
-| C12 | Indicador agregado por comida (no por alimento)          | 2       | 2     | 1     | 2      | 7     | no          | Agregar IG de una comida mixta no es defendible (R1/R3)                              |
-| C13 | **Nada (rechazar/aplazar la feature)**                   | 1       | 1     | 3     | 3      | 8     | runner-up   | Opcion honesta; con evidencia estrecha en DM1 el margen es pequeno                  |
-| C14 | Detalle del alimento a demanda (tocar fila -> panel)      | 2       | 2     | 2     | 2      | 8     | no          | Superficie nueva (no existe hoy); la banda cabe en el desglose sin anadir pantalla    |
+| C7  | Indicador en filas de resultado                           | 2       | 3     | 2     | 1      | 8     | no          | Satura el escaneo y moraliza (R2)                                                    |
+| C8  | Indicador en el diario                                    | 1       | 3     | 2     | 1      | 7     | no          | Convierte cada comida en un juicio recurrente; riesgo regulatorio (R4)               |
+| C9  | **Explicacion educativa ("¿que es el IG?")**              | 3       | 1     | 3     | 3      | 10    | **F2**      | Absorbida por F1 (nota educativa colapsada)                                          |
+| C10 | Segunda metrica ignorable (colapsada)                     | 1       | 1     | 3     | 3      | 8     | no          | Es la forma de F1; no una feature aparte                                             |
+| C11 | **Enlace/consulta a fuente externa (sin dato embebido)**  | 2       | 1     | 3     | 3      | 9     | **F3**      | Respaldo de datos de F1 (evita licencia y precision falsa)                           |
+| C12 | Indicador agregado por comida (no por alimento)           | 2       | 2     | 1     | 2      | 7     | no          | Agregar IG de una comida mixta no es defendible (R1/R3)                              |
+| C13 | **Nada (rechazar/aplazar la feature)**                    | 1       | 1     | 3     | 3      | 8     | runner-up   | Opcion honesta; con evidencia estrecha en DM1 el margen es pequeno                   |
+| C14 | Detalle del alimento a demanda (tocar fila -> panel)      | 2       | 2     | 2     | 2      | 8     | no          | Superficie nueva (no existe hoy); la banda cabe en el desglose sin anadir pantalla   |
 
 **Elegidas: C6 (F1), con C9 (F2) y C11 (F3) como partes.** F1 es el nucleo; F2
 (educacion) va dentro de la misma tarjeta y F3 (enlace externo) resuelve el bloqueo de
@@ -136,13 +136,13 @@ completo (no lo enciende el modo completo).
 
 **Tabla de que va / que no va.**
 
-| Va                                                                  | No va                                                                 |
-| ------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Banda cualitativa (Bajo/Medio/Alto) en el desglose, marcada "estimado" | Numero de IG, carga glucemica (GL), "impacto glucemico" cuantificado  |
-| Texto + forma redundantes con el color; `aria-label` con la banda   | Color como unico canal; flechas o ranking por IG                      |
-| Explicacion colapsada y enlace externo                              | Recomendacion ("mejor", "elige", "deberias"), objetivos de IG         |
-| Co-ubicada con los macros, lejos de la insulina                     | En filas de busqueda, en el diario, junto al registro de insulina     |
-| Omitir cuando no aplica (sin carbohidrato / sin dato)               | Inventar, derivar de la foto o "estimar" sin metodologia documentada  |
+| Va                                                                     | No va                                                                |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Banda cualitativa (Bajo/Medio/Alto) en el desglose, marcada "estimado" | Numero de IG, carga glucemica (GL), "impacto glucemico" cuantificado |
+| Texto + forma redundantes con el color; `aria-label` con la banda      | Color como unico canal; flechas o ranking por IG                     |
+| Explicacion colapsada y enlace externo                                 | Recomendacion ("mejor", "elige", "deberias"), objetivos de IG        |
+| Co-ubicada con los macros, lejos de la insulina                        | En filas de busqueda, en el diario, junto al registro de insulina    |
+| Omitir cuando no aplica (sin carbohidrato / sin dato)                  | Inventar, derivar de la foto o "estimar" sin metodologia documentada |
 
 **Veredicto razonado.** El IG es una **estimacion cualitativa de respuesta** (no un
 nutriente ni una "composicion" en sentido estricto, es una respuesta fisiologica medida
@@ -159,12 +159,12 @@ El IG **no es derivable** del pipeline actual: CIQUAL 2020 no trae IG/GL (revisa
 `tools/catalog/.cache/xml/const_2020_07_07.xml`, 67 `const_code`; ninguno es IG) y USDA
 FDC tampoco. Las tablas publicas de IG tienen **licencias incompatibles** con AGPL-3.0:
 
-| Fuente                                    | Acceso                | Redistribucion                             | ¿Embeber en la PWA?   |
-| ----------------------------------------- | --------------------- | ------------------------------------------ | --------------------- |
-| Atkinson et al. 2021 (AJCN)               | lectura gratis        | "no uso comercial" / Elsevier user license | **No**                |
-| Universidad de Sydney (glycemicindex.com) | de pago / all rights  | permiso obligatorio / pago                 | **No**                |
-| FAO/WHO 1998 (FN Paper 66, Tabla 8)       | lectura gratis        | "All rights reserved"                      | **No**                |
-| Repos GitHub "abiertos"                   | variable              | derivan de las tablas anteriores           | **No** (origen dudoso) |
+| Fuente                                    | Acceso               | Redistribucion                             | ¿Embeber en la PWA?    |
+| ----------------------------------------- | -------------------- | ------------------------------------------ | ---------------------- |
+| Atkinson et al. 2021 (AJCN)               | lectura gratis       | "no uso comercial" / Elsevier user license | **No**                 |
+| Universidad de Sydney (glycemicindex.com) | de pago / all rights | permiso obligatorio / pago                 | **No**                 |
+| FAO/WHO 1998 (FN Paper 66, Tabla 8)       | lectura gratis       | "All rights reserved"                      | **No**                 |
+| Repos GitHub "abiertos"                   | variable             | derivan de las tablas anteriores           | **No** (origen dudoso) |
 
 **Clave del bloqueo (corregida).** El IG es **especifico del alimento, la variedad y la
 coccion** (el mismo "arroz" va de bajo a alto). Por tanto:
@@ -192,11 +192,11 @@ tolerante, `CATALOG_VERSION`/`SCHEMA_VERSION` bumpeados con test).
 
 ## Decisiones nuevas (propuesta D70-D72)
 
-| #   | Decision                                                                     | Detalle                                                                                                                                                                                                                                                                                       | Estado    |
-| --- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| D70 | **IG cualitativo, opcional y solo en el desglose**                           | Banda Bajo/Medio/Alto con texto y forma redundantes (no solo color), **sin numero**, marcada "estimado"; en el contexto de composicion del alimento (desglose del borrador/detecciones), **nunca** en filas de resultado ni en el diario; incluye la **explicacion colapsada** (F2). **Opt-in propio** en `Ajustes`, por defecto oculto e **independiente del modo completo**. No toca D10/D12 | propuesta |
-| D71 | **Sin tablas de IG propietarias; dato por alimento o enlace**                | El valor solo puede venir de una **tabla propia curada alimento a alimento con fuente, metodologia y licencia compatible** (o permiso); en otro caso, **enlace a fuente externa**; se **omite** si no aplica. Se reconoce que una banda derivada de Atkinson/Sydney/FAO seria **obra derivada**: no se embebe. Campo opcional tolerante (patron D68) si se persiste | propuesta |
-| D72 | **Guardarrail de frontera IG -> dosis**                                      | Sin ranking ni orden por IG, sin IG en el diario, sin `objetivo de IG`, sin conversion IG->unidades ni IG->carbos->insulina; textos de "estimado, no consejo dietetico ni guia de insulina"; **test de frontera** que prohibe cualquier ruta IG->unidades                                                                                                     | propuesta |
+| #   | Decision                                                      | Detalle                                                                                                                                                                                                                                                                                                                                                                                        | Estado    |
+| --- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| D70 | **IG cualitativo, opcional y solo en el desglose**            | Banda Bajo/Medio/Alto con texto y forma redundantes (no solo color), **sin numero**, marcada "estimado"; en el contexto de composicion del alimento (desglose del borrador/detecciones), **nunca** en filas de resultado ni en el diario; incluye la **explicacion colapsada** (F2). **Opt-in propio** en `Ajustes`, por defecto oculto e **independiente del modo completo**. No toca D10/D12 | propuesta |
+| D71 | **Sin tablas de IG propietarias; dato por alimento o enlace** | El valor solo puede venir de una **tabla propia curada alimento a alimento con fuente, metodologia y licencia compatible** (o permiso); en otro caso, **enlace a fuente externa**; se **omite** si no aplica. Se reconoce que una banda derivada de Atkinson/Sydney/FAO seria **obra derivada**: no se embebe. Campo opcional tolerante (patron D68) si se persiste                            | propuesta |
+| D72 | **Guardarrail de frontera IG -> dosis**                       | Sin ranking ni orden por IG, sin IG en el diario, sin `objetivo de IG`, sin conversion IG->unidades ni IG->carbos->insulina; textos de "estimado, no consejo dietetico ni guia de insulina"; **test de frontera** que prohibe cualquier ruta IG->unidades                                                                                                                                      | propuesta |
 
 ## Alcance
 
@@ -240,17 +240,17 @@ tolerante, `CATALOG_VERSION`/`SCHEMA_VERSION` bumpeados con test).
 
 ### i18n
 
-| Clave              | ES                                                                   | EN                                                             |
-| ------------------ | -------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `gi.label`         | Índice glucémico (estimado)                                          | Glycemic index (estimated)                                     |
-| `gi.low`           | Bajo                                                                 | Low                                                            |
-| `gi.medium`        | Medio                                                                | Medium                                                         |
-| `gi.high`          | Alto                                                                 | High                                                           |
+| Clave              | ES                                                                      | EN                                                             |
+| ------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `gi.label`         | Índice glucémico (estimado)                                             | Glycemic index (estimated)                                     |
+| `gi.low`           | Bajo                                                                    | Low                                                            |
+| `gi.medium`        | Medio                                                                   | Medium                                                         |
+| `gi.high`          | Alto                                                                    | High                                                           |
 | `gi.estimateNote`  | Estimación de composición. No es consejo dietético ni guía de insulina. | Estimated composition. Not dietary advice or insulin guidance. |
-| `gi.notApplicable` | Sin carbohidratos: no aplica                                         | No carbs: not applicable                                       |
-| `gi.learn`         | ¿Qué es el índice glucémico?                                         | What is the glycemic index?                                    |
-| `gi.external`      | Ver IG en una fuente externa                                         | See GI in an external source                                   |
-| `settings.giLabel` | Mostrar el índice glucémico estimado                                 | Show estimated glycemic index                                  |
+| `gi.notApplicable` | Sin carbohidratos: no aplica                                            | No carbs: not applicable                                       |
+| `gi.learn`         | ¿Qué es el índice glucémico?                                            | What is the glycemic index?                                    |
+| `gi.external`      | Ver IG en una fuente externa                                            | See GI in an external source                                   |
+| `settings.giLabel` | Mostrar el índice glucémico estimado                                    | Show estimated glycemic index                                  |
 
 > **Nota i18n.** Las cadenas ES propuestas llevan **tildes** (índice, glucémico,
 > estimación, dietético, guía, qué). La guarda de `src/i18n/index.test.ts` exige tildes
