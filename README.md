@@ -27,6 +27,7 @@ de tu dispositivo.
 - Calidad de vida (ronda 2): borrador persistente, busqueda por uso y explorar por categorias: [`docs/specs/24-calidad-de-vida-2.md`](docs/specs/24-calidad-de-vida-2.md)
 - Diario: agrupar comidas (contenedor reversible): [`docs/specs/25-diario-agrupar-comidas.md`](docs/specs/25-diario-agrupar-comidas.md)
 - Diario: modo simplificado/completo: [`docs/specs/26-diario-modos-simplificado-completo.md`](docs/specs/26-diario-modos-simplificado-completo.md)
+- Indice glucemico en los alimentos (investigacion y prototipos): [`docs/specs/27-indice-glucemico.md`](docs/specs/27-indice-glucemico.md)
 - Contrato de trabajo: [`docs/receta-de-codigo.md`](docs/receta-de-codigo.md)
 
 ## Estado
@@ -67,6 +68,8 @@ intenciones queda como **gate con pesos** (D8/D12).
 **Calidad de vida 2 (SPEC 24, D62-D64):** el **borrador persistente** sobrevive a la recarga, la **busqueda prioriza tus alimentos mas usados** (frecuencia derivada del diario, no almacenada) y el catalogo se puede **explorar por categorias** sin teclear. Sigue sin backend ni esquema.
 
 **Diario: agrupar comidas (SPEC 25, D65-D66):** multi-seleccionar dos o mas comidas del dia (entrada visible **Seleccionar** o **pulsacion larga**) y **juntarlas** bajo un contenedor **reversible** con nombre opcional y total **derivado**; **Separar** deshace el contenedor y deja las hijas intactas. El grupo no tiene hora ni slot, no alimenta ninguna dosis y el resumen sigue contando las comidas hijas. `SCHEMA_VERSION 3 -> 4` con migracion tolerante.
+
+**Indice glucemico (SPEC 27, D70-D72; investigacion y prototipos):** investigacion de producto (2026-10-15) sobre integrar el **indice glucemico** en los alimentos. Veredicto: **se puede, pero acotado** — banda **cualitativa** (sin numero), **opcional**, solo en la **ficha** del alimento, con texto y forma redundantes (no solo color) y nota "estimado, no consejo"; nunca en filas ni en el diario. **Bloqueo de datos:** las tablas publicas de IG no son redistribuibles bajo AGPL-3.0; se propone **mapeo propio por categoria** o enlace externo. Decisiones **propuestas**; hay **prototipos desechables** para fijar la UX.
 
 Detalle por entregable: [`docs/specs/02-fase1.md`](docs/specs/02-fase1.md).
 
