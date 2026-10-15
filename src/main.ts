@@ -15,6 +15,7 @@ import {
   groupCarbs,
   groupMeals,
   hasMacros,
+  isCarbSource,
   itemCarbs,
   itemMacros,
   loadVault,
@@ -550,6 +551,7 @@ app.innerHTML = `
         <p id="detect-summary" class="muted" aria-live="polite"></p>
         <h3 data-i18n="photo.detected"></h3>
         <ul id="detect-results" class="draft"></ul>
+        <p id="detect-carbquality-note" class="muted carbquality-note" data-i18n="carbquality.note" hidden></p>
         <p class="muted" data-i18n="photo.resultsNote"></p>
       </div>
       <p><button id="share-photo" type="button" data-i18n="contrib.share" hidden></button></p>
@@ -1343,7 +1345,8 @@ function carbQualityKey(band: CarbQualityBand): StringKey {
 
 /**
  * Insignia de calidad del carbohidrato (SPEC 27): banda con **forma + texto**
- * redundantes (no solo color, WCAG 1.4.1). Dato derivado de la fibra; no es el IG.
+ * redundantes. El color **no** distingue la banda (nada de semaforo rojo/verde):
+ * la leen el recuento de segmentos y la palabra. Dato derivado de la fibra; no es el IG.
  */
 function carbQualityBadge(band: CarbQualityBand): HTMLElement {
   const row = document.createElement('div');
@@ -1353,8 +1356,6 @@ function carbQualityBadge(band: CarbQualityBand): HTMLElement {
   label.textContent = tr('carbquality.label');
   const badge = document.createElement('span');
   badge.className = `carbquality-band carbquality-band--${band}`;
-  badge.setAttribute('role', 'img');
-  badge.setAttribute('aria-label', `${tr('carbquality.label')}: ${tr(carbQualityKey(band))}`);
   const bars = document.createElement('span');
   bars.className = 'carbquality-bars';
   bars.setAttribute('aria-hidden', 'true');
@@ -1374,25 +1375,32 @@ function giExternalLink(name: string): HTMLAnchorElement {
   anchor.href = `https://duckduckgo.com/?q=${encodeURIComponent(`${name} ${tr('gi.searchSuffix')}`)}`;
   anchor.target = '_blank';
   anchor.rel = 'noopener noreferrer';
-  anchor.textContent = `${tr('gi.external')} ↗`;
+  anchor.setAttribute('aria-label', `${tr('gi.external')}: ${name}`);
+  const text = document.createElement('span');
+  text.textContent = tr('gi.external');
+  const arrow = document.createElement('span');
+  arrow.setAttribute('aria-hidden', 'true');
+  arrow.textContent = ' ↗';
+  anchor.append(text, arrow);
   return anchor;
 }
 
 /**
- * Anexa a una fila del desglose la banda de calidad (y el enlace al IG si la
- * persona lo ha permitido). Solo en modo completo; se **oculta** cuando no hay
- * carbohidratos o no se conoce la fibra.
+ * Anexa a una fila del desglose la banda de calidad (si aplica) y el enlace al
+ * IG (si la persona lo permite **y** el alimento es fuente de carbohidratos).
+ * Solo en modo completo. Devuelve `true` si pinto la banda.
  */
 function appendCarbQuality(
   row: HTMLElement,
   name: string,
   carbsPer100g: number,
   fiberPer100g: number | undefined,
-): void {
-  if (screenMode !== 'complete') return;
+): boolean {
+  if (screenMode !== 'complete') return false;
   const band = carbQualityBand(carbsPer100g, fiberPer100g);
   if (band) row.appendChild(carbQualityBadge(band));
-  if (externalLinksEnabled) row.appendChild(giExternalLink(name));
+  if (externalLinksEnabled && isCarbSource(carbsPer100g)) row.appendChild(giExternalLink(name));
+  return band !== null;
 }
 
 /** Sincroniza el control segmentado de Ajustes con `screenMode`. */
@@ -1487,6 +1495,7 @@ function renderDetect(): void {
   const engine = detectionEngine ? ` · ${tr('detect.engine')}: ${detectionEngine}` : '';
   summary.textContent = `${detections.length} · ${tr('photo.detected')}${engine}`;
   list.innerHTML = '';
+  let qualityShown = false;
   detections.forEach((result, index) => {
     const best: TopKEntry = result.topk[0] ?? {
       label: result.label,
@@ -1507,12 +1516,13 @@ function renderDetect(): void {
     row.appendChild(name);
     const qualityFood = foodById(best.classId);
     if (qualityFood) {
-      appendCarbQuality(
-        row,
-        qualityFood.name[locale],
-        qualityFood.carbsPer100g,
-        qualityFood.fiberPer100g,
-      );
+      qualityShown =
+        appendCarbQuality(
+          row,
+          qualityFood.name[locale],
+          qualityFood.carbsPer100g,
+          qualityFood.fiberPer100g,
+        ) || qualityShown;
     }
     const alternatives = selectableTopk(result.topk);
     if (alternatives.length > 1) {
@@ -1533,6 +1543,7 @@ function renderDetect(): void {
     }
     list.appendChild(row);
   });
+  byId('detect-carbquality-note').hidden = !(screenMode === 'complete' && qualityShown);
 }
 
 async function startDetection(image: CapturedImage): Promise<void> {

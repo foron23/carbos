@@ -22,11 +22,16 @@ export const CARB_QUALITY_MIN_CARBS_PER_100G = 5;
 export const FIBER_SOURCE_PER_100G = 3;
 export const FIBER_HIGH_PER_100G = 6;
 
+/** `true` si el alimento es una fuente relevante de carbohidratos. */
+export function isCarbSource(carbsPer100g: number): boolean {
+  return Number.isFinite(carbsPer100g) && carbsPer100g >= CARB_QUALITY_MIN_CARBS_PER_100G;
+}
+
 export function carbQualityBand(
   carbsPer100g: number,
   fiberPer100g: number | undefined,
 ): CarbQualityBand | null {
-  if (!Number.isFinite(carbsPer100g) || carbsPer100g < CARB_QUALITY_MIN_CARBS_PER_100G) return null;
+  if (!isCarbSource(carbsPer100g)) return null;
   if (fiberPer100g === undefined || !Number.isFinite(fiberPer100g)) return null;
   if (fiberPer100g >= FIBER_HIGH_PER_100G) return 'high';
   if (fiberPer100g >= FIBER_SOURCE_PER_100G) return 'medium';

@@ -262,12 +262,12 @@ export const STRINGS = {
     'carbquality.medium': 'Media',
     'carbquality.high': 'Alta',
     'carbquality.note':
-      'Según la fibra del alimento (fuente desde 3 g; alta desde 6 g por 100 g). No es el índice glucémico.',
+      'Según la fibra del alimento (fuente desde 3 g; alta desde 6 g por 100 g). No es el índice glucémico ni consejo dietético.',
     'gi.external': 'Ver índice glucémico (fuente externa)',
     'gi.searchSuffix': 'índice glucémico',
     'settings.externalLinks': 'Permitir abrir fuentes externas',
     'settings.externalLinksHint':
-      'Muestra enlaces que abren una web fuera de la app (por ejemplo, el índice glucémico). Nada se abre sin tu toque.',
+      'Muestra enlaces en el desglose (modo completo) que abren una web fuera de la app. Al tocar uno, el nombre del alimento se envía a un buscador externo. Nada se abre sin tu toque.',
   },
   en: {
     'app.title': 'Carbos · carbs on your device',
@@ -530,12 +530,12 @@ export const STRINGS = {
     'carbquality.medium': 'Medium',
     'carbquality.high': 'High',
     'carbquality.note':
-      "Based on the food's fiber (source from 3 g; high from 6 g per 100 g). Not the glycemic index.",
+      "Based on the food's fiber (source from 3 g; high from 6 g per 100 g). Not the glycemic index or dietary advice.",
     'gi.external': 'See glycemic index (external source)',
     'gi.searchSuffix': 'glycemic index',
     'settings.externalLinks': 'Allow opening external sources',
     'settings.externalLinksHint':
-      'Shows links that open a website outside the app (for example, the glycemic index). Nothing opens without your tap.',
+      'Shows links in the breakdown (complete mode) that open a website outside the app. When you tap one, the food name is sent to an external search engine. Nothing opens without your tap.',
   },
 } as const;
 

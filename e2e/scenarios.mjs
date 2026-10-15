@@ -2047,8 +2047,9 @@ export const scenarios = [
         0,
         'en simple no hay banda de calidad',
       );
+      const simpleCarbs = await text(page, '#draft-total');
 
-      // Completo: banda de fibra (garbanzos = alta) con texto + forma + aria.
+      // Completo: banda de fibra (garbanzos = alta) con texto + forma.
       await page.$eval('#settings', (el) => {
         el.open = true;
       });
@@ -2060,11 +2061,18 @@ export const scenarios = [
       const band = await page.$eval('.carbquality-band', (el) => ({
         text: (el.textContent || '').trim(),
         bars: el.querySelectorAll('.carbquality-bars i').length,
-        aria: el.getAttribute('aria-label') || '',
+        filled: Array.from(el.querySelectorAll('.carbquality-bars i')).filter(
+          (bar) => getComputedStyle(bar).opacity !== '0.25',
+        ).length,
       }));
-      assert(band.text.length > 0, 'la banda lleva texto (no depende del color)');
+      assert(/Alta|High/.test(band.text), 'la banda nombra el nivel (no solo color)');
       assertEqual(band.bars, 3, 'la banda lleva forma de 3 segmentos');
-      assert(band.aria.length > 0, 'la banda lleva aria-label');
+      assertEqual(band.filled, 3, 'la fibra alta rellena los 3 segmentos');
+      assertEqual(
+        await text(page, '#draft-total'),
+        simpleCarbs,
+        'el total de carbos del borrador no cambia entre modos',
+      );
 
       // Un alimento sin carbohidratos oculta la banda (no se inventa).
       await addFood(page, 'pechuga de pollo');
@@ -2089,16 +2097,28 @@ export const scenarios = [
         timeout: 8000,
       });
       await waitFor(page, '#draft-items .gi-link');
-      const href = await page.$eval('.gi-link', (a) => a.getAttribute('href'));
-      assert(
-        href !== null && href.includes('duckduckgo.com/?q='),
-        'el enlace apunta a una busqueda externa',
-      );
+      const link = await page.$eval('.gi-link', (a) => ({
+        href: a.getAttribute('href') || '',
+        aria: a.getAttribute('aria-label') || '',
+        height: a.getBoundingClientRect().height,
+      }));
+      assert(link.href.includes('duckduckgo.com/?q='), 'el enlace apunta a una busqueda externa');
+      assert(link.aria.length > 0, 'el enlace tiene nombre accesible');
+      assert(link.height >= 44, `el enlace mide al menos 44 px (${link.height})`);
 
       // El enlace persiste entre recargas (ajuste global).
       await reload(page);
       await waitFor(page, '#app header h1');
       await waitFor(page, '#draft-items .gi-link');
+
+      // Registra: en el diario no aparece ni la banda ni el enlace (criterio 2).
+      await register(page);
+      await waitForText(page, '#diary', 'Garbanzos');
+      assertEqual(
+        await page.$$eval('#diary .carbquality, #diary .gi-link', (nodes) => nodes.length),
+        0,
+        'en el diario no aparece la banda ni el enlace',
+      );
 
       await screenshot(page, 'carbquality-ig');
     },

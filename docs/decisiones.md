@@ -122,4 +122,3 @@ El estatus legal lo deciden el **uso previsto** y la **funcion**, no el precio n
 - Nombre y etiqueta: **Carbos** · "Cuenta carbohidratos. En tu dispositivo, y solo en tu dispositivo."
 - Prohibido como nombre o claim: "bolus", "calculadora de insulina", "dosis", "prescripcion".
 - Reglas: nunca "dosis", "recomendamos", "deberias ponerte", "seguro", "preciso". Siempre "estimacion", "registro", "aritmetica", "tus numeros", "revisa y ajusta", "tu equipo medico".
-                                          
