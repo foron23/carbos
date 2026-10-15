@@ -206,6 +206,22 @@ coccion** (el mismo "arroz" va de bajo a alto). Por tanto:
 > máximo honesto es una **banda** o un **enlace**. La restricción legal y la científica
 > apuntan al mismo sitio: **banda o puntero, nunca un número**.
 
+**¿Y calcularlo nosotros desde la composición? No (y es importante).** El IG es una
+**respuesta fisiológica medida** (ISO 26642:2010), **no una función de los macros**:
+dos alimentos con la misma composición pueden tener IG muy distinto (estructura del
+almidón, tamaño de partícula, procesado, cocción, matriz), y CIQUAL da azúcares totales
+pero **no** el reparto fructosa/glucosa/sacarosa, que sí cambia el IG. La literatura lo
+confirma: los modelos de regresión/ML que intentan predecir el IG desde la composición
+son **específicos de clase** y **no generalizan** (solo correlaciónan en cereales, no en
+legumbres; no hay asociación entre el IG calculado por tablas y el medido en comidas
+compuestas). Derivarlo de `carbsPer100g`/`fiberPer100g`/azúcares sería **inventar un
+número** (falsa confianza) y, si se entrenara un modelo, exigiría las mismas tablas
+restringidas. Lo prohíbe la regla del proyecto "si un número no se puede medir, no se
+afirma". Si algún día se quiere algo _sin_ datos licenciados, la vía honesta **no** es el
+IG calculado, sino un indicador **propio y transparente de calidad del carbohidrato**
+(fibra, azúcares, grado de procesado), con su propio nombre y definición, **sin llamarlo
+"IG"**.
+
 Cobertura aproximada sobre los **186 alimentos** (172 CIQUAL + 14 recetas propias; el
 recuento "154" del README esta desactualizado): frutas, cereales, legumbres, lacteos y
 dulces (~95-110) admitirian curacion; los platos compuestos (~40-50) se **omiten**;
@@ -384,6 +400,9 @@ Construidos y verificados (desechables; `prototypes/` esta en `.gitignore`):
 - **Conversion IG -> insulina** y cualquier "output" usado para decidir dosis (FDA
   _General Wellness_ / MDR UE).
 - **Numero de IG** y cualquier "impacto glucemico" cuantificado: la banda basta.
+- **Calcular el IG (o la GL) desde la composicion** del alimento o con un modelo: el IG
+  es una respuesta **medida**, no derivable; los modelos de regresion/ML son especificos
+  de clase y no generalizan, y ademas exigirian las tablas restringidas para entrenar.
 - **Ranking/orden por IG, objetivos de IG** y recomendaciones dieteticas.
 - **IG en el diario** y en filas de resultado (ruido y moralizacion).
 - **Embeber tablas propietarias** (Atkinson 2021, Sydney, FAO/WHO) o derivados suyos.
@@ -401,6 +420,9 @@ Construidos y verificados (desechables; `prototypes/` esta en `.gitignore`):
   secundaria"; cero claims de manejo de DM1.
 - **Precision falsa.** Mitigacion: nunca un numero; "estimado"; **ocultar** si no hay dato
   defendible (no derivar).
+- **Intentar calcular el IG desde la composicion.** Mitigacion: no derivarlo nunca; si se
+  quiere algo sin datos licenciados, un indicador **propio y transparente de calidad del
+  carbohidrato** (sin llamarlo "IG") o el enlace externo.
 - **Moralizacion / culpa.** Mitigacion: sin semaforo rojo-verde como unico canal, sin
   lenguaje "bueno/malo"; banda con texto descriptivo.
 - **Datos/licencias (obra derivada).** Mitigacion: enlace externo o tabla propia con
@@ -427,6 +449,11 @@ Construidos y verificados (desechables; `prototypes/` esta en `.gitignore`):
   (https://doi.org/10.3945/ajcn.116.137208); Vega-Lopez et al. 2007
   (https://doi.org/10.2337/dc06-1598); ISO 26642:2010
   (https://www.iso.org/standard/43633.html).
+- **IG predecible desde la composicion (y por que no basta):** Al Hamli et al. 2011
+  (https://doi.org/10.1017/S002966511100173X, solo cereales); Li & Arandjelović 2017
+  (https://doi.org/10.1109/BHI.2017.7897279); Flint et al. 2004
+  (https://doi.org/10.1079/BJN20041124, el IG calculado por tablas no predice el medido
+  en comidas compuestas); Rytz et al. 2019 (https://www.mdpi.com/2072-6643/11/5/1172).
 - **UX:** etiquetado traffic-light UK
   (https://www.gov.uk/government/publications/check-the-label/check-the-label); GI Symbol /
   Glycemic Index Foundation (https://www.gifoundation.com/gifsa-endorsement/gi-symbol/);
