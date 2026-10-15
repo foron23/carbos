@@ -40,6 +40,7 @@ const IGUALES_PERMITIDAS = new Set([
   'label.total',
   'kind.basal',
   'diary.originManual',
+  'macro.kcal',
 ]);
 
 describe('cadenas de la interfaz', () => {
